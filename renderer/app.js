@@ -1065,7 +1065,7 @@
       <ol class="steps">
         <li><div><b>${t('Create your online notebook')}</b><span>${t('Sign up for Cloudflare (free) and choose a password for your notebook when asked (NOTEBOOK_PASSWORD). It takes about 3 minutes.')}</span><div class="row" style="margin-top:6px"><button class="btn primary" type="button" id="cloudDeploy">${t('Create it on Cloudflare')}</button></div></div></li>
         <li><div><b>${t('Connect this app to it')}</b><span>${t('Copy your notebook’s address from Cloudflare (it ends in .workers.dev) and enter it with your password.')}</span>
-          <form class="cloud-form" id="cloudForm"><label class="field">${t('Address')}<input id="cloudUrl" type="url" dir="ltr" placeholder="https://study-notebook-online.yourname.workers.dev" required></label>
+          <form class="cloud-form" id="cloudForm"><label class="field">${t('Address')}<input id="cloudUrl" type="url" dir="ltr" placeholder="https://study-notebook.yourname.workers.dev" required></label>
           <label class="field">${t('Password')}<input id="cloudPw" type="password" dir="ltr" autocomplete="current-password" required></label>
           <p class="status" id="cloudMsg" role="status"></p>
           <div class="row"><button class="btn primary" type="submit">${t('Connect')}</button></div></form></div></li>
