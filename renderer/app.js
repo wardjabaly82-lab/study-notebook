@@ -104,7 +104,16 @@
   function removeDocs(test) { const kept = {}; for (const p of Object.keys(docs)) if (test(p)) { kept[p] = docs[p]; delete docs[p]; } return kept; }
   function undoable(msg, kept, after) { toast(msg, { label: t('Undo'), fn: () => { Object.assign(docs, kept); save(); if (after) after(); else render(); toast(t('Restored')); } }); }
   const COVERS = ['#6c2330', '#24533f', '#2c3a5e', '#7a4f1d', '#523061', '#255a5e', '#53562a', '#3d4650'];   // bookcloth
-  const dirOf = c => (c && c.lang === 'he') ? 'rtl' : (c && c.lang === 'en') ? 'ltr' : (/[֐-׿]/.test(c ? c.name : '') ? 'rtl' : 'ltr');
+  // Which way a course reads. The notes themselves decide (a course set to Hebrew can hold English notes);
+  // math is left out of the count. With too little text, the course's language setting decides.
+  function dirOf(c) {
+    if (!c) return 'ltr';
+    const text = children(c.id, 'sections').slice(0, 40).map(s => s.title + ' ' + (s.content || '').slice(0, 600)).join(' ')
+      .replace(/\$\$[\s\S]*?\$\$|\\\([\s\S]*?\\\)|\\[a-zA-Z]+/g, ' ');
+    const he = (text.match(/[\u0590-\u05FF]/g) || []).length, la = (text.match(/[A-Za-z]/g) || []).length;
+    if (he + la >= 40) return he > la ? 'rtl' : 'ltr';
+    return c.lang === 'he' ? 'rtl' : c.lang === 'en' ? 'ltr' : /[\u0590-\u05FF]/.test(c.name) ? 'rtl' : 'ltr';
+  }
   const dirFor = lang => (lang === 'he' || lang === 'ar') ? 'rtl' : 'ltr';
   const courseNum = c => ((c && c.name.match(/\d{4,6}/)) || [])[0];
   const fmtTs = s => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + String(x).padStart(2, '0'); };
