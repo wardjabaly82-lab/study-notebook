@@ -72,7 +72,7 @@
   }
   let toastT;
   function toast(msg) { const el = $('toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (el.hidden = true), 3600); }
-  const COVERS = ['#3b5bdb', '#2f9e6b', '#d9480f', '#9c36b5', '#1971c2', '#c2255c', '#0c8599', '#e8590c'];
+  const COVERS = ['#0a7cff', '#30b350', '#ff8a00', '#af52de', '#5856d6', '#ff375f', '#1eaac4', '#ff5e3a'];
   const coverOf = id => COVERS[[...String(id)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) % COVERS.length];
   const dirOf = c => (c && c.lang === 'he') ? 'rtl' : (c && c.lang === 'en') ? 'ltr' : (/[֐-׿]/.test(c ? c.name : '') ? 'rtl' : 'ltr');
   const dirFor = lang => (lang === 'he' || lang === 'ar') ? 'rtl' : 'ltr';

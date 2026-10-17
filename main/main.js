@@ -323,7 +323,7 @@ ipcMain.handle('connector:reveal', () => { const f = connectorBundle(); if (fs.e
 ipcMain.handle('app:setTheme', (ev, t) => {
   if (['system', 'light', 'dark'].includes(t)) nativeTheme.themeSource = t;
   const s = loadSettings(); if (s.theme !== t && ['system', 'light', 'dark'].includes(t)) { s.theme = t; saveSettings(s); }
-  if (win && !win.isDestroyed()) win.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#16181d' : '#f7f5f0');
+  if (win && !win.isDestroyed()) win.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#19191b' : '#f5f5f7');
 });
 
 /* ---------- lecture recording ---------- */
@@ -382,7 +382,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1320, height: 860, minWidth: 900, minHeight: 600,
     title: 'Study Notebook',
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#16181d' : '#f7f5f0',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#19191b' : '#f5f5f7',
     icon: path.join(__dirname, '..', 'build', 'icon.png'),
     show: false,
     webPreferences: {
