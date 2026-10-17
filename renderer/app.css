@@ -29,6 +29,7 @@
   --marker: rgba(255, 214, 10, .55); --marker-solid: #ffd60a; --marker-ink: #1d1d1f;
   --cover: #0071e3; --cover-edge: #005bb8; --on-cover: #ffffff;
   --rule: transparent; --margin-line: transparent;
+  --paper: var(--raised); --bg: var(--desk);   /* names the print window uses */
   /* depth */
   --hairline: 0 0 0 .5px rgba(0, 0, 0, .06);
   --shadow: 0 0 0 .5px rgba(0, 0, 0, .05), 0 1px 3px rgba(0, 0, 0, .05), 0 8px 28px rgba(0, 0, 0, .05);
