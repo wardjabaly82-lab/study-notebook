@@ -56,7 +56,7 @@
 
   /* ================= state ================= */
   // view: 'notes' | 'lecture' | 'practice'
-  const S = { claudeSeen: 0, view: 'notes', lecture: null, lecAt: null, confirmLec: false, renamingLec: false, courseId: store('sn-course') || '', search: '', editing: null, confirmDel: null, collapsed: new Set(), flash: new Set(), menu: false, settings: null, lastClaude: 0, prac: null, pracTopic: '', pracMode: 'due' };
+  const S = { claudeSeen: 0, view: 'notes', lecture: null, lecAt: null, confirmLec: false, renamingLec: false, courseId: store('sn-course') || '', search: '', editing: null, confirmDel: null, collapsed: new Set(), flash: new Set(), menu: false, settings: null, lastClaude: 0, prac: null, pracTopic: '', pracMode: 'due', genType: 'mixed' };
   const course = () => courses().find(c => c.id === S.courseId) || null;
   function selectCourse(id) { S.courseId = id || ''; store('sn-course', S.courseId); S.view = 'notes'; S.lecture = null; S.prac = null; S.editing = S.confirmDel = null; S.search = ''; render(); const w = $('sheetWrap'); if (w) w.scrollTop = 0; }
 
@@ -179,6 +179,7 @@
         <div class="menu-wrap">
           <button class="btn" id="moreBtn" type="button" aria-haspopup="menu" aria-expanded="${S.menu}" aria-label="${esc(t('More'))}">⋯</button>
           ${S.menu ? `<div class="menu" role="menu">
+            <button type="button" role="menuitem" data-act="auto-save">${t('Auto-save Claude chats to this course')}</button>
             <button type="button" role="menuitem" data-act="add-topic">${t('Add a topic by hand')}</button>
             <button type="button" role="menuitem" data-act="export-md" ${has ? '' : 'disabled'}>${t('Export as Markdown')}</button>
             <button type="button" role="menuitem" data-act="course-settings">${t('Rename or change language')}</button>
@@ -256,7 +257,7 @@
         <p>${esc(t('Open the Claude app and study a topic from {course}: ask questions until it makes sense. Then say:', { course: c.name }))}</p>
         <p class="say" dir="auto">${esc(say)}</p>
         <p class="small">${esc(t('Claude saves the final explanation here, under the right topic.'))}</p>
-        ${lastClaude() ? `<p class="small">${esc(t('If Claude says it can’t find Study Notebook, start a new chat in the Claude desktop app, or tell it: “Search your tools for study-notebook”.'))}</p>` : `<button class="btn primary" type="button" data-act="settings">${t('Connect to Claude')}</button>`}</div>`;
+        ${lastClaude() ? `<button class="btn primary" type="button" data-act="auto-save">${t('Set up auto-saving for this course')}</button>` : `<button class="btn primary" type="button" data-act="settings">${t('Connect to Claude')}</button>`}</div>`;
       return;
     }
     const q = norm(S.search);
@@ -331,6 +332,39 @@
     if (S.pracMode === 'mistakes') pool = pool.filter(k => (k.hist || []).slice(-3).some(h => !h.ok));
     return pool;
   }
+  // Make new practice questions from the notes, here in the app (no Claude needed).
+  function genBox(c, secs, first) {
+    const roots = kids(secs, null);
+    const types = [['mixed', t('Mixed')], ['flash', t('Flashcards')], ['fill', t('Fill in the blank')], ['choice', t('Multiple choice')]];
+    return `<div class="gen">
+      <div><h3>${first ? t('Make questions from your notes') : t('Make new questions')}</h3><p class="small">${t('Pick a type and the app writes questions from your notes, right here. No Claude needed.')}</p></div>
+      <div class="seg" role="group" aria-label="${esc(t('Question type'))}">${types.map(([k, l]) => `<button type="button" data-gtype="${k}" aria-pressed="${S.genType === k}">${l}</button>`).join('')}</div>
+      ${first ? `<label class="field">${t('Topic')}<select id="pracTopic" dir="auto"><option value="">${t('All topics')}</option>${roots.map(r => `<option value="${esc(r.id)}"${S.pracTopic === r.id ? ' selected' : ''}>${esc(r.title)}</option>`).join('')}</select></label>` : ''}
+      <button class="btn primary big" type="button" data-act="gen-make" ${roots.length ? '' : 'disabled'}>${roots.length ? (S.pracTopic && secs[S.pracTopic] ? t('Make questions on this topic') : t('Make questions')) : t('Add notes first')}</button>
+    </div>`;
+  }
+  function makeQuestions(c, secs) {
+    if (!window.PracticeGen) return;
+    const inTopic = S.pracTopic && secs[S.pracTopic] ? new Set(subtree(secs, S.pracTopic)) : null;
+    const list = Object.values(secs).filter(s => !inTopic || inTopic.has(s.id));
+    const existing = new Set(cards(c.id).map(k => String(k.q || '').toLowerCase().replace(/[*_`>#]/g, '').replace(/\s+/g, ' ').trim()));
+    const items = window.PracticeGen.generate({ sections: list, lang: dirOf(c) === 'rtl' ? 'he' : 'en', type: S.genType, limit: 15, existing });
+    if (!items.length) { toast(t('No new questions to make from these notes. Ask Claude for more, or add notes with definitions and key terms in bold.')); return; }
+    const byTopic = {}; for (const it of items) (byTopic[it.topic_section_id] = byTopic[it.topic_section_id] || []).push(it);
+    const ids = [];
+    for (const [sid, group] of Object.entries(byTopic)) {
+      try {
+        const { writes } = Ops.run(docs, 'save_practice', { course: c.id, topic_section_id: sid, items: group.map(({ topic_section_id, ...x }) => x) });
+        for (const w of writes) { docs[w.path] = { ...w.data, source: 'app' }; ids.push(w.path.split('/').pop()); }
+      } catch (e) { /* a group that can't be saved is skipped */ }
+    }
+    if (!ids.length) { toast(t('No new questions to make from these notes. Ask Claude for more, or add notes with definitions and key terms in bold.')); return; }
+    save();
+    toast(tn(ids.length, 'Made 1 question from your notes', 'Made {n} questions from your notes'));
+    S.prac = { ids: ids.sort(() => Math.random() - 0.5), i: 0, shown: false, chosen: null, order: null, right: 0, wrong: [] };
+    renderSide(); renderTop(); renderSheet(); $('sheetWrap').scrollTop = 0;
+  }
+
   function startPractice(c, secs) {
     const pool = pracPool(c, secs).slice().sort((a, b) => ((a.srs && a.srs.due) || 0) - ((b.srs && b.srs.due) || 0));
     if (!pool.length) return;
@@ -354,7 +388,9 @@
     const all = cards(c.id);
     const he = dirOf(c) === 'rtl';
     if (!all.length) {
-      sheet.innerHTML = `<div class="empty"><h2>${t('No practice questions yet')}</h2><p>${t('Claude writes flashcards and exam-style questions from your notes. Ask it in the Claude app, for example:')}</p><p class="say" dir="auto">${esc(askPractice(c))}</p><button class="btn primary" type="button" data-act="copy-prac">${t('Copy')}</button><button class="text-btn" type="button" data-act="back-notes">${t('← Back to notes')}</button></div>`;
+      sheet.innerHTML = `<div class="prac"><div class="prac-head"><h2>${t('Practice')}</h2><p>${esc(t('Make questions from your notes, then practice them with spaced repetition.'))}</p></div>${genBox(c, secs, true)}
+        <div class="ask"><p>${t('Claude also adds questions by itself when it saves a new topic. You can ask it for more in the Claude app, for example:')}</p><p class="say-box" dir="auto">${esc(askPractice(c))}</p><button class="btn" type="button" data-act="copy-prac">${t('Copy')}</button></div></div>`;
+      const ps = sheet.querySelector('#pracTopic'); if (ps) ps.onchange = e => { S.pracTopic = e.target.value; renderSheet(); };
       return;
     }
     const P = S.prac;
@@ -389,6 +425,7 @@
         <label class="field">${t('Topic')}<select id="pracTopic" dir="auto"><option value="">${t('All topics')}</option>${roots.map(r => `<option value="${esc(r.id)}"${S.pracTopic === r.id ? ' selected' : ''}>${esc(r.title)}</option>`).join('')}</select></label>
         <button class="btn primary big" type="button" data-act="prac-start" ${pool.length ? '' : 'disabled'}>${pool.length ? esc(tn(Math.min(pool.length, 50), 'Start: 1 question', 'Start: {n} questions')) : esc(S.pracMode === 'due' ? t('Nothing due right now') : t('Nothing to practice here'))}</button>
       </div>
+      ${genBox(c, secs, false)}
       <h3>${t('By topic')}</h3>
       <ul class="topic-stats" dir="${dirOf(c)}">${stats.map(s => `<li><button type="button" class="ts-row" data-ptopic="${esc(s.r.id)}"><span class="ts-title" dir="auto">${esc(s.r.title)}</span><span class="ts-bar" title="${esc(s.acc == null ? t('Not practiced yet') : t('{p}% right', { p: Math.round(s.acc * 100) }))}"><i class="${s.acc == null ? 'none' : s.acc < 0.6 ? 'low' : s.acc < 0.85 ? 'mid' : 'high'}" style="width:${s.acc == null ? 0 : Math.round(s.acc * 100)}%"></i></span><small dir="${UIDIR}">${s.n ? esc(s.acc == null ? tn(s.n, '1 item, not practiced yet', '{n} items, not practiced yet') : t('{n} items, {p}% right', { n: s.n, p: Math.round(s.acc * 100) })) : esc(t('No questions yet'))}</small></button></li>`).join('')}${loose.length ? `<li><span class="ts-row"><span class="ts-title">${t('Other')}</span><span></span><small>${esc(tn(loose.length, '1 item', '{n} items'))}</small></span></li>` : ''}</ul>
       <div class="ask"><p>${t('Want more questions, or questions on a weak topic? Tell Claude in the Claude app:')}</p><p class="say-box" dir="auto">${esc(askPractice(c, S.pracTopic && secs[S.pracTopic] ? secs[S.pracTopic].title : ''))}</p><button class="btn" type="button" data-act="copy-prac">${t('Copy')}</button></div>
@@ -483,6 +520,7 @@
     const go = e.target.closest('[data-go]'); if (go) { if (S.view !== 'notes' || S.search) { S.search = ''; showView('notes'); } goTo(go.dataset.go); return; }
     const tog = e.target.closest('[data-tog]'); if (tog) { const id = tog.dataset.tog; S.collapsed.has(id) ? S.collapsed.delete(id) : S.collapsed.add(id); renderContents(); return; }
     const pm = e.target.closest('[data-pmode]'); if (pm) { S.pracMode = pm.dataset.pmode; renderSheet(); return; }
+    const gt = e.target.closest('[data-gtype]'); if (gt) { S.genType = gt.dataset.gtype; renderSheet(); return; }
     const pt = e.target.closest('[data-ptopic]'); if (pt) { S.pracTopic = pt.dataset.ptopic; S.pracMode = 'all'; renderSheet(); return; }
     const ch = e.target.closest('[data-choice]'); if (ch && S.prac) { S.prac.chosen = +ch.dataset.choice; renderSheet(); return; }
     const gr = e.target.closest('[data-grade]'); if (gr && S.prac) { const c = course(); const k = cards(c.id).find(x => x.id === S.prac.ids[S.prac.i]); if (k) grade(c, k, +gr.dataset.grade); return; }
@@ -512,6 +550,7 @@
       case 'add-topic': S.menu = false; addSection(null); break;
       case 'export-md': S.menu = false; renderTop(); exportMd(); break;
       case 'course-settings': S.menu = false; renderTop(); openCourseSettings(); break;
+      case 'auto-save': S.menu = false; renderTop(); openAutoSave(c); break;
       case 'delete-course': S.menu = false; renderTop(); openDeleteCourse(); break;
       case 'back-notes': S.prac = null; showView('notes'); break;
       case 'copy-ask': copy(askClaude(c.id, S.lecture)); break;
@@ -523,6 +562,7 @@
       case 'do-delete-lec': delete docs[lecPath(c.id, S.lecture)]; save(); S.confirmLec = false; S.lecture = null; showView('notes'); renderSide(); toast(t('Recording deleted')); break;
       case 'export-lec': { const l = lectures(c.id).find(x => x.id === S.lecture); if (l) D.saveFile((l.title.replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'lecture') + '.txt', `${l.title}\n\n${l.text || ''}\n`).then(r => { if (r && r.ok) toast(t('Exported')); }); break; }
       case 'prac-start': startPractice(c, secs); break;
+      case 'gen-make': makeQuestions(c, secs); break;
       case 'prac-home': S.prac = null; renderSheet(); break;
       case 'prac-retry': { const ids = S.prac.wrong.slice(); S.prac = { ids, i: 0, shown: false, chosen: null, order: null, right: 0, wrong: [] }; renderSheet(); break; }
       case 'show-answer': if (S.prac) { S.prac.shown = true; renderSheet(); } break;
@@ -586,6 +626,37 @@
       <div class="row"><button class="btn primary" type="submit">${t('Create course')}</button><button class="btn ghost" type="button" data-close>${t('Cancel')}</button></div></form>`,
       d => { d.querySelector('#ncName').focus(); d.querySelector('#ncForm').onsubmit = e => { e.preventDefault(); const n = d.querySelector('#ncName').value.trim(); if (!n) return; dlg.close(); newCourse(n, d.querySelector('#ncLang').value); toast(t('Course created')); }; });
   }
+  // One-time setup per course: a Claude Project whose instructions send every chat's notes here.
+  function autoSaveText(c) {
+    const he = c.lang === 'he';
+    return [
+      `Study Notebook course: "${c.name}"`,
+      ``,
+      `In every chat in this project, use the Study Notebook tools (study-notebook) and save what we study to the course "${c.name}" automatically, as we go, without asking me:`,
+      `- When you finish explaining something, save the final, clear explanation under the right topic (update an existing section instead of adding a duplicate).`,
+      `- When I ask about one part of something already saved, replace only that part with a deeper explanation (edit_part), not the whole section.`,
+      `- After each new topic, add 2–4 practice questions for it.`,
+      `- Don't save anything I say not to save.`,
+      `- After each save, tell me in one short line what was saved and where.`,
+      he ? `- Write the notes in Hebrew, with formulas in Latin form.` : ''
+    ].filter((x, i) => x !== '' || i === 1).join('\n');
+  }
+  function openAutoSave(c) {
+    if (!c) return;
+    const text = autoSaveText(c);
+    openDlg('auto-save', `<div class="dlg-in">${head(esc(t('Auto-save Claude chats to “{course}”', { course: c.name })), esc(t('Set this up once. After that you just study, and the notes appear here by themselves.')))}
+      <ol class="steps">
+        <li><div><b>${esc(t('Create a project in the Claude app'))}</b><span>${esc(t('In the Claude desktop app, open Projects and create a new project. Name it “{course}”.', { course: c.name }))}</span></div></li>
+        <li><div><b>${esc(t('Paste these instructions into the project'))}</b><span>${esc(t('Open the project’s instructions and paste this text. You only do this once.'))}</span></div></li>
+        <li><div><b>${esc(t('Study in that project'))}</b><span>${esc(t('Start your chats inside the project. Claude saves the explanations here as you go, adds practice questions, and when you ask about one part, it deepens just that part. Say “don’t save this” to keep something out.'))}</span></div></li>
+      </ol>
+      <pre class="auto-text" dir="ltr">${esc(text)}</pre>
+      <div class="row"><button class="btn primary" type="button" id="copyAuto">${t('Copy instructions')}</button><button class="btn ghost" type="button" data-close>${t('Done')}</button></div>
+      <p class="small">${esc(t('Without a project, Claude still saves automatically, but it guesses the course from the subject or asks you once at the start of a chat.'))}</p></div>`, d => {
+      d.querySelector('#copyAuto').onclick = () => copy(text);
+    });
+  }
+
   function openCourseSettings() {
     const c = course(); if (!c) return;
     openDlg('course', `<form class="dlg-in" id="csForm">${head(t('Course details'))}
@@ -818,7 +889,7 @@
         else if (op === 'save_practice') {
           toast(tn(result.saved, 'Claude added 1 practice item to {course}', 'Claude added {n} practice items to {course}', { course: result.course }));
           render();
-        } else if (op === 'save_section') {
+        } else if (op === 'save_section' || op === 'edit_part') {
           toast(result.action === 'updated' ? t('Claude updated “{title}” in {course}', { title: result.title, course: result.course }) : t('Claude saved “{title}” in {course}', { title: result.title, course: result.course }));
           const busy = S.editing || (S.view === 'practice' && S.prac);
           if (cid !== S.courseId && !busy) { S.courseId = cid; store('sn-course', cid); S.search = ''; }

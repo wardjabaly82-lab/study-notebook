@@ -33,6 +33,8 @@ You need the [Claude desktop app](https://claude.ai/download) and a normal Claud
 
 (Settings → Other ways to connect also offers the `.mcpb` extension file, which can be opened with the Claude app or dragged into its window.)
 
+**Auto-save a course (once per course):** in Study Notebook open the course's **⋯ → Auto-save Claude chats to this course**, create a Claude Project with the course's name, and paste the instructions it gives you. Every chat in that project then saves to that course by itself: Claude saves explanations as you go, adds practice questions for each new topic, and when you ask about one part of something it deepens just that part. Say "don't save this" to keep something out.
+
 Then just study by talking to Claude. When you understand something, Claude saves the final explanation into your notebook, under the right course and topic. If you don't understand a section, Claude rewrites just that part. You can also say "save this to my 52324 notebook" any time. The first time, Claude asks permission to use Study Notebook; choose **Always allow**.
 
 If the notebook app is open, Claude's changes appear in it instantly. If it's closed, they appear the next time you open it.
@@ -49,6 +51,8 @@ Then tell Claude in the Claude app the sentence the app shows you, e.g. *"Make n
 - Settings → Lecture recording shows the space used and can remove the engine.
 
 ### 5. Practice for exams
+Open **Practice**, pick a type (mixed, flashcards, fill in the blank, multiple choice) and press **Make questions**: the app writes them from your notes right away, on your computer, without Claude. Claude also adds questions on its own when it saves a new topic, and you can ask it for more:
+
 Ask Claude in the Claude app, e.g. *"Make practice questions for my 52324 notebook, focusing on my weak topics"*. Claude saves flashcards, multiple-choice and open questions linked to your topics. Click **Practice** in the app: answer, then rate how well you knew it (Again / Hard / Good / Easy). Questions you miss come back in 10 minutes; ones you know come back days or weeks later (spaced repetition). The practice page shows your accuracy per topic, and Claude can see it too, so it writes more questions where you're weak. Keyboard: Space shows the answer, 1–4 rate it, 1–6 pick a multiple-choice answer.
 
 Notes Claude makes from a lecture end with links like *[Lecture 4, 12:30]*: click one to open the transcript at that moment.

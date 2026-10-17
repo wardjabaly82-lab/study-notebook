@@ -42,6 +42,10 @@
       "description": "Save or update an explanation in your notebook"
     },
     {
+      "name": "edit_part",
+      "description": "Replace one part of a saved section with a deeper or clearer version, leaving the rest unchanged."
+    },
+    {
       "name": "list_lectures",
       "description": "List recorded lectures in a course"
     },

@@ -242,6 +242,34 @@
         }
       }
       return out;
+    },
+
+    // Replaces one passage of a section (e.g. with a deeper explanation of just that part),
+    // leaving the rest of the section exactly as it was. The previous version is kept for undo.
+    edit_part(docs, { course, section_id, find, replace }, now) {
+      const c = findCourse(docs, course);
+      const secs = sections(docs, c.id);
+      const s = secs[section_id];
+      if (!s) throw new OpError(`No section "${section_id}" in "${c.name}". Use get_outline to find the right id.`);
+      const oldPart = cleanText(find, MAX_CONTENT, 'The passage to replace');
+      const newPart = cleanText(replace, MAX_CONTENT, 'The new text');
+      const text = String(s.content || '');
+      let at = -1, len = oldPart.length, count = text.split(oldPart).length - 1;
+      if (count === 1) at = text.indexOf(oldPart);
+      else if (count === 0) {
+        // Allow small whitespace differences (line breaks, double spaces).
+        const rx = new RegExp(oldPart.trim().split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+'), 'g');
+        const hits = [...text.matchAll(rx)];
+        count = hits.length;
+        if (count === 1) { at = hits[0].index; len = hits[0][0].length; }
+      }
+      if (count === 0) throw new OpError('That passage isn’t in the section. Read the section again with read_section and copy the passage exactly.');
+      if (count > 1) throw new OpError(`That passage appears ${count} times in the section. Include more of the surrounding text so it matches only once.`);
+      const content = text.slice(0, at) + newPart + text.slice(at + len);
+      if (content.length > MAX_CONTENT) throw new OpError('The section would get too long. Put the deeper explanation in a new sub-topic instead (save_section with parent_id).');
+      const updated = { ...s, content, rev: (s.rev || 1) + 1, updatedAt: now, prevTitle: s.title, prevContent: s.content, source: 'claude' };
+      delete updated.id;
+      return { result: { action: 'updated', part: true, course: c.name, section_id: s.id, title: s.title, path: pathOf(secs, s.id), revision: updated.rev }, writes: [{ path: `${BASE}/${c.id}/sections/${s.id}`, data: updated }] };
     }
   };
 
