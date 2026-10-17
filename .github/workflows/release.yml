@@ -1,35 +1,33 @@
 name: Publish release
-
-# When the app version in package.json changes on main (1.3.0 -> 1.3.1 ...), build
-# the Windows installer and publish it as GitHub Release vX.Y.Z (electron-builder
-# creates the tag). Installed copies of Study Notebook update themselves from
-# these releases. Also runs by hand from the Actions tab.
 on:
   push:
     branches: [main]
     paths: [package.json]
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
   windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
+        with: { node-version: 22, cache: npm }
       - run: npm ci
-
       - name: Build the Claude connector
         run: npm run build:connector
-
-      - name: Build and publish the Windows installer
-        run: npx electron-builder --win nsis --publish always
+      - name: Build the Windows installer
+        run: npx electron-builder --win nsis --publish never
+      - name: Publish the release
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V=$(node -p "require('./package.json').version")
+          ls -la dist
+          FILES="dist/Study-Notebook-Setup-$V.exe dist/Study-Notebook-Setup-$V.exe.blockmap dist/latest.yml"
+          if gh release view "v$V" > /dev/null 2>&1; then
+            gh release upload "v$V" $FILES --clobber
+          else
+            gh release create "v$V" $FILES --title "Study Notebook $V" --notes "Study Notebook $V. Installed apps update themselves." --target "$GITHUB_SHA"
+          fi
