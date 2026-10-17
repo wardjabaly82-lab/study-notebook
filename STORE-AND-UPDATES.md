@@ -7,7 +7,7 @@ Two things need your own accounts, so they're prepared but switched off.
 Updates come from the Releases of https://github.com/wardjabaly82-lab/study-notebook.
 
 - The app checks a few times a day, downloads new versions in the background (only the changed parts, using the `.blockmap`), and installs them when it closes. Settings → Updates shows the status.
-- To publish a new version: raise `"version"` in `package.json`, build the Windows installer (`npm run dist:win`), and create a GitHub Release named `vX.Y.Z` with these files from `dist/`: `Study-Notebook-Setup-X.Y.Z.exe`, its `.blockmap`, and `latest.yml`.
+- To publish a new version: raise `"version"` in `package.json` and push to `main`. `.github/workflows/release.yml` builds the installer and creates GitHub Release `vX.Y.Z` with the `.exe`, its `.blockmap` and `latest.yml`.
 - Never publish the "with-my-notes" installer: it contains personal notes.
 
 ## 2. Microsoft Store (no more "Windows protected your PC" warning)

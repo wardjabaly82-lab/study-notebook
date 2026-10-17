@@ -83,14 +83,9 @@ npm start
 ```
 
 ### Make installers
-Push a version tag to GitHub and the workflow in `.github/workflows/build.yml` builds the Windows installer and both Mac apps, then attaches them to a GitHub Release:
+Releases are automatic: raise `"version"` in `package.json` and push it to `main`. The workflow in `.github/workflows/release.yml` builds the Windows installer and publishes it as GitHub Release `vX.Y.Z`, which installed apps pick up as an update.
 
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-You can also run it by hand: GitHub → **Actions → Build installers → Run workflow**. The files appear under that run's **Artifacts**.
+To build the Windows and Mac apps without releasing: GitHub → **Actions → Build installers → Run workflow** (`.github/workflows/build.yml`). The files appear under that run's **Artifacts**.
 
 To build on your own machine: `npm run dist:win` on Windows, `npm run dist:mac` on a Mac.
 
