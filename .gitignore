@@ -8,3 +8,4 @@ renderer/vendor/
 connector/dist/
 build/*.mcpb
 build/seed-notes.json
+graphify-out/
