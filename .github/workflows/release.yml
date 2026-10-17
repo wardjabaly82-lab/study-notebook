@@ -1,11 +1,14 @@
 name: Publish release
 
-# When a version tag (v1.3.0, v1.3.1, ...) is pushed, build the Windows installer
-# and publish it as a GitHub Release. Installed copies of Study Notebook update
-# themselves from these releases.
+# When the app version in package.json changes on main (1.3.0 -> 1.3.1 ...), build
+# the Windows installer and publish it as GitHub Release vX.Y.Z (electron-builder
+# creates the tag). Installed copies of Study Notebook update themselves from
+# these releases. Also runs by hand from the Actions tab.
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths: [package.json]
+  workflow_dispatch:
 
 permissions:
   contents: write
