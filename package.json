@@ -1,7 +1,7 @@
 {
   "name": "study-notebook",
   "productName": "Study Notebook",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Turns course PDFs and questions into complete, organized study notes, using the AI you choose.",
   "author": "Study Notebook",
   "license": "MIT",
@@ -95,6 +95,10 @@
       {
         "from": "connector/dist/server/index.js",
         "to": "connector/server.js"
+      },
+      {
+        "from": "build/speech/ggml-silero-v5.1.2.bin",
+        "to": "speech/ggml-silero-v5.1.2.bin"
       }
     ],
     "publish": {

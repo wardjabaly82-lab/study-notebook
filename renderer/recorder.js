@@ -155,7 +155,7 @@
 
     const now = Date.now();
     R.lectureId = 'l' + now.toString(36) + Math.random().toString(36).slice(2, 6);
-    text = ''; R.live = []; R.seconds = 0; R.silentFor = 0; R.paused = false; R.failures = 0;
+    text = ''; goodTail = ''; R.live = []; R.seconds = 0; R.silentFor = 0; R.paused = false; R.failures = 0;
     pending = []; pendingLen = 0; frames = []; chunkStart = 0; queue = Promise.resolve();
     SN.putLecture(R.courseId, R.lectureId, { title: R.title, lang: R.lang, startedAt: now, durationSec: 0, text: '', status: 'recording', engine: R.variant });
     node.port.onmessage = e => onFrame(e.data);
@@ -228,7 +228,7 @@
     for (const p of parts) for (let i = 0; i < p.length; i++) { const v = Math.max(-1, Math.min(1, p[i])); pcm[o++] = v < 0 ? v * 0x8000 : v * 0x7fff; }
     const lid = R.lectureId, cid = R.courseId, lang = R.lang;
     queue = queue.then(async () => {
-      const r = await D.speechTranscribe(pcm, lang, text.slice(-220).replace(/\[\d+:\d+(:\d+)?\]\s*/g, ''));
+      const r = await D.speechTranscribe(pcm, lang, promptFor(cid));
       if (!r.ok) {
         R.failures++;
         add(cid, lid, start, T('(This part couldn’t be transcribed.)'));
@@ -238,7 +238,16 @@
       R.failures = 0;
       const t = clean(r.text);
       if (t) add(cid, lid, start, t);
+      // Only text the engine was sure about is passed on as context, so one mistake can't snowball.
+      if (r.doubtful || !t) goodTail = ''; else goodTail = (goodTail + ' ' + t).slice(-200);
     });
+  }
+
+  // Context for the next piece: the course name (helps with its vocabulary) and the last reliable text.
+  let goodTail = '';
+  function promptFor(cid) {
+    const c = SN.courseById && SN.courseById(cid);
+    return [c && c.name ? c.name + '.' : '', goodTail.trim()].filter(Boolean).join(' ');
   }
 
   // Drops what speech engines tend to "hear" in music or noise.

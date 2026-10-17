@@ -7,6 +7,7 @@ const net = require('net');
 const path = require('path');
 const crypto = require('crypto');
 const { spawn, execFile } = require('child_process');
+const { filterSegments } = require('./transcript-filter');
 
 const WHISPER_VERSION = 'v1.8.2';
 const RELEASES = `https://github.com/ggml-org/whisper.cpp/releases/download/${WHISPER_VERSION}`;
@@ -28,7 +29,7 @@ const LANGS = { he: 'hebrew', en: 'general', ar: 'general', auto: 'general' };
 
 class EngineError extends Error { constructor(code, message) { super(message || code); this.code = code; } }
 
-function create({ dataDir, log, onProgress }) {
+function create({ dataDir, log, onProgress, vadModel }) {
   const engineDir = path.join(dataDir, 'speech');
   const stateFile = path.join(engineDir, 'state.json');
   const readState = () => { try { return JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch (e) { return {}; } };
@@ -194,7 +195,12 @@ function create({ dataDir, log, onProgress }) {
   async function launch(bin, model, variant) {
     const port = await freePort();
     const threads = Math.max(2, Math.min(8, require('os').cpus().length - 1));
-    const args = ['-m', model, '--host', '127.0.0.1', '--port', String(port), '-t', String(threads), '-nt'];
+    const args = ['-m', model, '--host', '127.0.0.1', '--port', String(port), '-t', String(threads)];
+    // Voice detection: only the parts with speech reach Whisper, so music, laughter and
+    // silence can't turn into invented text.
+    const vad = vadModel && fs.existsSync(vadModel);
+    if (vad) args.push('--vad', '-vm', vadModel, '-vt', '0.5', '-vspd', '250', '-vsd', '300', '-vp', '300');
+    log.info('speech.server.launch', { variant, vad: !!vad });
     const proc = spawn(bin, args, { cwd: path.dirname(bin), windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
     let errTail = '';
     proc.stderr.on('data', d => { errTail = (errTail + d).slice(-2000); });
@@ -261,14 +267,18 @@ function create({ dataDir, log, onProgress }) {
     const form = new FormData();
     form.append('file', new Blob([wav(pcm16)], { type: 'audio/wav' }), 'chunk.wav');
     form.append('language', lang === 'auto' ? 'auto' : lang);
-    form.append('response_format', 'json');
+    form.append('response_format', 'verbose_json');
+    form.append('no_language_probabilities', 'true');
+    // Start sure; if the result looks garbled or repetitive, Whisper retries more loosely.
     form.append('temperature', '0');
-    if (prompt) form.append('prompt', String(prompt).slice(-220));
+    form.append('temperature_inc', '0.2');
+    form.append('prompt', String(prompt || '').slice(-220));
     const res = await fetch(`http://127.0.0.1:${s.port}/inference`, { method: 'POST', body: form });
     if (!res.ok) throw new EngineError('transcribe_failed', `HTTP ${res.status}`);
     const j = await res.json();
     if (j.error) throw new EngineError('transcribe_failed', j.error);
-    return String(j.text || '').trim();
+    const segs = Array.isArray(j.segments) && j.segments.length ? j.segments : [{ text: j.text }];
+    return filterSegments(segs);
   }
 
   function status() {

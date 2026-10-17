@@ -43,6 +43,7 @@ Click **Record lecture**, give it a name, choose the spoken language (Hebrew, En
 Then tell Claude in the Claude app the sentence the app shows you, e.g. *"Make notes from my lecture "Lecture 4" and save them to my 52324 notebook"*. Claude reads the transcript, fixes recognition mistakes, and writes complete notes into the right topics. The lecture page lists which notes came from it.
 
 - The first recording downloads the speech engine once: about 2 GB (the engine plus a 1.6 GB speech model). Hebrew uses the ivrit.ai Hebrew model; English, Arabic and mixed lectures use Whisper large-v3-turbo. If the Hebrew model can't be downloaded, the general model is used instead.
+- Only the parts with speech are transcribed: voice detection skips music, laughter and silence, and the app drops the stock phrases and repeated words speech engines tend to invent there ("I. I. I.", "Thank you.", subtitle credits).
 - With an NVIDIA graphics card it runs on the card and easily keeps up with the lecture; otherwise it uses the processor (slower).
 - Recording works on Windows for now. The computer won't go to sleep while recording.
 - Settings → Lecture recording shows the space used and can remove the engine.

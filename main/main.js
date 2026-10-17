@@ -330,6 +330,7 @@ ipcMain.handle('app:setTheme', (ev, t) => {
 
 const engine = Engine.create({
   dataDir: dataDir(), log,
+  vadModel: app.isPackaged ? path.join(process.resourcesPath, 'speech', 'ggml-silero-v5.1.2.bin') : path.join(__dirname, '..', 'build', 'speech', 'ggml-silero-v5.1.2.bin'),
   onProgress: p => { if (win && !win.isDestroyed()) win.webContents.send('speech:progress', p); }
 });
 const SPEECH_LANGS = new Set(['he', 'en', 'ar', 'auto']);
@@ -351,8 +352,8 @@ ipcMain.handle('speech:transcribe', async (ev, req) => {
   if (!(pcm instanceof Uint8Array) || pcm.byteLength % 2 || pcm.byteLength > 16000 * 2 * 40 || !SPEECH_LANGS.has(lang)) return { ok: false, code: 'failed' };
   try {
     const copy = new Int16Array(pcm.byteLength / 2); new Uint8Array(copy.buffer).set(pcm);
-    const text = await engine.transcribe(copy, lang, typeof prompt === 'string' ? prompt.slice(-500) : '');
-    return { ok: true, text };
+    const r = await engine.transcribe(copy, lang, typeof prompt === 'string' ? prompt.slice(-500) : '');
+    return { ok: true, text: r.text, doubtful: r.doubtful };
   } catch (e) { log.warn('speech.transcribe.failed', { code: e.code, error: e.message }); return engineErr(e); }
 });
 ipcMain.handle('speech:stop', () => { engine.stop(); releaseAwake(); });
