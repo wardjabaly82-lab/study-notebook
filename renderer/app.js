@@ -802,7 +802,7 @@
       if (u.state === 'available') { box.innerHTML = `<p class="small" id="updLine"></p><div class="bar"><i id="updBar" style="width:0%"></i></div>`; showUpdProgress(u); return; }
       const line = u.state === 'ready' ? t('Version {v} is ready.', { v: u.version }) : u.state === 'checking' ? t('Checking for updates…') : u.state === 'error' ? t('Couldn’t check for updates. Try again later.') : t('You have the latest version ({v}).', { v: u.current });
       box.innerHTML = `<p class="small">${esc(line)}</p><div class="row">${u.state === 'ready' ? `<button class="btn primary" type="button" id="updNow">${t('Restart and update')}</button>` : u.state === 'checking' ? '' : `<button class="btn" type="button" id="updCheck">${t('Check for updates')}</button>`}</div>`;
-      const now = box.querySelector('#updNow'); if (now) now.onclick = async () => { await saveNow(); D.updateInstall(); };
+      const now = box.querySelector('#updNow'); if (now) now.onclick = () => installUpdate();
       const ck = box.querySelector('#updCheck'); if (ck) ck.onclick = () => { renderUpdBox(box, { ...u, state: 'checking' }); D.updateCheck(); };
     }
   }
@@ -830,12 +830,16 @@
     if (box) { if (p.state === 'available' && document.getElementById('updLine')) showUpdProgress(p); else renderUpdBox(box, { enabled: true, ...p }); }
     showUpdReady(p.state === 'ready' ? p.version : '');
   });
+  async function installUpdate() {
+    if (window.recorderState && window.recorderState().active) { toast(t('Stop the recording first, then restart to update.')); return; }
+    await saveNow(); toast(t('Updating… Study Notebook will open again in a moment.')); setTimeout(() => D.updateInstall(), 600);
+  }
   function showUpdReady(v) {
     let b = document.getElementById('updReady');
     if (!v) { if (b) b.remove(); return; }
     if (!b) {
       b = document.createElement('button'); b.type = 'button'; b.id = 'updReady'; b.className = 'upd-ready';
-      b.onclick = async () => { await saveNow(); D.updateInstall(); };
+      b.onclick = () => installUpdate();
       const foot = document.querySelector('.side-foot'); if (foot) foot.prepend(b);
     }
     b.innerHTML = `<span class="upd-ico" aria-hidden="true">↻</span><span><b>${esc(t('Update ready'))}</b>${esc(t('Restart to use version {v}', { v }))}</span>`;

@@ -41,7 +41,9 @@ function create({ log, notify, progress }) {
   return {
     status: () => ({ ...st }),
     check: async () => { if (!updater) return st; try { await updater.checkForUpdates(); } catch (e) {} return { ...st }; },
-    install: () => { if (updater && st.state === 'ready') updater.quitAndInstall(false, true); },
+    // Silent: no installer window. The app closes, updates in the background (same folder,
+    // notes and settings untouched) and opens again by itself.
+    install: () => { if (updater && st.state === 'ready') updater.quitAndInstall(true, true); },
     startChecking: () => { if (!updater) return; const run = () => updater.checkForUpdates().catch(() => {}); setTimeout(run, 15000); setInterval(run, 6 * 3600 * 1000); }
   };
 }
