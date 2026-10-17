@@ -1,0 +1,126 @@
+{
+  "name": "study-notebook",
+  "productName": "Study Notebook",
+  "version": "1.3.0",
+  "description": "Turns course PDFs and questions into complete, organized study notes, using the AI you choose.",
+  "author": "Study Notebook",
+  "license": "MIT",
+  "main": "main/main.js",
+  "scripts": {
+    "postinstall": "node scripts/copy-vendor.js",
+    "start": "electron .",
+    "dist:win": "npm run build:connector && electron-builder --win --publish never",
+    "dist:mac": "npm run build:connector && electron-builder --mac --publish never",
+    "dist:linux": "npm run build:connector && electron-builder --linux --publish never",
+    "build:connector": "node scripts/build-connector.js",
+    "dist:store": "npm run build:connector && electron-builder --win appx --publish never"
+  },
+  "devDependencies": {
+    "@anthropic-ai/mcpb": "^2.1.2",
+    "@fontsource-variable/frank-ruhl-libre": "^5.3.0",
+    "@fontsource-variable/rubik": "^5.3.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "dompurify": "^3.4.17",
+    "electron": "^44.8.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "marked": "^12.0.2",
+    "mathjax": "3.2.2",
+    "pdfjs-dist": "3.11.174",
+    "zod": "^4.6.7"
+  },
+  "build": {
+    "appId": "com.studynotebook.app",
+    "productName": "Study Notebook",
+    "copyright": "Study Notebook",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main/**",
+      "renderer/**",
+      "build/icon.png",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "Study-Notebook-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Study Notebook"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.education",
+      "identity": "-",
+      "artifactName": "Study-Notebook-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/icon.png",
+      "category": "Education",
+      "artifactName": "Study-Notebook-${version}.${ext}"
+    },
+    "extraResources": [
+      {
+        "from": "build/Study Notebook.mcpb",
+        "to": "Study Notebook.mcpb"
+      },
+      {
+        "from": "connector/dist/server/index.js",
+        "to": "connector/server.js"
+      }
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "wardjabaly82-lab",
+      "repo": "study-notebook",
+      "releaseType": "release"
+    },
+    "appx": {
+      "applicationId": "StudyNotebook",
+      "identityName": "REPLACE_WITH_PACKAGE_IDENTITY_NAME",
+      "publisher": "CN=REPLACE_WITH_PUBLISHER_ID",
+      "publisherDisplayName": "REPLACE_WITH_YOUR_PUBLISHER_NAME",
+      "displayName": "Study Notebook",
+      "backgroundColor": "#3b5bdb",
+      "languages": [
+        "en-US",
+        "he-IL"
+      ]
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wardjabaly82-lab/study-notebook.git"
+  }
+}

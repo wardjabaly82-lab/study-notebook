@@ -1,0 +1,10 @@
+node_modules/
+dist/
+renderer/vendor/
+*.log
+.DS_Store
+.env
+.env.*
+connector/dist/
+build/*.mcpb
+build/seed-notes.json

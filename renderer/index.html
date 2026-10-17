@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' app:; script-src 'self' app: 'unsafe-inline'; style-src 'self' app: 'unsafe-inline'; font-src 'self' app: data:; img-src 'self' app: data: blob:; worker-src 'self' app: blob:; connect-src 'self' app:">
+<title>Study Notebook</title>
+<link rel="stylesheet" href="vendor/fonts/rubik/index.css">
+<link rel="stylesheet" href="vendor/fonts/frank-ruhl-libre/index.css">
+<link rel="stylesheet" href="app.css">
+<script src="i18n.js"></script>
+<script>
+  // Apply the saved theme before anything draws, so there is no flash.
+  (function () { var t = 'system'; try { t = localStorage.getItem('sn-theme') || 'system'; } catch (e) {} document.documentElement.setAttribute('data-theme', t); })();
+</script>
+</head>
+<body>
+<div class="shell">
+  <aside class="side" data-i18n-aria="Courses">
+    <div class="brand">
+      <svg class="brand-mark" width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="4" y="2.5" width="18" height="21" rx="3" fill="var(--cover)"/><rect x="7" y="2.5" width="2" height="21" fill="var(--cover-edge)"/><path d="M12 9h7M12 13h7M12 17h4.5" stroke="var(--on-cover)" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span>Study Notebook</span>
+      <button class="icon-btn search-all" id="searchAllBtn" type="button" data-i18n-title="Search all courses (Ctrl+K)" data-i18n-aria="Search all courses"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    </div>
+    <nav class="courses" id="courses"></nav>
+    <button class="new-course" id="newCourseBtn" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="New course">New course</span></button>
+    <div class="side-foot">
+      <button class="claude-pill" id="claudePill" type="button"></button>
+      <div class="side-row">
+        <button class="icon-btn" id="themeBtn" type="button"></button>
+        <button class="text-btn" id="settingsBtn" type="button"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.8v2.6M12 18.6v2.6M21.2 12h-2.6M5.4 12H2.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8M18.5 18.5l-1.8-1.8M7.3 7.3 5.5 5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="Settings">Settings</span></button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main" id="main">
+    <header class="top" id="top"></header>
+    <div class="body">
+      <nav class="contents" id="contents" data-i18n-aria="Contents"></nav>
+      <div class="sheet-wrap" id="sheetWrap"><article class="sheet" id="sheet"></article></div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+  svg: { fontCache: 'global' },
+  startup: { typeset: false },
+  options: { enableMenu: false, menuOptions: { settings: { assistiveMml: false, explorer: false } } }
+};
+</script>
+<script src="vendor/marked.min.js"></script>
+<script src="vendor/purify.min.js"></script>
+<script src="vendor/pdf.min.js"></script>
+<script src="vendor/mathjax/tex-svg.js" async></script>
+<script src="notebook-ops.js"></script>
+<script src="app.js"></script>
+<script src="print-ui.js"></script>
+<script src="recorder.js"></script>
+</body>
+</html>

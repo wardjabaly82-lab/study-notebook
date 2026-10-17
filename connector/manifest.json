@@ -1,0 +1,83 @@
+{
+  "manifest_version": "0.3",
+  "name": "study-notebook",
+  "display_name": "Study Notebook",
+  "version": "1.0.0",
+  "description": "Lets Claude keep your Study Notebook up to date while you study, turn recorded lectures into notes, and prepare exam practice.",
+  "long_description": "Study normally by talking with Claude. When you understand something, Claude saves the final explanation into your **Study Notebook**, under the right course, topic and sub-topic. If you didn't understand a section, Claude rewrites just that section.\n\nWorks with the Study Notebook app on this computer. If the app is open, changes appear in it instantly; if it's closed, they appear the next time you open it. Your notes never leave your computer through this extension.",
+  "author": {
+    "name": "Study Notebook"
+  },
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/index.js"
+      ],
+      "env": {}
+    }
+  },
+  "tools": [
+    {
+      "name": "list_courses",
+      "description": "List your courses"
+    },
+    {
+      "name": "get_outline",
+      "description": "Show a course's notebook as a tree of sections"
+    },
+    {
+      "name": "read_section",
+      "description": "Read one notebook section"
+    },
+    {
+      "name": "search_notes",
+      "description": "Search your notes"
+    },
+    {
+      "name": "save_section",
+      "description": "Save or update an explanation in your notebook"
+    },
+    {
+      "name": "list_lectures",
+      "description": "List recorded lectures in a course"
+    },
+    {
+      "name": "read_lecture",
+      "description": "Read a recorded lecture's transcript"
+    },
+    {
+      "name": "create_course",
+      "description": "Create a new course notebook"
+    },
+    {
+      "name": "save_practice",
+      "description": "Save flashcards and practice questions"
+    },
+    {
+      "name": "get_practice_overview",
+      "description": "See practice results by topic"
+    }
+  ],
+  "keywords": [
+    "study",
+    "notes",
+    "students",
+    "notebook",
+    "education"
+  ],
+  "license": "MIT",
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}
