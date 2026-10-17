@@ -1,0 +1,32 @@
+name: Publish release
+
+# When a version tag (v1.3.0, v1.3.1, ...) is pushed, build the Windows installer
+# and publish it as a GitHub Release. Installed copies of Study Notebook update
+# themselves from these releases.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build the Claude connector
+        run: npm run build:connector
+
+      - name: Build and publish the Windows installer
+        run: npx electron-builder --win nsis --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
