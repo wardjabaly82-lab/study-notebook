@@ -236,7 +236,7 @@ const Pages = {
     if (p === '/privacy') return P.html(P.privacyPage(await currentUser(request, env), env.OWNER_NAME || ''));
 
     const user = await currentUser(request, env);
-    if (p === '/') return user ? redirect('/app/') : P.html(landingPage({ ready: googleReady(env, url) }), 200, { 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; script-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" });
+    if (p === '/') return user ? redirect('/app/') : P.html(landingPage({ ready: googleReady(env, url) }), 200, { 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; script-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" });
     if (p.startsWith('/landing/') && request.method === 'GET') return env.ASSETS.fetch(new Request(new URL(p, url.origin), request));
     if (p === '/favicon.ico' || p === '/favicon.svg') return new Response(FAVICON, { headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' } });
     const NEEDS_SIGN_IN = p === '/app' || p.startsWith('/app/') || p === '/authorize' || p === '/link' || p === '/account' || p.startsWith('/account/');
