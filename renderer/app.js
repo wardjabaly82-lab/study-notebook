@@ -115,7 +115,7 @@
     return c.lang === 'he' ? 'rtl' : c.lang === 'en' ? 'ltr' : /[\u0590-\u05FF]/.test(c.name) ? 'rtl' : 'ltr';
   }
   const dirFor = lang => (lang === 'he' || lang === 'ar') ? 'rtl' : 'ltr';
-  const courseNum = c => ((c && c.name.match(/\d{4,6}/)) || [])[0];
+  const courseNum = c => (c && c.num) || ((c && String(c.name || "").match(/\d{4,6}/)) || [])[0];
   const fmtTs = s => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + String(x).padStart(2, '0'); };
   const parseTs = str => String(str || '').split(':').map(Number).reduce((a, v) => a * 60 + (isNaN(v) ? 0 : v), 0);
   function askClaude(cid, lid) {
@@ -205,7 +205,7 @@
       const call = num || title.split(/\s+/).filter(Boolean).slice(0, 3).map(w => w[0]).join('').toUpperCase();
       const ex = daysTo(c.examDate), soon = ex != null && ex >= 0 && ex <= 7;
       if (soon) parts.push(ex === 0 ? t('Exam today') : ex === 1 ? t('Exam tomorrow') : t('Exam in {n} days', { n: ex }));
-      return `<button class="course${soon ? ' exam-soon' : ''}" type="button" data-course="${esc(c.id)}" aria-current="${c.id === S.courseId}" style="--c:${COVERS[made.indexOf(c.id) % COVERS.length]}" title="${esc(c.name + ' · ' + parts.join(t(', ')) + '\n' + t('Drag to move it on the shelf'))}"><b class="sp-t" dir="auto">${esc(title)}</b><span class="cn" dir="auto">${esc(call)}</span>${soon ? `<span class="sp-exam" aria-hidden="true">${ex === 0 ? '!' : ex}</span>` : ''}${due ? `<span class="due-pill" aria-hidden="true">${due}</span>` : ''}</button>`;
+      return `<button class="course${soon ? ' exam-soon' : ''}${c.photo ? ' has-photo' : ''}" type="button" data-course="${esc(c.id)}" aria-current="${c.id === S.courseId}" style="--c:${COVERS[(c.color ?? made.indexOf(c.id)) % COVERS.length]}${c.photo ? `;--photo:url(${c.photo})` : ''}" title="${esc(c.name + ' · ' + parts.join(t(', ')) + '\n' + t('Drag to move it on the shelf'))}"><b class="sp-t" dir="auto">${esc(title)}</b><span class="cn" dir="auto">${esc(call)}</span>${soon ? `<span class="sp-exam" aria-hidden="true">${ex === 0 ? '!' : ex}</span>` : ''}${due ? `<span class="due-pill" aria-hidden="true">${due}</span>` : ''}</button>`;
     }).join('') || `<p class="small" style="padding:6px 10px">${t('No courses yet.')}</p>`;
     renderClaudePill(); renderSlip();
     const th = theme();
@@ -335,6 +335,7 @@
 
   function renderSheet() {
     const sheet = $('sheet'); const c = course();
+    sheet.dataset.paper = (c && S.view === 'notes' && c.paper) || 'plain'; sheet.dataset.width = (c && c.width) || 'normal';
     if (!c) {
       sheet.setAttribute('dir', UIDIR);
       sheet.innerHTML = `<div class="empty"><h2>${t('Start your first notebook')}</h2><p>${t('Create a course, then study it with Claude. Claude saves the final explanations here, topic by topic.')}</p><button class="btn primary" type="button" data-act="new-course">${t('Create a course')}</button></div>`;
@@ -730,11 +731,6 @@
   }
 
   /* ================= actions ================= */
-  function newCourse(name, lang) {
-    const id = rid('c');
-    docs[coursePath(id)] = { name: String(name).trim().slice(0, 80), lang, createdAt: Date.now(), chat: [], files: [], sourceParts: 0 };
-    save(); selectCourse(id);
-  }
   function deleteCourse(id) {
     const kept = removeDocs(p => p === coursePath(id) || p.startsWith(coursePath(id) + '/'));
     save(); S.courseId = ''; selectCourse(courses()[0] ? courses()[0].id : '');
@@ -998,12 +994,45 @@
   const head = (title, sub) => `<div class="dlg-head"><div style="flex:1"><h2>${title}</h2>${sub ? `<p>${sub}</p>` : ''}</div><button type="button" class="sn-x" data-close aria-label="${esc(t('Close'))}">×</button></div>`;
   const langSelect = (id, v) => `<select id="${id}"><option value="he"${v === 'he' ? ' selected' : ''}>${t('Hebrew')}</option><option value="en"${v === 'en' ? ' selected' : ''}>${t('English')}</option><option value="auto"${!v || v === 'auto' ? ' selected' : ''}>${t('Same as the course material')}</option></select>`;
 
+  // The course form (new course and course details): name, number, language, exam, book colour, photo, page.
+  const PAPERS = ['plain', 'lined', 'dotted', 'grid'], WIDTHS = ['narrow', 'normal', 'wide'];
+  const segPick = (name, list, cur) => `<div class="seg" role="radiogroup">${list.map(v => `<label><input type="radio" name="${name}" value="${v}" ${v === cur ? 'checked' : ''}><span>${t(v[0].toUpperCase() + v.slice(1))}</span></label>`).join('')}</div>`;
+  function courseForm(c, title, sub, go) {
+    const color = c.color != null ? c.color : -1;
+    return `<form class="dlg-in" id="cfForm">${head(title, sub)}
+      <label class="field">${t('Course name')}<input id="cfName" required maxlength="80" value="${esc(c.name || '')}" placeholder="${esc(t('e.g. Probability for Statistics students'))}" dir="auto"></label>
+      <div class="row two"><label class="field">${t('Course number')}<input id="cfNum" maxlength="8" inputmode="numeric" value="${esc(c.num || courseNum(c) || '')}" placeholder="52324" dir="ltr"></label>
+        <label class="field">${t('Exam date (Moed A)')}<input id="cfExam" type="date" value="${esc(c.examDate || '')}"></label></div>
+      <label class="field">${t('Notes language')}${langSelect('cfLang', c.lang || 'he')}</label>
+      <div class="field">${t('Book colour')}<div class="swatches" role="radiogroup">${COVERS.map((col, i) => `<label style="--c:${col}"><input type="radio" name="cfColor" value="${i}" ${i === color ? 'checked' : ''} aria-label="${esc(t('Colour {n}', { n: i + 1 }))}"></label>`).join('')}</div></div>
+      <div class="field">${t('Photo on the book')}<div class="row"><input type="file" id="cfPhoto" accept="image/*" hidden><button class="btn" type="button" id="cfPhotoBtn">${c.photo ? t('Change photo') : t('Choose a photo')}</button>${c.photo ? `<button class="btn ghost" type="button" id="cfPhotoX">${t('Remove photo')}</button>` : ''}</div></div>
+      <div class="field">${t('Page')}${segPick('cfPaper', PAPERS, c.paper || 'plain')}</div>
+      <div class="field">${t('Page width')}${segPick('cfWidth', WIDTHS, c.width || 'normal')}</div>
+      <div class="row"><button class="btn primary" type="submit">${go}</button><button class="btn ghost" type="button" data-close>${t('Cancel')}</button></div></form>`;
+  }
+  // A photo becomes a small JPEG (fits on a book spine, keeps the notebook light).
+  const shrink = f => new Promise((ok, no) => { const img = new Image(); img.onload = () => { const k = Math.min(1, 360 / Math.max(img.width, img.height)); const cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k); cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(img.src); ok(cv.toDataURL('image/jpeg', 0.78)); }; img.onerror = no; img.src = URL.createObjectURL(f); });
+  function wireCourseForm(d, c, done) {
+    let photo = c.photo || '';
+    const pick = d.querySelector('#cfPhoto');
+    d.querySelector('#cfPhotoBtn').onclick = () => pick.click();
+    pick.onchange = async () => { const f = pick.files[0]; if (!f) return; try { photo = await shrink(f); d.querySelector('#cfPhotoBtn').textContent = t('Photo chosen'); } catch (e) { toast(t('Couldn’t read that image')); } };
+    const x = d.querySelector('#cfPhotoX'); if (x) x.onclick = () => { photo = ''; x.remove(); };
+    d.querySelector('#cfName').focus();
+    d.querySelector('#cfForm').onsubmit = e => {
+      e.preventDefault(); const q = sel => d.querySelector(sel);
+      const name = q('#cfName').value.trim(); if (!name) return;
+      const v = { name: name.slice(0, 80), lang: q('#cfLang').value, num: q('#cfNum').value.replace(/\D/g, '').slice(0, 8), examDate: q('#cfExam').value,
+        paper: (q('[name=cfPaper]:checked') || {}).value || 'plain', width: (q('[name=cfWidth]:checked') || {}).value || 'normal', photo };
+      const col = q('[name=cfColor]:checked'); if (col) v.color = +col.value;
+      for (const k of ['num', 'examDate', 'photo']) if (!v[k]) v[k] = undefined;
+      dlg.close(); done(v);
+    };
+  }
   function openNewCourse() {
-    openDlg('new', `<form class="dlg-in" id="ncForm">${head(t('New course'), t('Claude will save this course’s notes in the language you choose.'))}
-      <label class="field">${t('Course name')}<input id="ncName" required maxlength="80" placeholder="${esc(t('e.g. 52324 - Probability for Statistics students'))}" dir="auto"></label>
-      <label class="field">${t('Notes language')}${langSelect('ncLang', 'he')}</label>
-      <div class="row"><button class="btn primary" type="submit">${t('Create course')}</button><button class="btn ghost" type="button" data-close>${t('Cancel')}</button></div></form>`,
-      d => { d.querySelector('#ncName').focus(); d.querySelector('#ncForm').onsubmit = e => { e.preventDefault(); const n = d.querySelector('#ncName').value.trim(); if (!n) return; dlg.close(); newCourse(n, d.querySelector('#ncLang').value); toast(t('Course created')); }; });
+    openDlg('new', courseForm({}, t('New course'), t('Claude will save this course’s notes in the language you choose.'), t('Create course')), d => wireCourseForm(d, {}, v => {
+      const id = rid('c'); docs[coursePath(id)] = JSON.parse(JSON.stringify({ ...v, createdAt: Date.now(), chat: [], files: [], sourceParts: 0 })); save(); selectCourse(id); toast(t('Course created'));
+    }));
   }
   // One-time setup per course: a Claude Project whose instructions send every chat's notes here.
   function autoSaveText(c) {
@@ -1040,11 +1069,9 @@
 
   function openCourseSettings() {
     const c = course(); if (!c) return;
-    openDlg('course', `<form class="dlg-in" id="csForm">${head(t('Course details'))}
-      <label class="field">${t('Course name')}<input id="csName" required maxlength="80" value="${esc(c.name)}" dir="auto"></label>
-      <label class="field">${t('Notes language')}${langSelect('csLang', c.lang)}</label>
-      <div class="row"><button class="btn primary" type="submit">${t('Save changes')}</button><button class="btn ghost" type="button" data-close>${t('Cancel')}</button></div></form>`,
-      d => { d.querySelector('#csForm').onsubmit = e => { e.preventDefault(); const n = d.querySelector('#csName').value.trim(); if (!n) return; docs[coursePath(c.id)] = { ...docs[coursePath(c.id)], name: n.slice(0, 80), lang: d.querySelector('#csLang').value }; save(); dlg.close(); render(); toast(t('Changes saved')); }; });
+    openDlg('course', courseForm(c, t('Course details'), '', t('Save changes')), d => wireCourseForm(d, c, v => {
+      docs[coursePath(c.id)] = JSON.parse(JSON.stringify({ ...docs[coursePath(c.id)], ...v })); save(); render(); toast(t('Changes saved'));
+    }));
   }
   function openDeleteCourse() {
     const c = course(); if (!c) return;
