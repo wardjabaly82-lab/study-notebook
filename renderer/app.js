@@ -90,7 +90,13 @@
     if (c.lang === 'he') return topic ? `תכין לי שאלות תרגול וכרטיסיות על "${topic}" ב-Study Notebook, בקורס ${nb}` : `תכין לי שאלות תרגול לקראת המבחן ב-Study Notebook, בקורס ${nb}, ותתמקד בנושאים שאני חלש בהם`;
     return topic ? `Make practice questions and flashcards on "${topic}" in Study Notebook, course ${nb}` : `Make exam practice questions in Study Notebook, course ${nb}, focusing on my weak topics`;
   }
-  const copy = text => navigator.clipboard.writeText(text).then(() => toast(t('Copied. Paste it into Claude.'))).catch(() => {});
+  async function copy(text, msg) {
+    let ok = false;
+    try { ok = D.copyText ? await D.copyText(text) : false; } catch (e) {}
+    if (!ok) try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {}
+    toast(ok ? (msg || t('Copied. Paste it into Claude.')) : t('Couldn’t copy. Select the text and press Ctrl+C.'));
+    return ok;
+  }
 
   /* ================= markdown + math ================= */
   function mdToHtml(md) {
@@ -610,8 +616,8 @@
   /* ================= dialogs ================= */
   let dlg = null, dlgKind = '';
   function openDlg(kind, html, onOpen) {
-    if (!dlg) { dlg = document.createElement('dialog'); dlg.className = 'dlg'; document.body.appendChild(dlg); dlg.addEventListener('close', () => { if (dlgKind === 'welcome') store('sn-welcomed', '1'); dlgKind = ''; D.getSettings().then(st => { S.settings = st; renderClaudePill(); if (S.view === 'notes') renderSheet(); }); }); }
-    dlgKind = kind; dlg.innerHTML = html; dlg.classList.toggle('wide', kind === 'search');
+    if (!dlg) { dlg = document.createElement('dialog'); dlg.className = 'dlg'; document.body.appendChild(dlg); dlg.addEventListener('scroll', () => dlg.classList.toggle('scrolled', dlg.scrollTop > 4)); dlg.addEventListener('close', () => { dlg.classList.remove('scrolled'); if (dlgKind === 'welcome') store('sn-welcomed', '1'); dlgKind = ''; D.getSettings().then(st => { S.settings = st; renderClaudePill(); if (S.view === 'notes') renderSheet(); }); }); }
+    dlgKind = kind; dlg.innerHTML = html; dlg.classList.toggle('wide', kind === 'search'); dlg.scrollTop = 0; dlg.classList.remove('scrolled');
     dlg.querySelectorAll('[data-close]').forEach(x => x.onclick = () => dlg.close());
     if (!dlg.open) dlg.showModal();
     if (onOpen) onOpen(dlg);
@@ -653,7 +659,7 @@
       <pre class="auto-text" dir="ltr">${esc(text)}</pre>
       <div class="row"><button class="btn primary" type="button" id="copyAuto">${t('Copy instructions')}</button><button class="btn ghost" type="button" data-close>${t('Done')}</button></div>
       <p class="small">${esc(t('Without a project, Claude still saves automatically, but it guesses the course from the subject or asks you once at the start of a chat.'))}</p></div>`, d => {
-      d.querySelector('#copyAuto').onclick = () => copy(text);
+      d.querySelector('#copyAuto').onclick = () => copy(text, t('Instructions copied. Paste them into the Claude project.'));
     });
   }
 
@@ -906,7 +912,7 @@
 
   /* ================= shared with the recorder ================= */
   window.SN = {
-    course, courseById: id => courses().find(c => c.id === id) || null, render, toast, saveNow, dirFor, askClaude, t, tn,
+    course, courseById: id => courses().find(c => c.id === id) || null, render, toast, saveNow, dirFor, askClaude, copy, t, tn,
     updateRecBtn() { const b = $('recBtn'); if (b) b.outerHTML = recButton(); },
     putLecture(cid, lid, data) { docs[lecPath(cid, lid)] = data; save(); if (cid === S.courseId) { renderContents(); renderSide(); } },
     patchLecture(cid, lid, patch) {

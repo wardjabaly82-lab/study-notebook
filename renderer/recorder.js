@@ -101,7 +101,7 @@
       case 'cancel': if (R.state === 'preparing') { R.cancelled = true; D.speechCancel(); } break;
       case 'stop': stop(); break;
       case 'collapse': R.collapsed = !R.collapsed; draw(); break;
-      case 'copy': try { await navigator.clipboard.writeText(SN.askClaude(R.courseId, R.lectureId)); SN.toast(T('Copied. Paste it into Claude.')); } catch (err) {} break;
+      case 'copy': SN.copy(SN.askClaude(R.courseId, R.lectureId)); break;
       case 'open': SN.openLecture(R.courseId, R.lectureId); R.state = 'idle'; draw(); break;
       case 'retry': R.state = 'setup'; draw(); break;
     }

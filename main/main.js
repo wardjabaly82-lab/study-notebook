@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, shell, protocol, net, nativeTheme, Menu, desktopCapturer, powerSaveBlocker } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, protocol, net, nativeTheme, Menu, desktopCapturer, powerSaveBlocker, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
@@ -366,6 +366,8 @@ ipcMain.handle('speech:testAudio', () => process.env.SN_TEST_AUDIO && fs.existsS
 
 /* ---------- updates ---------- */
 let updates = null;
+// Copy text for the student (the page itself isn't allowed to write to the clipboard).
+ipcMain.handle('clipboard:write', (ev, text) => { if (typeof text !== 'string' || text.length > 200000) return false; clipboard.writeText(text); return true; });
 ipcMain.handle('update:status', () => updates ? updates.status() : { enabled: false });
 ipcMain.handle('update:check', () => updates ? updates.check() : { enabled: false });
 ipcMain.handle('update:install', () => { if (updates) updates.install(); });
