@@ -1023,10 +1023,70 @@
   }
   if (D.updateStatus) D.updateStatus().then(u => { if (u && u.state === 'ready') showUpdReady(u.version); }).catch(() => {});
 
+  /* ---------- online notebook: use Study Notebook in any Claude chat ---------- */
+  const DEPLOY_URL = 'https://deploy.workers.cloudflare.com/?url=https://github.com/wardjabaly82-lab/study-notebook/tree/main/cloud';
+  const DOC_RX = /^data\/users\/local\/[A-Za-z0-9_-]{1,64}(\/(sections|sources|lectures|cards)\/[A-Za-z0-9_-]{1,64})?$/;
+  async function applyCloud(changes) {
+    try {
+      if (!Array.isArray(changes)) throw new Error('bad');
+      let notes = 0;
+      for (const c of changes) {
+        if (!c || !DOC_RX.test(c.path) || (c.data !== null && (typeof c.data !== 'object' || Array.isArray(c.data)))) continue;
+        if (c.data === null) delete docs[c.path]; else docs[c.path] = c.data;
+        if (c.path.includes('/sections/') || c.path.includes('/cards/')) notes++;
+      }
+      dirty = true; await saveNow();
+      if (!S.editing && !(S.view === 'practice' && S.prac)) render(); else { renderSide(); renderContents(); }
+      if (notes) toast(tn(notes, '1 change came in from your online notebook', '{n} changes came in from your online notebook'));
+      return { ok: true, result: { applied: changes.length } };
+    } catch (e) { return { ok: false, error: 'Couldn’t apply the online changes.' }; }
+  }
+  let cloudState = null;
+  if (D.onCloudStatus) D.onCloudStatus(s => { cloudState = s; const box = document.getElementById('cloudBox'); if (box && !box.dataset.busy) paintCloud(box); });
+  async function drawCloud(d) {
+    const box = d.querySelector('#cloudBox'); if (!box || !D.cloudStatus) return;
+    cloudState = await D.cloudStatus(); paintCloud(box);
+  }
+  function paintCloud(box) {
+    const s = cloudState || {};
+    if (s.enabled) {
+      const when = s.syncing ? t('Syncing…') : s.lastSync ? t('Last synced {when}', { when: ago(s.lastSync) }) : t('Not synced yet');
+      const mcp = s.url.replace(/\/+$/, '') + '/mcp';
+      box.innerHTML = `<div class="cs-state ${s.error ? '' : 'ok'}"><span class="cs-ico">${s.error ? '!' : '✓'}</span><div><b>${s.error ? esc(t('Online notebook: needs attention')) : esc(t('Online notebook connected'))}</b><p>${esc(s.error ? t(s.error) : when)}${!s.error && s.online ? ' · ' + esc(tn(s.online, '1 item online', '{n} items online')) : ''}</p></div></div>
+        <p class="small">${t('To use it in any Claude chat (web, phone or desktop): in Claude open Customize → Connectors → Add custom connector, paste this address, press Add, then Connect and enter your password.')}</p>
+        <div class="row"><code class="path" dir="ltr">${esc(mcp)}</code><button class="btn" type="button" id="cloudCopy">${t('Copy address')}</button></div>
+        <div class="row"><button class="btn" type="button" id="cloudNow">${t('Sync now')}</button><button class="btn ghost" type="button" id="cloudOff">${t('Disconnect')}</button></div>`;
+      box.querySelector('#cloudCopy').onclick = () => copy(mcp, t('Address copied. Paste it in Claude → Customize → Connectors.'));
+      box.querySelector('#cloudNow').onclick = () => D.cloudSync();
+      box.querySelector('#cloudOff').onclick = async () => { if (!confirm(t('Stop syncing with the online notebook? Your notes stay on this computer and online; they just stop updating each other.'))) return; await D.cloudDisconnect(); cloudState = await D.cloudStatus(); paintCloud(box); };
+      return;
+    }
+    box.innerHTML = `<p class="small">${t('Study Notebook works in chats started from the Claude app on this computer. To use it in any chat, also on your phone or the web, put an online copy of your notebook in your own free Cloudflare account. The app keeps both in sync.')}</p>
+      <ol class="steps">
+        <li><div><b>${t('Create your online notebook')}</b><span>${t('Sign up for Cloudflare (free) and choose a password for your notebook when asked (NOTEBOOK_PASSWORD). It takes about 3 minutes.')}</span><div class="row" style="margin-top:6px"><button class="btn primary" type="button" id="cloudDeploy">${t('Create it on Cloudflare')}</button></div></div></li>
+        <li><div><b>${t('Connect this app to it')}</b><span>${t('Copy your notebook’s address from Cloudflare (it ends in .workers.dev) and enter it with your password.')}</span>
+          <form class="cloud-form" id="cloudForm"><label class="field">${t('Address')}<input id="cloudUrl" type="url" dir="ltr" placeholder="https://study-notebook-online.yourname.workers.dev" required></label>
+          <label class="field">${t('Password')}<input id="cloudPw" type="password" dir="ltr" autocomplete="current-password" required></label>
+          <p class="status" id="cloudMsg" role="status"></p>
+          <div class="row"><button class="btn primary" type="submit">${t('Connect')}</button></div></form></div></li>
+        <li><div><b>${t('Add it to Claude')}</b><span>${t('After connecting, this page shows the address to add in Claude → Customize → Connectors. Then every chat can save to your notebook.')}</span></div></li>
+      </ol>`;
+    box.querySelector('#cloudDeploy').onclick = () => D.openExternal(DEPLOY_URL);
+    box.querySelector('#cloudForm').onsubmit = async e => {
+      e.preventDefault(); const msg = box.querySelector('#cloudMsg'); const btn = e.target.querySelector('button[type=submit]');
+      msg.className = 'status'; msg.textContent = t('Connecting…'); btn.disabled = true; box.dataset.busy = '1';
+      const r = await D.cloudConnect(box.querySelector('#cloudUrl').value, box.querySelector('#cloudPw').value);
+      delete box.dataset.busy; btn.disabled = false;
+      if (!r.ok) { msg.className = 'status bad'; msg.textContent = t(r.message || 'Couldn’t connect.'); return; }
+      cloudState = await D.cloudStatus(); paintCloud(box); toast(t('Connected. Your notes are now online too.'));
+    };
+  }
+
   function renderSettings() {
     const s = S.settings || {};
     openDlg('settings', `<div class="dlg-in">${head(t('Settings'))}
       ${claudeSection()}
+      <section class="group"><h3>${t('Use in any chat')}</h3><div class="box" id="cloudBox"><p class="small">${t('Checking…')}</p></div></section>
       <section class="group"><h3>${t('Lecture recording')}</h3><div class="box" id="speechBox"><p class="small">${t('Checking…')}</p></div></section>
       <section class="group"><h3>${t('Appearance')}</h3>
         <div class="seg" role="group" aria-label="${esc(t('Appearance'))}">${['system', 'light', 'dark'].map(th => `<button type="button" data-theme-pick="${th}" aria-pressed="${theme() === th}">${THEME_ICON[th]}${t(THEME_NAME[th])}</button>`).join('')}</div>
@@ -1040,7 +1100,7 @@
         <div class="row"><button class="btn" type="button" id="backup">${t('Back up all notes')}</button><button class="btn" type="button" id="restore">${t('Restore from a backup')}</button><button class="btn ghost" type="button" id="folder">${t('Open notes folder')}</button></div>
         <div class="path" dir="ltr">${esc(s.dataDir || '')}</div></div></section>
       <section class="group"><h3>${t('Updates')}</h3><div class="box" id="updBox"><p class="small">${esc(t('Version {v}.', { v: s.version || '' }))}</p></div></section></div>`, d => {
-      wireClaude(d); drawSpeech(d); drawUpdates(d);
+      wireClaude(d); drawSpeech(d); drawUpdates(d); drawCloud(d);
       const kl = d.querySelector('#keysLink'); if (kl) kl.onclick = () => openShortcuts();
       d.querySelectorAll('[data-theme-pick]').forEach(b => b.onclick = () => setTheme(b.dataset.themePick));
       d.querySelectorAll('[data-ui-lang]').forEach(b => b.onclick = async () => { if (b.dataset.uiLang === uiLang) return; window.I18N.set(b.dataset.uiLang); await saveNow(); location.reload(); });
@@ -1067,6 +1127,7 @@
 
   /* ================= Claude, live ================= */
   D.onConnectorOp(async (op, args) => {
+    if (op === '__cloud_apply') return applyCloud(args && args.changes);
     try {
       const { result, writes } = Ops.run(docs, op, args);
       for (const w of writes) { if (w.data === null) delete docs[w.path]; else docs[w.path] = w.data; }

@@ -1,0 +1,29 @@
+{
+  "name": "study-notebook-online",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The online copy of your Study Notebook: lets Claude use your notebook in any chat (web, phone, desktop), and syncs with the Study Notebook app on your laptop.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "1.2.3"
+  },
+  "devDependencies": {
+    "wrangler": "4.151.1"
+  },
+  "cloudflare": {
+    "bindings": {
+      "NOTEBOOK_PASSWORD": {
+        "description": "Choose a password for your online notebook (at least 10 characters). You type it once when you add the connector in Claude, and once in the Study Notebook app on your laptop."
+      },
+      "DB": {
+        "description": "Where your notes are stored online."
+      },
+      "OAUTH_KV": {
+        "description": "Stores Claude's sign-in to your notebook."
+      }
+    }
+  }
+}

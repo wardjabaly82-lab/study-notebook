@@ -1,7 +1,7 @@
 {
   "name": "study-notebook",
   "productName": "Study Notebook",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "description": "Turns course PDFs and questions into complete, organized study notes, using the AI you choose.",
   "author": "Study Notebook",
   "license": "MIT",
@@ -12,7 +12,7 @@
     "dist:win": "npm run build:connector && electron-builder --win --publish never",
     "dist:mac": "npm run build:connector && electron-builder --mac --publish never",
     "dist:linux": "npm run build:connector && electron-builder --linux --publish never",
-    "build:connector": "node scripts/build-connector.js",
+    "build:connector": "node scripts/sync-cloud.js && node scripts/build-connector.js",
     "dist:store": "npm run build:connector && electron-builder --win appx --publish never"
   },
   "devDependencies": {

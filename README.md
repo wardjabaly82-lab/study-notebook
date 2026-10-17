@@ -39,6 +39,9 @@ Then just study by talking to Claude. When you understand something, Claude save
 
 If the notebook app is open, Claude's changes appear in it instantly. If it's closed, they appear the next time you open it.
 
+### Use it in any chat (phone and web too)
+Normally Claude reaches Study Notebook only in chats in the Claude app on this computer. To use it in **every** chat, put an online copy of your notebook in your own free Cloudflare account: **Settings → Use in any chat**, then follow the three steps (details in [cloud/README.md](cloud/README.md)). The app keeps your laptop and the online copy in sync both ways.
+
 ### 4. Record a lecture
 Click **Record lecture**, give it a name, choose the spoken language (Hebrew, English, Arabic, or mixed), and play the recorded lecture in Chrome. Study Notebook captures the sound playing on your computer and writes a transcript live, on your own computer (nothing is uploaded). Keep other sounds off while recording. Click **Stop and save** at the end (or it stops when the sound source closes).
 

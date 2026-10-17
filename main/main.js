@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, shell, protocol, net, nativeTheme, Menu, desktopCapturer, powerSaveBlocker, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, protocol, net, nativeTheme, Menu, desktopCapturer, powerSaveBlocker, clipboard, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
@@ -10,6 +10,7 @@ const link = require('./connector-link');
 const Ops = require('../renderer/notebook-ops.js');
 const Engine = require('./engine');
 const Updates = require('./updates');
+const CloudSync = require('./cloud-sync');
 const claudeSetup = require('./claude-setup');
 
 const RENDERER = path.join(__dirname, '..', 'renderer');
@@ -148,6 +149,7 @@ ipcMain.handle('store:save', (ev, text) => {
     const bad = validateData(JSON.parse(text));
     if (bad) throw new Error('invalid data shape');
     writeAtomic(DATA(), text);
+    if (cloud) cloud.soon();
     return { ok: true };
   } catch (e) { log.error('store.save.failed', { error: e && e.message }); return { ok: false }; }
 });
@@ -256,7 +258,7 @@ function forwardToPage(op, args) {
     win.webContents.send('connector:op', { reqId, op, args });
   });
 }
-ipcMain.on('connector:ready', () => { pageReady = true; });
+ipcMain.on('connector:ready', () => { pageReady = true; if (cloud) cloud.sync(); });
 ipcMain.on('connector:result', (ev, r) => {
   const done = r && pendingOps.get(r.reqId);
   if (!done) return;
@@ -280,6 +282,44 @@ function applyToFile(op, args) {
     return { ok: false, error: e instanceof Ops.OpError ? e.message : 'Couldn’t save to the notes file.' };
   }
 }
+
+/* ---------- online notebook (use Study Notebook in any Claude chat) ---------- */
+let cloud = null;
+// Changes from the online notebook: the open window applies them live; otherwise straight to the file.
+async function applyCloudChanges(changes) {
+  if (win && !win.isDestroyed() && pageReady) {
+    const r = await forwardToPage('__cloud_apply', { changes });
+    if (r.ok) return;
+    throw new Error(r.error || 'The app couldn’t apply the online changes.');
+  }
+  const d = loadData();
+  for (const c of changes) { if (c.data === null) delete d.docs[c.path]; else d.docs[c.path] = c.data; }
+  const bad = validateData(d); if (bad) throw new Error(bad);
+  writeAtomic(DATA(), JSON.stringify({ version: 1, savedAt: Date.now(), docs: d.docs }));
+}
+const seal = pw => safeStorage.isEncryptionAvailable() ? { key: safeStorage.encryptString(pw).toString('base64'), sealed: true } : { key: Buffer.from(pw, 'utf8').toString('base64'), sealed: false };
+const unseal = c => { try { return c.sealed ? safeStorage.decryptString(Buffer.from(c.key, 'base64')) : Buffer.from(c.key, 'base64').toString('utf8'); } catch (e) { return ''; } };
+function cloudConfig() { const c = loadSettings().cloud; return c && c.url && c.key ? { url: c.url, password: unseal(c) } : null; }
+function startCloud() {
+  cloud = CloudSync.create({ dataDir, loadData, applyChanges: applyCloudChanges, log, onStatus: s => { if (win && !win.isDestroyed()) win.webContents.send('cloud:status', s); } });
+  cloud.configure(cloudConfig());
+}
+const cleanUrl = u => { try { const x = new URL(String(u || '').trim()); if (x.protocol !== 'https:' && !(x.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(x.hostname))) return null; return x.origin; } catch (e) { return null; } };
+ipcMain.handle('cloud:status', () => cloud ? cloud.status() : { enabled: false });
+ipcMain.handle('cloud:connect', async (ev, req) => {
+  const url = cleanUrl(req && req.url), password = String((req && req.password) || '');
+  if (!url) return { ok: false, message: 'Enter the address of your online notebook, starting with https://' };
+  if (password.length < 6) return { ok: false, message: 'Enter the password you chose when you set it up.' };
+  try { await cloud.test(url, password); }
+  catch (e) { return { ok: false, message: e.message || 'Couldn’t connect.' }; }
+  const s = loadSettings(); s.cloud = { url, ...seal(password), since: Date.now() }; saveSettings(s);
+  cloud.reset(); cloud.configure({ url, password });
+  const st = await cloud.sync();
+  log.info('cloud.connected');
+  return { ok: !st.error, status: st, message: st.error || '' };
+});
+ipcMain.handle('cloud:disconnect', () => { const s = loadSettings(); delete s.cloud; saveSettings(s); cloud.configure(null); cloud.reset(); log.info('cloud.disconnected'); return { ok: true }; });
+ipcMain.handle('cloud:sync', () => cloud ? cloud.sync() : { enabled: false });
 
 async function handleConnector(op, args) {
   if (op === 'ping') {
@@ -450,6 +490,7 @@ function createWindow() {
 app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
 
 app.whenReady().then(() => {
+  startCloud();
   protocol.handle('app', req => {
     const url = new URL(req.url);
     if (url.host !== 'notebook' || req.method !== 'GET') return new Response('Not found', { status: 404 });

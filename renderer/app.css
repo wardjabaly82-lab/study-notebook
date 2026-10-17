@@ -504,6 +504,12 @@ kbd { font-family: var(--f-ui); font-size: 12px; font-weight: 500; background: v
 .fs-note p { margin: .3em 0; }
 .fs-note mjx-container[display="true"] { margin: .4em 0 !important; }
 
+/* online notebook */
+.cloud-form { display: grid; gap: 10px; margin-top: 8px; }
+.cloud-form .field input { direction: ltr; }
+#cloudBox .row code.path { flex: 1 1 260px; background: var(--fill); border-radius: 8px; padding: 7px 10px; }
+#cloudBox .steps li > div > .row { margin-top: 8px; }
+
 /* ---------- accessibility: motion, transparency, contrast ---------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
