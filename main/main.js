@@ -458,7 +458,7 @@ app.whenReady().then(() => {
   dropOldAiSettings();
   dailyBackup();
   setInterval(dailyBackup, 6 * 3600 * 1000);
-  updates = Updates.create({ log, notify: v => { if (win && !win.isDestroyed()) win.webContents.send('update:ready', v); } });
+  updates = Updates.create({ log, notify: v => { if (win && !win.isDestroyed()) win.webContents.send('update:ready', v); }, progress: p => { if (win && !win.isDestroyed()) win.webContents.send('update:progress', p); } });
   updates.startChecking();
   const t = loadSettings().theme; if (['system', 'light', 'dark'].includes(t)) nativeTheme.themeSource = t;
   createWindow();

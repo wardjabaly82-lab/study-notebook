@@ -719,12 +719,31 @@
     const box = d.querySelector('#updBox'); if (!box || !D.updateStatus) return;
     D.updateStatus().then(u => {
       if (!u.enabled) { box.innerHTML = `<p class="small">${esc(t('Version {v}.', { v: (S.settings && S.settings.version) || '' }))} ${t('Automatic updates aren’t set up for this copy.')}</p>`; return; }
-      const line = u.state === 'available' ? t('Version {v} is downloading…', { v: u.version }) : u.state === 'ready' ? t('Version {v} is ready.', { v: u.version }) : u.state === 'checking' ? t('Checking for updates…') : u.state === 'error' ? t('Couldn’t check for updates. Try again later.') : t('You have the latest version ({v}).', { v: u.current });
+      if (u.state === 'available') { box.innerHTML = `<p class="small" id="updLine"></p><div class="bar"><i id="updBar" style="width:0%"></i></div>`; showUpdProgress(u); return; }
+      const line = u.state === 'ready' ? t('Version {v} is ready.', { v: u.version }) : u.state === 'checking' ? t('Checking for updates…') : u.state === 'error' ? t('Couldn’t check for updates. Try again later.') : t('You have the latest version ({v}).', { v: u.current });
       box.innerHTML = `<p class="small">${esc(line)}</p><div class="row">${u.state === 'ready' ? `<button class="btn primary" type="button" id="updNow">${t('Restart and update')}</button>` : `<button class="btn" type="button" id="updCheck">${t('Check for updates')}</button>`}</div>`;
       const now = box.querySelector('#updNow'); if (now) now.onclick = async () => { await saveNow(); D.updateInstall(); };
       const ck = box.querySelector('#updCheck'); if (ck) ck.onclick = async () => { ck.disabled = true; await D.updateCheck(); setTimeout(() => drawUpdates(d), 1500); };
     });
   }
+
+  // "Downloading version 1.4.1: 34 of 110 MB, about 1 min left"
+  const mb = b => (b / 1e6).toFixed(b < 1e7 ? 1 : 0);
+  function showUpdProgress(u) {
+    const line = document.getElementById('updLine'), bar = document.getElementById('updBar'); if (!line) return;
+    const total = u.total || u.size;
+    let txt;
+    if (!u.done || !total) txt = u.size ? t('Version {v} is downloading ({size} MB)…', { v: u.version, size: mb(u.size) }) : t('Version {v} is downloading…', { v: u.version });
+    else {
+      const left = u.bps > 0 ? (total - u.done) / u.bps : 0;
+      const when = !left ? '' : left < 60 ? t('less than a minute left') : t('about {m} min left', { m: Math.ceil(left / 60) });
+      txt = t('Downloading version {v}: {done} of {total} MB', { v: u.version, done: mb(u.done), total: mb(total) }) + (when ? ', ' + when : '');
+      if (u.size && u.total && u.total < u.size * 0.9) txt += '. ' + t('Only the changed parts are downloaded.');
+    }
+    line.textContent = txt;
+    if (bar) bar.style.width = (total ? Math.min(100, Math.round(100 * (u.done || 0) / total)) : 0) + '%';
+  }
+  if (D.onUpdateProgress) D.onUpdateProgress(p => { if (p.state === 'available') showUpdProgress(p); });
 
   function renderSettings() {
     const s = S.settings || {};
