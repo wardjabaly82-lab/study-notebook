@@ -123,8 +123,20 @@ button { cursor: default; -webkit-tap-highlight-color: transparent; }
 .side { background: var(--shelf); color: var(--shelf-ink); display: flex; flex-direction: column; min-height: 0; padding: 18px 14px 10px; gap: 8px; }
 .brand { display: flex; align-items: center; gap: 7px; font-weight: 600; font-size: 13.5px; letter-spacing: -.005em; padding: 2px 0 8px; color: var(--shelf-ink); white-space: nowrap; }
 .brand-mark { width: 20px; height: 20px; }
-.courses { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 10px; margin: 0 -6px; padding: 4px 6px; scrollbar-width: thin; }
-.course { position: relative; flex: 1 1 0; min-height: 132px; max-height: 248px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 22px 0 10px; border: 0; border-radius: 3px 3px 1px 1px; color: #f4ecdc; text-align: center;
+.courses { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 10px; margin: 0 -8px; padding: 8px 8px 12px;
+  /* the shelf fades out at its edges instead of showing a scrollbar track */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%); }
+/* A hairline scroll thumb on the shelf, only while you're over it */
+.courses::-webkit-scrollbar { width: 6px; }
+.courses::-webkit-scrollbar-track { background: transparent; margin: 10px 0; }
+.courses::-webkit-scrollbar-thumb { background: transparent; border: 0; border-radius: 99px; min-height: 40px; }
+.courses:hover::-webkit-scrollbar-thumb { background: rgba(255, 238, 200, .22); }
+.courses::-webkit-scrollbar-thumb:hover { background: rgba(255, 238, 200, .38); }
+.courses::-webkit-scrollbar-button { display: none; height: 0; }
+.course { touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.courses.sorting .course:not(.lifted) { transition: transform 0s, filter var(--fast) ease; }
+.course.lifted { z-index: 2; cursor: grabbing; filter: brightness(1.1); box-shadow: inset 7px 0 9px -7px rgba(255, 255, 255, .22), inset -8px 0 10px -6px rgba(0, 0, 0, .35), 0 14px 26px -8px rgba(0, 0, 0, .65); scale: 1.03; transition: scale var(--fast) var(--ease), box-shadow var(--fast) ease; }
+.course { position: relative; flex: 1 0 auto; height: 0; min-height: 172px; max-height: 248px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 22px 0 10px; border: 0; border-radius: 3px 3px 1px 1px; color: #f4ecdc; text-align: center;
   background: linear-gradient(to bottom, transparent 9px, rgba(255, 238, 200, .32) 9px 10px, transparent 10px 13px, rgba(255, 238, 200, .32) 13px 14px, transparent 14px), var(--c, var(--cover));
   box-shadow: inset 7px 0 9px -7px rgba(255, 255, 255, .22), inset -8px 0 10px -6px rgba(0, 0, 0, .35), inset 0 0 0 1px rgba(0, 0, 0, .2); }
 .course:hover { filter: brightness(1.08); }
@@ -666,7 +678,7 @@ kbd { font-family: var(--f-ui); font-size: 12px; font-weight: 500; background: v
 /* ---------- phone: the shelf becomes a drawer of volumes lying flat ---------- */
 @media (max-width: 700px) {
   .courses { gap: 8px; }
-  .course { flex: none; min-height: 56px; max-height: none; flex-direction: row; justify-content: space-between; padding: 0 12px 0 16px; gap: 12px;
+  .course { flex: none; height: auto; min-height: 56px; max-height: none; flex-direction: row; justify-content: space-between; padding: 0 12px 0 16px; gap: 12px;
     background: linear-gradient(to right, transparent 7px, rgba(255, 238, 200, .32) 7px 8px, transparent 8px), var(--c, var(--cover)); }
   [dir="rtl"] .course { background: linear-gradient(to left, transparent 7px, rgba(255, 238, 200, .32) 7px 8px, transparent 8px), var(--c, var(--cover)); }
   .sp-t { writing-mode: horizontal-tb; transform: none; white-space: normal; font-size: 15.5px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }

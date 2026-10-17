@@ -116,6 +116,7 @@
     'Automatic': 'אוטומטי', 'Light': 'בהיר', 'Dark': 'כהה',
     'Version {v} is ready': 'גרסה {v} מוכנה', 'Restart the app to update. It takes a few seconds, and your notes are saved first.': 'הפעילו מחדש את האפליקציה כדי לעדכן. זה לוקח כמה שניות, והסיכומים נשמרים קודם.',
     'Restart now': 'הפעלה מחדש עכשיו', 'Later': 'אחר כך', 'Hide': 'הסתרה', 'A new version is on its way': 'גרסה חדשה בדרך',
+    'Drag to move it on the shelf': 'גררו כדי להזיז על המדף',
     'Paper warmth': 'חמימות הדף', 'Neutral': 'ניטרלי', 'Paper': 'נייר', 'Warm': 'חם', 'Sepia': 'ספיה',
     'Paper warmth: how warm the pages and the shelf look, in light and in dark.': 'חמימות הדף: עד כמה הדפים והמדף נראים חמים, בבהיר ובכהה.',
     'Date due': 'לוח חזרות', 'This course’s review slip': 'מתי לחזור על מה בקורס הזה', 'Reviewed': 'נעשה',

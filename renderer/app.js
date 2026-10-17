@@ -37,7 +37,7 @@
   const cardPath = (cid, kid) => `${BASE}/${cid}/cards/${kid}`;
   function courses() {
     return Object.entries(docs).filter(([p, d]) => p.split('/').length === 4 && d && d.name)
-      .map(([p, d]) => ({ id: p.split('/')[3], ...d })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      .map(([p, d]) => ({ id: p.split('/')[3], ...d })).sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9) || (a.createdAt || 0) - (b.createdAt || 0));
   }
   function children(cid, kind) {
     const pre = `${BASE}/${cid}/${kind}/`; const out = [];
@@ -194,14 +194,16 @@
     if (S.courseId && !list.some(c => c.id === S.courseId)) S.courseId = list[0] ? list[0].id : '';
     if (!S.courseId && list[0]) S.courseId = list[0].id;
     // Each course is a volume on the shelf: its name on the spine, its course number as the call number.
-    $('courses').innerHTML = list.map((c, i) => {
+    // A course keeps its cloth colour wherever it's moved: colours follow the order courses were made in.
+    const made = list.slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)).map(c => c.id);
+    if (!S.dragging) $('courses').innerHTML = list.map(c => {
       const n = children(c.id, 'sections').length, nl = lectures(c.id).length, due = dueCount(c.id);
       const parts = [n ? tn(n, '1 section', '{n} sections') : t('Empty')];
       if (nl) parts.push(tn(nl, '1 lecture', '{n} lectures'));
       if (due) parts.push(tn(due, '1 practice item due', '{n} practice items due'));
       const num = courseNum(c), title = (num ? c.name.replace(num, '').replace(/^[\s·:–-]+|[\s·:–-]+$/g, '') : '') || c.name;
       const call = num || title.split(/\s+/).filter(Boolean).slice(0, 3).map(w => w[0]).join('').toUpperCase();
-      return `<button class="course" type="button" data-course="${esc(c.id)}" aria-current="${c.id === S.courseId}" style="--c:${COVERS[i % COVERS.length]}" title="${esc(c.name + ' · ' + parts.join(t(', ')))}"><b class="sp-t" dir="auto">${esc(title)}</b><span class="cn" dir="auto">${esc(call)}</span>${due ? `<span class="due-pill" aria-hidden="true">${due}</span>` : ''}</button>`;
+      return `<button class="course" type="button" data-course="${esc(c.id)}" aria-current="${c.id === S.courseId}" style="--c:${COVERS[made.indexOf(c.id) % COVERS.length]}" title="${esc(c.name + ' · ' + parts.join(t(', ')) + '\n' + t('Drag to move it on the shelf'))}"><b class="sp-t" dir="auto">${esc(title)}</b><span class="cn" dir="auto">${esc(call)}</span>${due ? `<span class="due-pill" aria-hidden="true">${due}</span>` : ''}</button>`;
     }).join('') || `<p class="small" style="padding:6px 10px">${t('No courses yet.')}</p>`;
     renderClaudePill(); renderSlip();
     const th = theme();
@@ -796,6 +798,69 @@
     if (title !== s.title || content !== s.content) putSection(c.id, { ...s, title, content, prevTitle: s.title, prevContent: s.content, rev: (s.rev || 1) + 1, updatedAt: Date.now(), source: 'me' });
     S.editing = null; render(); toast(t('Changes saved'));
   });
+  /* ---------- moving volumes on the shelf ----------
+     Drag a course up or down (mouse: just drag; touch: hold, then drag; keyboard: Alt+↑/↓).
+     The new order is saved on each course, so it's the same on every device. */
+  const shelf = $('courses');
+  function saveShelfOrder() {
+    const ids = [...shelf.querySelectorAll('.course')].map(b => b.dataset.course);
+    let changed = false;
+    ids.forEach((id, i) => { const d = docs[coursePath(id)]; if (d && d.order !== i) { docs[coursePath(id)] = { ...d, order: i }; changed = true; } });
+    if (changed) save();
+    renderSide();
+  }
+  let drag = null, eatClick = false;
+  function dragMove(y) {
+    const b = drag.btn, box = shelf.getBoundingClientRect();
+    let before = null;
+    for (const o of shelf.querySelectorAll('.course')) { if (o === b) continue; const r = o.getBoundingClientRect(); if (y < r.top + r.height / 2) { before = o; break; } }
+    if (b.nextElementSibling !== before && before !== b) shelf.insertBefore(b, before);
+    b.style.transform = 'none'; const top = b.getBoundingClientRect().top;
+    b.style.transform = `translateY(${y - drag.grab - top}px)`;
+    if (y < box.top + 36) shelf.scrollTop -= 10; else if (y > box.bottom - 36) shelf.scrollTop += 10;   // near an edge: scroll the shelf
+  }
+  function dragStart(e) {
+    drag.active = true; S.dragging = true; drag.btn.classList.add('lifted'); shelf.classList.add('sorting');
+    drag.grab = drag.y - drag.btn.getBoundingClientRect().top;
+    try { drag.btn.setPointerCapture(drag.pid); } catch (er) {}
+    if (navigator.vibrate && drag.touch) navigator.vibrate(12);
+  }
+  function dragEnd(commit) {
+    if (!drag) return; clearTimeout(drag.timer);
+    const was = drag.active, b = drag.btn; drag = null;
+    if (!was) return;
+    S.dragging = false; eatClick = true; setTimeout(() => { eatClick = false; }, 0);
+    b.classList.remove('lifted'); b.style.transform = ''; shelf.classList.remove('sorting');
+    if (commit) saveShelfOrder(); else renderSide();
+  }
+  shelf.addEventListener('pointerdown', e => {
+    const b = e.target.closest('.course'); if (!b || e.button > 0) return;
+    drag = { btn: b, pid: e.pointerId, x: e.clientX, y: e.clientY, touch: e.pointerType !== 'mouse', active: false };
+    if (drag.touch) drag.timer = setTimeout(() => { if (drag && !drag.active) dragStart(); }, 380);   // hold to pick it up
+  });
+  shelf.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.pid) return;
+    const far = Math.hypot(e.clientX - drag.x, e.clientY - drag.y);
+    if (!drag.active) {
+      if (drag.touch) { if (far > 8) dragEnd(false); return; }   // a finger moving before the hold is a scroll
+      if (far < 6) return; dragStart();
+    }
+    e.preventDefault(); dragMove(e.clientY);
+  });
+  shelf.addEventListener('pointerup', () => dragEnd(true));
+  shelf.addEventListener('pointercancel', () => dragEnd(false));
+  shelf.addEventListener('touchmove', e => { if (drag && drag.active) e.preventDefault(); }, { passive: false });
+  shelf.addEventListener('contextmenu', e => { if (drag) e.preventDefault(); });
+  shelf.addEventListener('click', e => { if (eatClick) { e.stopPropagation(); e.preventDefault(); } }, true);
+  shelf.addEventListener('keydown', e => {
+    const b = e.target.closest('.course'); if (!b || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    e.preventDefault();
+    const sib = e.key === 'ArrowUp' ? b.previousElementSibling : b.nextElementSibling; if (!sib) return;
+    shelf.insertBefore(b, e.key === 'ArrowUp' ? sib : sib.nextElementSibling);
+    const id = b.dataset.course; saveShelfOrder();
+    const again = shelf.querySelector(`[data-course="${CSS.escape(id)}"]`); if (again) again.focus();
+  });
+
   // Phone: the course list slides in from the side, the topic list rises from the bottom.
   const scrim = document.createElement('div'); scrim.className = 'nav-scrim'; document.body.appendChild(scrim);
   function phonePanel(which) {
