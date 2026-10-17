@@ -1071,8 +1071,7 @@
 
   // "Downloading version 1.4.1: 34 of 110 MB, about 1 min left"
   const mb = b => (b / 1e6).toFixed(b < 1e7 ? 1 : 0);
-  function showUpdProgress(u) {
-    const line = document.getElementById('updLine'), bar = document.getElementById('updBar'); if (!line) return;
+  function updText(u) {
     const total = u.total || u.size;
     let txt;
     if (!u.done || !total) txt = u.size ? t('Version {v} is downloading ({size} MB)…', { v: u.version, size: mb(u.size) }) : t('Version {v} is downloading…', { v: u.version });
@@ -1082,8 +1081,31 @@
       txt = t('Downloading version {v}: {done} of {total} MB', { v: u.version, done: mb(u.done), total: mb(total) }) + (when ? ', ' + when : '');
       if (u.size && u.total && u.total < u.size * 0.9) txt += '. ' + t('Only the changed parts are downloaded.');
     }
-    line.textContent = txt;
-    if (bar) bar.style.width = (total ? Math.min(100, Math.round(100 * (u.done || 0) / total)) : 0) + '%';
+    return txt;
+  }
+  const updPct = u => { const total = u.total || u.size; return total ? Math.min(100, Math.round(100 * (u.done || 0) / total)) : 0; };
+  function showUpdProgress(u) {
+    const line = document.getElementById('updLine'), bar = document.getElementById('updBar'); if (!line) return;
+    line.textContent = updText(u);
+    if (bar) bar.style.width = updPct(u) + '%';
+  }
+  // A notice in the corner of the window: while a new version downloads, and again when it's ready to install.
+  // "Hide" / "Later" put it away for that version; the sidebar button stays until the restart.
+  const updHidden = { available: '', ready: '' };
+  function updNotice(u) {
+    let el = document.getElementById('updNote');
+    const show = u && (u.state === 'available' || u.state === 'ready') && u.version && updHidden[u.state] !== u.version;
+    if (!show) { if (el) el.remove(); return; }
+    if (!el) { el = document.createElement('div'); el.id = 'updNote'; el.className = 'upd-note'; el.setAttribute('role', 'status'); el.dir = UIDIR; document.body.appendChild(el); }
+    if (el.dataset.state !== u.state || el.dataset.v !== u.version) {
+      el.dataset.state = u.state; el.dataset.v = u.version;
+      el.innerHTML = u.state === 'ready'
+        ? `<span class="upd-ico" aria-hidden="true">↻</span><div><b>${esc(t('Version {v} is ready', { v: u.version }))}</b><p>${esc(t('Restart the app to update. It takes a few seconds, and your notes are saved first.'))}</p><div class="row"><button class="btn primary" type="button" data-upd="install">${esc(t('Restart now'))}</button><button class="btn ghost" type="button" data-upd="later">${esc(t('Later'))}</button></div></div>`
+        : `<span class="upd-ico" aria-hidden="true">↓</span><div><b>${esc(t('A new version is on its way'))}</b><p id="updNoteLine"></p><div class="bar"><i id="updNoteBar"></i></div><div class="row"><button class="btn ghost" type="button" data-upd="later">${esc(t('Hide'))}</button></div></div>`;
+      el.querySelector('[data-upd="later"]').onclick = () => { updHidden[u.state] = u.version; el.remove(); };
+      const go = el.querySelector('[data-upd="install"]'); if (go) go.onclick = () => installUpdate();
+    }
+    if (u.state === 'available') { el.querySelector('#updNoteLine').textContent = updText(u); el.querySelector('#updNoteBar').style.width = updPct(u) + '%'; }
   }
   // Live: Settings follows the update by itself (checking → downloading → ready), and a button
   // in the sidebar offers the restart as soon as the download is done.
@@ -1091,6 +1113,7 @@
     const box = document.getElementById('updBox');
     if (box) { if (p.state === 'available' && document.getElementById('updLine')) showUpdProgress(p); else renderUpdBox(box, { enabled: true, ...p }); }
     showUpdReady(p.state === 'ready' ? p.version : '');
+    updNotice(p);
   });
   async function installUpdate() {
     if (window.recorderState && window.recorderState().active) { toast(t('Stop the recording first, then restart to update.')); return; }
@@ -1106,7 +1129,7 @@
     }
     b.innerHTML = `<span class="upd-ico" aria-hidden="true">↻</span><span><b>${esc(t('Update ready'))}</b>${esc(t('Restart to use version {v}', { v }))}</span>`;
   }
-  if (D.updateStatus) D.updateStatus().then(u => { if (u && u.state === 'ready') showUpdReady(u.version); }).catch(() => {});
+  if (D.updateStatus) D.updateStatus().then(u => { if (u && u.state === 'ready') { showUpdReady(u.version); updNotice(u); } }).catch(() => {});
 
   /* ---------- online notebook: use Study Notebook in any Claude chat ---------- */
   const DOC_RX = /^data\/users\/local\/[A-Za-z0-9_-]{1,64}(\/(sections|sources|lectures|cards)\/[A-Za-z0-9_-]{1,64})?$/;
@@ -1318,7 +1341,6 @@
     renderSheet();
     if (dlg && dlg.open && (dlgKind === 'settings' || dlgKind === 'welcome')) { claudeMsg = null; drawClaude(dlg); }
   });
-  if (D.onUpdateReady) D.onUpdateReady(v => toast(t('Version {v} is ready. It installs when you close the app.', { v })));
   setInterval(() => { renderClaudePill(); }, 60000);
   (async () => {
     render();
