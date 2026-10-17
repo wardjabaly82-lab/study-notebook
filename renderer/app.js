@@ -813,7 +813,8 @@
     return [
       `Study Notebook course: "${c.name}"`,
       ``,
-      `In every chat in this project, use the Study Notebook tools (study-notebook) and save what we study to the course "${c.name}" automatically, as we go, without asking me:`,
+      `In every chat in this project, use the Study Notebook tools and save what we study to the course "${c.name}" automatically, as we go, without asking me:`,
+      `- The tools come from the Study Notebook app on my computer. Their names contain "study-notebook" (for example mcp__remote-devices__study-notebook__save_section). If you don't see them, search your tools for "study-notebook" before telling me they're missing.`,
       `- When you finish explaining something, save the final, clear explanation under the right topic (update an existing section instead of adding a duplicate).`,
       `- When I ask about one part of something already saved, replace only that part with a deeper explanation (edit_part), not the whole section.`,
       `- After each new topic, add 2–4 practice questions for it.`,
@@ -830,6 +831,7 @@
         <li><div><b>${esc(t('Create a project in the Claude app'))}</b><span>${esc(t('In the Claude desktop app, open Projects and create a new project. Name it “{course}”.', { course: c.name }))}</span></div></li>
         <li><div><b>${esc(t('Paste these instructions into the project'))}</b><span>${esc(t('Open the project’s instructions and paste this text. You only do this once.'))}</span></div></li>
         <li><div><b>${esc(t('Study in that project'))}</b><span>${esc(t('Start your chats inside the project. Claude saves the explanations here as you go, adds practice questions, and when you ask about one part, it deepens just that part. Say “don’t save this” to keep something out.'))}</span></div></li>
+        <li><div><b>${esc(t('Use the Claude app on this computer'))}</b><span>${esc(t('Start the chats from the Claude desktop app on this computer, with this computer linked to the chat. A chat that isn’t linked (for example one started on your phone) can’t reach Study Notebook.'))}</span></div></li>
       </ol>
       <pre class="auto-text" dir="ltr">${esc(text)}</pre>
       <div class="row"><button class="btn primary" type="button" id="copyAuto">${t('Copy instructions')}</button><button class="btn ghost" type="button" data-close>${t('Done')}</button></div>
