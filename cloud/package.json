@@ -5,7 +5,8 @@
   "description": "Study Notebook online: one shared site where each student signs in with Google and keeps a private notebook that Claude can use in any chat.",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test": "node test/server-test.mjs"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "1.2.3"

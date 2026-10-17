@@ -14,7 +14,7 @@
   async function req(path, opts = {}) {
     const r = await fetch(path, { credentials: 'same-origin', ...opts, headers: { ...H, ...(opts.headers || {}) } });
     if (r.status === 401) { signedOut(); throw new Error('signed_out'); }
-    if (r.status === 413) { error = 'Your online notebook is full (100 MB). Delete old recordings or courses to make room.'; throw new Error('full'); }
+    if (r.status === 413) { error = 'Your online notebook is full (15 MB). Delete old recordings or courses to make room.'; throw new Error('full'); }
     if (!r.ok) throw new Error('http ' + r.status);
     return r.json();
   }
@@ -77,7 +77,7 @@
       me = m; rev = r.rev; synced = new Map(Object.entries(r.docs).map(([p, d]) => [p, JSON.stringify(d)]));
       lastSync = Date.now(); online = synced.size;
       // Claude's changes arrive within seconds while the page is open.
-      setInterval(() => { if (document.visibilityState === 'visible') pull(); }, 8000);
+      setInterval(() => { if (document.visibilityState === 'visible') pull(); }, 30000);
       document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pull(); });
       window.addEventListener('online', () => pull());
       return { docs: r.docs };

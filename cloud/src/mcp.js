@@ -38,7 +38,7 @@ async function callTool(env, uid, name, args) {
     const { result, writes } = Ops.run(docs, name, args || {});
     if (writes && writes.length) {
       const adding = writes.reduce((n, w) => n + (w.data ? JSON.stringify(w.data).length : 0), 0);
-      if ((await usage(env, uid)).bytes + adding > QUOTA_BYTES) return { content: [{ type: 'text', text: 'The student’s notebook is full (100 MB). Nothing was saved; ask them to delete old recordings or courses.' }], isError: true };
+      if ((await usage(env, uid)).bytes + adding > QUOTA_BYTES) return { content: [{ type: 'text', text: 'The student’s notebook is full (15 MB). Nothing was saved; ask them to delete old recordings or courses.' }], isError: true };
       await writeDocs(env, uid, writes);
     }
     const text = JSON.stringify(result, null, 2) + (READ_ONLY.has(name) ? '' : '\n\n' + ONLINE_NOTE);

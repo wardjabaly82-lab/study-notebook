@@ -38,7 +38,7 @@ function create({ dataDir, loadData, applyChanges, log, onStatus, fetchImpl }) {
       });
     } catch (e) { throw new SyncError('offline', 'Can’t reach your online notebook. Check the internet connection.'); }
     if (res.status === 401) throw new SyncError('signed_out', 'This computer was signed out of your account. Sign in with Google again.');
-    if (res.status === 413) throw new SyncError('full', 'Your online notebook is full (100 MB). Delete old recordings or courses to make room.');
+    if (res.status === 413) throw new SyncError('full', 'Your online notebook is full (15 MB). Delete old recordings or courses to make room.');
     if (!res.ok) throw new SyncError('server', `Your online notebook answered with an error (${res.status}).`);
     try { return await res.json(); } catch (e) { throw new SyncError('server', 'That address doesn’t look like a Study Notebook online server.'); }
   }
@@ -86,8 +86,8 @@ function create({ dataDir, loadData, applyChanges, log, onStatus, fetchImpl }) {
       if (kept.size) { const back = [...kept].map(([p, d]) => ({ path: p, data: d })); await applyChanges(back); for (const k of back) st.hashes[k.path] = hashOf(k.data); }
     }
     writeState(st);
-    const ping = await api('GET', '/sync/ping');
-    Object.assign(status, { lastSync: Date.now(), error: '', pulled: incoming.length, pushed, online: ping.docs || 0, email: ping.email || status.email, name: ping.name || status.name, mcp: ping.mcp || status.mcp });
+    // After a sync both sides hold the same items, so no extra request is needed to count them.
+    Object.assign(status, { lastSync: Date.now(), error: '', pulled: incoming.length, pushed, online: Object.keys(loadData().docs || {}).length });
     if (incoming.length || pushed) log.info('cloud.synced', { pulled: incoming.length, pushed });
   }
 
@@ -110,7 +110,7 @@ function create({ dataDir, loadData, applyChanges, log, onStatus, fetchImpl }) {
     configure(next) {
       cfg = next && next.url && next.token ? { url: next.url, token: next.token } : null;
       Object.assign(status, { enabled: !!cfg, url: cfg ? cfg.url : '', email: (next && next.email) || '', name: (next && next.name) || '', mcp: cfg ? cfg.url.replace(/\/+$/, '') + '/mcp' : '', error: '' });
-      clearInterval(interval); interval = cfg ? setInterval(() => run(), 30000) : null;
+      clearInterval(interval); interval = cfg ? setInterval(() => run(), 60000) : null;
       emit();
     },
     // Tells the site this computer is signing out (best effort).

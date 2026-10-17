@@ -55,7 +55,7 @@ async function push(request, env, uid) {
   const incoming = Array.isArray(body && body.changes) ? body.changes : null;
   if (!incoming || incoming.length > 5000) return json({ error: 'bad_changes' }, 400);
   try { return json({ ok: true, ...(await store.applyPush(env, uid, incoming)) }); }
-  catch (e) { if (e.code === 'full') return json({ error: 'full', message: 'Your notebook is full (100 MB). Delete old recordings or courses to make room.' }, 413); if (e.code) return json({ error: e.code, path: e.path }, 400); throw e; }
+  catch (e) { if (e.code === 'full') return json({ error: 'full', message: 'Your notebook is full (15 MB). Delete old recordings or courses to make room.' }, 413); if (e.code) return json({ error: e.code, path: e.path }, 400); throw e; }
 }
 
 /* ---------------- the desktop app's sync (signed in with a token) ---------------- */

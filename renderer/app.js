@@ -852,7 +852,7 @@
       `Study Notebook course: "${c.name}"`,
       ``,
       `In every chat in this project, use the Study Notebook tools and save what we study to the course "${c.name}" automatically, as we go, without asking me:`,
-      `- The tools come from the Study Notebook app on my computer. Their names contain "study-notebook" (for example mcp__remote-devices__study-notebook__save_section). If you don't see them, search your tools for "study-notebook" before telling me they're missing.`,
+      `- The tools come from the Study Notebook connector; their names contain "study-notebook". If you don't see them, search your tools for "study-notebook" before telling me they're missing.`,
       `- When you finish explaining something, save the final, clear explanation under the right topic (update an existing section instead of adding a duplicate).`,
       `- When I ask about one part of something already saved, replace only that part with a deeper explanation (edit_part), not the whole section.`,
       `- Save notes from a PDF, slides or a lecture in one go (save_sections). The app makes the practice questions itself; write them only when I ask.`,
@@ -1062,7 +1062,6 @@
   if (D.updateStatus) D.updateStatus().then(u => { if (u && u.state === 'ready') showUpdReady(u.version); }).catch(() => {});
 
   /* ---------- online notebook: use Study Notebook in any Claude chat ---------- */
-  const DEPLOY_URL = 'https://deploy.workers.cloudflare.com/?url=https://github.com/wardjabaly82-lab/study-notebook/tree/main/cloud';
   const DOC_RX = /^data\/users\/local\/[A-Za-z0-9_-]{1,64}(\/(sections|sources|lectures|cards)\/[A-Za-z0-9_-]{1,64})?$/;
   async function applyCloud(changes) {
     try {

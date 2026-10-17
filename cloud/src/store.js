@@ -2,7 +2,7 @@
    scoped to that student, so one student can never read or change another's notes. */
 
 export const DOC_PATH = /^data\/users\/local\/[A-Za-z0-9_-]{1,64}(\/(sections|sources|lectures|cards)\/[A-Za-z0-9_-]{1,64})?$/;
-export const MAX_DOC = 2_000_000;
+export const MAX_DOC = 1_400_000;
 
 let ready = false;
 export async function ensureSchema(env) {
@@ -88,15 +88,23 @@ export async function countDocs(env, uid) {
   return row ? row.n : 0;
 }
 // writes: [{ path, data }] (data null = deleted). Each change gets the student's next revision number.
+// writes: [{ path, data }] (data null = deleted). Each change gets the student's next revision number.
+// One query per ~1.5 MB of changes: the free plan allows only 50 database queries per request.
 export async function writeDocs(env, uid, writes) {
   if (!writes.length) return currentRev(env, uid);
   await ensureSchema(env);
   const now = Date.now();
-  const stmt = env.DB.prepare(`INSERT INTO notes (uid, path, data, rev, mtime) VALUES (?1, ?2, ?3, (SELECT COALESCE(MAX(rev), 0) + 1 FROM notes WHERE uid = ?1), ?4)
-    ON CONFLICT(uid, path) DO UPDATE SET data = excluded.data, rev = (SELECT COALESCE(MAX(rev), 0) + 1 FROM notes WHERE uid = ?1), mtime = excluded.mtime`);
-  for (let i = 0; i < writes.length; i += 50) {
-    await env.DB.batch(writes.slice(i, i + 50).map(w => stmt.bind(uid, w.path, w.data === null || w.data === undefined ? null : JSON.stringify(w.data), now)));
+  const stmt = env.DB.prepare(`INSERT INTO notes (uid, path, data, rev, mtime)
+    SELECT ?1, json_extract(value, '$.p'), json_extract(value, '$.d'), (SELECT COALESCE(MAX(rev), 0) FROM notes WHERE uid = ?1) + key + 1, ?2 FROM json_each(?3) WHERE true
+    ON CONFLICT(uid, path) DO UPDATE SET data = excluded.data, rev = excluded.rev, mtime = excluded.mtime`);
+  let part = [], size = 0;
+  const flush = async () => { if (part.length) await stmt.bind(uid, now, JSON.stringify(part)).run(); part = []; size = 0; };
+  for (const w of writes) {
+    const d = w.data === null || w.data === undefined ? null : JSON.stringify(w.data);
+    if (size && size + (d ? d.length : 0) > 1_500_000) await flush();
+    part.push({ p: w.path, d }); size += (d ? d.length : 0) + w.path.length;
   }
+  await flush();
   return currentRev(env, uid);
 }
 export async function changesSince(env, uid, since, limit = 5000) {
@@ -104,13 +112,8 @@ export async function changesSince(env, uid, since, limit = 5000) {
   const { results } = await env.DB.prepare('SELECT path, data, rev FROM notes WHERE uid = ?1 AND rev > ?2 ORDER BY rev LIMIT ?3').bind(uid, since, limit).all();
   return results.map(r => ({ path: r.path, data: r.data === null ? null : JSON.parse(r.data), rev: r.rev }));
 }
-export async function docAt(env, uid, path) {
-  const row = await env.DB.prepare('SELECT data FROM notes WHERE uid = ?1 AND path = ?2').bind(uid, path).first();
-  try { return row && row.data ? JSON.parse(row.data) : null; } catch (e) { return null; }
-}
-
-// Each student may keep up to this much (notes, practice, transcripts); far more than a degree needs.
-export const QUOTA_BYTES = 100 * 1024 * 1024, QUOTA_DOCS = 50000;
+// Each student may keep up to this much (notes, practice, transcripts): several degrees' worth.
+export const QUOTA_BYTES = 15 * 1024 * 1024, QUOTA_DOCS = 20000;   // the whole free database is 500 MB
 export async function usage(env, uid) {
   const r = await env.DB.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(LENGTH(data)), 0) AS bytes FROM notes WHERE uid = ?1 AND data IS NOT NULL').bind(uid).first();
   return { docs: r ? r.n : 0, bytes: r ? r.bytes : 0 };
@@ -120,12 +123,16 @@ export async function applyPush(env, uid, incoming) {
   const adding = incoming.reduce((n, ch) => n + (ch && ch.data ? JSON.stringify(ch.data).length : 0), 0);
   const u = await usage(env, uid);
   if (u.bytes + adding > QUOTA_BYTES || u.docs + incoming.length > QUOTA_DOCS) throw Object.assign(new Error('full'), { code: 'full' });
+  // The stored copies of these items, in one query.
+  const { results } = await env.DB.prepare('SELECT path, data FROM notes WHERE uid = ?1 AND path IN (SELECT value FROM json_each(?2))')
+    .bind(uid, JSON.stringify(incoming.map(ch => ch && ch.path))).all();
+  const stored = new Map(results.map(r => [r.path, r.data]));
   const writes = [], kept = [];
   for (const ch of incoming) {
     if (!ch || typeof ch.path !== 'string' || !DOC_PATH.test(ch.path)) throw Object.assign(new Error('bad_path'), { code: 'bad_path', path: ch && ch.path });
     if (ch.data !== null && (typeof ch.data !== 'object' || Array.isArray(ch.data) || JSON.stringify(ch.data).length > MAX_DOC)) throw Object.assign(new Error('bad_data'), { code: 'bad_data', path: ch.path });
     if (ch.data && ch.data.updatedAt) {
-      const cur = await docAt(env, uid, ch.path);
+      let cur = null; try { cur = stored.get(ch.path) ? JSON.parse(stored.get(ch.path)) : null; } catch (e) {}
       if (cur && cur.updatedAt && cur.updatedAt > ch.data.updatedAt) { kept.push({ path: ch.path, data: cur }); continue; }
     }
     writes.push({ path: ch.path, data: ch.data });
@@ -206,8 +213,6 @@ async function pbkdf2(password, salt) {
 const fromHex = h => new Uint8Array((h.match(/../g) || []).map(x => parseInt(x, 16)));
 export async function legacyPasswordOk(env, given, stored) {
   if (typeof given !== 'string' || !given) return false;
-  const envPw = String(env.NOTEBOOK_PASSWORD || '');
-  if (envPw.length >= 6) return (await sha256(given)) === (await sha256(envPw));
   if (!stored) return false;
   const got = await pbkdf2(given, fromHex(stored.salt)), want = fromHex(stored.hash);
   let d = got.length ^ want.length; for (let i = 0; i < Math.min(got.length, want.length); i++) d |= got[i] ^ want[i];
