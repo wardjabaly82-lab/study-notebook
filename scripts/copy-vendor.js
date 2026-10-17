@@ -5,8 +5,11 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
-const nm = path.join(root, 'node_modules');
-const out = path.join(root, 'renderer', 'vendor');
+// The libraries come from the app's node_modules, or (when building the website on Cloudflare,
+// where only cloud/ is installed) from cloud/node_modules. An output folder can be given.
+const nm = process.env.SN_VENDOR_FROM || path.join(root, 'node_modules');
+const out = process.env.SN_VENDOR_TO || path.join(root, 'renderer', 'vendor');
+const web = !!process.env.SN_VENDOR_WEB;   // the website needs no PDF reader
 
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
@@ -17,7 +20,7 @@ const files = [
   ['pdfjs-dist/build/pdf.min.js', 'pdf.min.js'],
   ['pdfjs-dist/build/pdf.worker.min.js', 'pdf.worker.min.js']
 ];
-for (const [from, to] of files) fs.copyFileSync(path.join(nm, from), path.join(out, to));
+for (const [from, to] of files) if (!(web && /^pdfjs/.test(from))) fs.copyFileSync(path.join(nm, from), path.join(out, to));
 
 // MathJax: the TeX-to-SVG bundle plus the extensions it may load on demand.
 const mj = path.join(nm, 'mathjax', 'es5');
