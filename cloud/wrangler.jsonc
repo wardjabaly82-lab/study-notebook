@@ -6,6 +6,8 @@
   "compatibility_flags": ["global_fetch_strictly_public"],
   "workers_dev": true,
   "keep_vars": true,
+  // Google sign-in: the client ID is public; the secret is a Cloudflare secret (GOOGLE_CLIENT_SECRET).
+  "vars": { "GOOGLE_CLIENT_ID": "855333541492-khm5pn5ijtprmng8o0tdq19d5dbcm2n3.apps.googleusercontent.com" },
   "d1_databases": [{ "binding": "DB", "database_name": "study-notebook" }],
   "kv_namespaces": [{ "binding": "OAUTH_KV" }],
   "build": { "command": "node ../scripts/build-web.js", "watch_dir": ["../renderer", "landing"] },
