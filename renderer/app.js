@@ -477,13 +477,8 @@
       <button class="btn primary big" type="button" data-act="gen-make" ${roots.length ? '' : 'disabled'}>${roots.length ? (S.pracTopic && secs[S.pracTopic] ? t('Make questions on this topic') : t('Make questions')) : t('Add notes first')}</button>
     </div>`;
   }
-  function makeQuestions(c, secs) {
-    if (!window.PracticeGen) return;
-    const inTopic = S.pracTopic && secs[S.pracTopic] ? new Set(subtree(secs, S.pracTopic)) : null;
-    const list = Object.values(secs).filter(s => !inTopic || inTopic.has(s.id));
-    const existing = new Set(cards(c.id).map(k => String(k.q || '').toLowerCase().replace(/[*_`>#]/g, '').replace(/\s+/g, ' ').trim()));
-    const items = window.PracticeGen.generate({ sections: list, lang: dirOf(c) === 'rtl' ? 'he' : 'en', type: S.genType, limit: 15, existing });
-    if (!items.length) { toast(t('No new questions to make from these notes. Ask Claude for more, or add notes with definitions and key terms in bold.')); return; }
+  // Saves generated questions as practice cards; returns the new card ids.
+  function addGenerated(c, items) {
     const byTopic = {}; for (const it of items) (byTopic[it.topic_section_id] = byTopic[it.topic_section_id] || []).push(it);
     const ids = [];
     for (const [sid, group] of Object.entries(byTopic)) {
@@ -492,6 +487,30 @@
         for (const w of writes) { docs[w.path] = { ...w.data, source: 'app' }; ids.push(w.path.split('/').pop()); }
       } catch (e) { /* a group that can't be saved is skipped */ }
     }
+    return ids;
+  }
+  // New topics from Claude get 2–4 practice questions right away, made here (instant, no waiting for Claude).
+  function autoPractice(cid, sectionIds) {
+    const c = courses().find(x => x.id === cid); if (!c || !window.PracticeGen || !sectionIds.length) return 0;
+    const secs = sections(cid); const all = cards(cid);
+    const has = new Set(all.map(k => k.topicId).filter(Boolean));
+    const existing = new Set(all.map(k => String(k.q || '').toLowerCase().replace(/[*_`>#]/g, '').replace(/\s+/g, ' ').trim()));
+    const items = [];
+    for (const id of new Set(sectionIds)) {
+      if (!secs[id] || has.has(id)) continue;
+      items.push(...window.PracticeGen.generate({ sections: [secs[id]], lang: dirOf(c) === 'rtl' ? 'he' : 'en', type: 'mixed', limit: 3, existing }));
+    }
+    return items.length ? addGenerated(c, items).length : 0;
+  }
+
+  function makeQuestions(c, secs) {
+    if (!window.PracticeGen) return;
+    const inTopic = S.pracTopic && secs[S.pracTopic] ? new Set(subtree(secs, S.pracTopic)) : null;
+    const list = Object.values(secs).filter(s => !inTopic || inTopic.has(s.id));
+    const existing = new Set(cards(c.id).map(k => String(k.q || '').toLowerCase().replace(/[*_`>#]/g, '').replace(/\s+/g, ' ').trim()));
+    const items = window.PracticeGen.generate({ sections: list, lang: dirOf(c) === 'rtl' ? 'he' : 'en', type: S.genType, limit: 15, existing });
+    if (!items.length) { toast(t('No new questions to make from these notes. Ask Claude for more, or add notes with definitions and key terms in bold.')); return; }
+    const ids = addGenerated(c, items);
     if (!ids.length) { toast(t('No new questions to make from these notes. Ask Claude for more, or add notes with definitions and key terms in bold.')); return; }
     save();
     toast(tn(ids.length, 'Made 1 question from your notes', 'Made {n} questions from your notes'));
@@ -817,7 +836,7 @@
       `- The tools come from the Study Notebook app on my computer. Their names contain "study-notebook" (for example mcp__remote-devices__study-notebook__save_section). If you don't see them, search your tools for "study-notebook" before telling me they're missing.`,
       `- When you finish explaining something, save the final, clear explanation under the right topic (update an existing section instead of adding a duplicate).`,
       `- When I ask about one part of something already saved, replace only that part with a deeper explanation (edit_part), not the whole section.`,
-      `- After each new topic, add 2–4 practice questions for it.`,
+      `- Save notes from a PDF, slides or a lecture in one go (save_sections). The app makes the practice questions itself; write them only when I ask.`,
       `- Don't save anything I say not to save.`,
       `- After each save, tell me in one short line what was saved and where.`,
       he ? `- Write the notes in Hebrew, with formulas in Latin form.` : ''
@@ -1029,12 +1048,15 @@
   async function applyCloud(changes) {
     try {
       if (!Array.isArray(changes)) throw new Error('bad');
-      let notes = 0;
+      let notes = 0; const fresh = {};
       for (const c of changes) {
         if (!c || !DOC_RX.test(c.path) || (c.data !== null && (typeof c.data !== 'object' || Array.isArray(c.data)))) continue;
+        const isNew = c.data && !docs[c.path] && c.data.source === 'claude' && c.path.includes('/sections/');
         if (c.data === null) delete docs[c.path]; else docs[c.path] = c.data;
+        if (isNew) { const parts = c.path.split('/'); (fresh[parts[3]] = fresh[parts[3]] || []).push(parts[5]); }
         if (c.path.includes('/sections/') || c.path.includes('/cards/')) notes++;
       }
+      for (const [cid, ids] of Object.entries(fresh)) autoPractice(cid, ids);
       dirty = true; await saveNow();
       if (!S.editing && !(S.view === 'practice' && S.prac)) render(); else { renderSide(); renderContents(); }
       if (notes) toast(tn(notes, '1 change came in from your online notebook', '{n} changes came in from your online notebook'));
@@ -1142,7 +1164,16 @@
         else if (op === 'save_practice') {
           toast(tn(result.saved, 'Claude added 1 practice item to {course}', 'Claude added {n} practice items to {course}', { course: result.course }));
           render();
+        } else if (op === 'save_sections') {
+          const added = result.saved.filter(x => x.action === 'added').map(x => x.section_id);
+          const made = autoPractice(cid, added); if (made) save();
+          toast(tn(result.saved.length, 'Claude saved 1 topic in {course}', 'Claude saved {n} topics in {course}', { course: result.course }) + (made ? ' · ' + tn(made, '1 practice question made', '{n} practice questions made') : ''));
+          const busy = S.editing || (S.view === 'practice' && S.prac);
+          if (cid !== S.courseId && !busy) { S.courseId = cid; store('sn-course', cid); S.search = ''; }
+          if (S.view !== 'notes' && !busy && cid === S.courseId && S.view !== 'lecture') S.view = 'notes';
+          render(); if (cid === S.courseId && S.view === 'notes' && result.saved[0]) flash(result.saved[0].section_id);
         } else if (op === 'save_section' || op === 'edit_part') {
+          if (op === 'save_section' && result.action === 'added' && autoPractice(cid, [result.section_id])) save();
           toast(result.action === 'updated' ? t('Claude updated “{title}” in {course}', { title: result.title, course: result.course }) : t('Claude saved “{title}” in {course}', { title: result.title, course: result.course }));
           const busy = S.editing || (S.view === 'practice' && S.prac);
           if (cid !== S.courseId && !busy) { S.courseId = cid; store('sn-course', cid); S.search = ''; }

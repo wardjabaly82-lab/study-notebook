@@ -8,7 +8,7 @@ const net = require('net');
 const path = require('path');
 const crypto = require('crypto');
 
-const OPS = new Set(['ping', 'list_courses', 'get_outline', 'read_section', 'search_notes', 'save_section', 'edit_part', 'create_course', 'list_lectures', 'read_lecture', 'save_practice', 'get_practice_overview']);
+const OPS = new Set(['ping', 'list_courses', 'get_outline', 'read_section', 'search_notes', 'save_section', 'save_sections', 'edit_part', 'create_course', 'list_lectures', 'read_lecture', 'save_practice', 'get_practice_overview']);
 const MAX_LINE = 2 * 1024 * 1024;
 
 // Must match linkPath() in connector/src/server.js.

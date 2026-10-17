@@ -244,6 +244,31 @@
       return out;
     },
 
+    // Saves several sections in one go (e.g. all the notes from a PDF or a lecture).
+    // An item can go under an earlier item of the same list with "under": its number (1, 2, …).
+    save_sections(docs, { course, sections: items }, now) {
+      if (!Array.isArray(items) || !items.length) throw new OpError('Give at least one section to save.');
+      if (items.length > 40) throw new OpError('Save at most 40 sections at a time.');
+      const c = findCourse(docs, course);
+      const work = Object.assign({}, docs); const writes = new Map(); const ids = []; const saved = [];
+      items.forEach((it, i) => {
+        if (!it || typeof it !== 'object') throw new OpError(`Item ${i + 1} is not valid.`);
+        let parent = it.parent_id || undefined;
+        if (it.under !== undefined && it.under !== null) {
+          const n = Number(it.under);
+          if (!Number.isInteger(n) || n < 1 || n > i) throw new OpError(`Item ${i + 1}: "under" must be the number of an earlier item in this list.`);
+          parent = ids[n - 1];
+        }
+        let out;
+        try { out = OPS.save_section(work, { course: c.id, title: it.title, content: it.content, section_id: it.section_id, parent_id: parent, lecture_id: it.lecture_id }, now + i); }
+        catch (e) { throw new OpError(`Item ${i + 1}: ${e.message}`); }
+        for (const w of out.writes) { if (w.data === null) delete work[w.path]; else work[w.path] = w.data; writes.set(w.path, w); }
+        ids.push(out.result.section_id);
+        saved.push({ item: i + 1, action: out.result.action, section_id: out.result.section_id, path: out.result.path });
+      });
+      return { result: { course: c.name, saved }, writes: [...writes.values()] };
+    },
+
     // Replaces one passage of a section (e.g. with a deeper explanation of just that part),
     // leaving the rest of the section exactly as it was. The previous version is kept for undo.
     edit_part(docs, { course, section_id, find, replace }, now) {

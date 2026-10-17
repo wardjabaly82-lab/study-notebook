@@ -200,6 +200,23 @@ tool('save_section', {
   annotations: WRITE
 });
 
+tool('save_sections', {
+  title: 'Save several sections at once',
+  description: 'Save many final explanations in one call, e.g. all the notes from a PDF, slides or a lecture. Each item is like save_section. To put an item under another item of the same list, set "under" to that item’s number (1 = the first item). Faster than calling save_section many times.',
+  inputSchema: {
+    course: courseArg,
+    sections: z.array(z.object({
+      title: z.string().min(1).max(200).describe('Section title, short and specific, in the course’s notes language.'),
+      content: z.string().min(1).max(200000).describe('The complete explanation in Markdown.'),
+      section_id: z.string().max(64).optional().describe('Set this to update an existing section instead of adding one.'),
+      parent_id: z.string().max(64).optional().describe('An existing section to put this one under.'),
+      under: z.number().int().min(1).max(40).optional().describe('Put this one under an earlier item of this list: its number, starting at 1.'),
+      lecture_id: z.string().max(64).optional().describe('When these notes come from a recorded lecture: its lecture_id.')
+    })).min(1).max(40)
+  },
+  annotations: WRITE
+});
+
 tool('edit_part', {
   title: 'Replace one part of a section',
   description: 'Replace one passage inside a saved section, leaving the rest of the section exactly as it is. Use it when the student asks to go deeper into, or didn’t understand, one part of an explanation. Copy the passage from read_section exactly (it must appear once). The previous version is kept for undo in the app.',
