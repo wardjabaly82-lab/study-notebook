@@ -83,12 +83,12 @@
     const c = courses().find(x => x.id === cid); const l = lectures(cid).find(x => x.id === lid);
     const nb = c ? (courseNum(c) || c.name) : 'my';
     const title = l ? l.title : 'this lecture';
-    return c && c.lang === 'he' ? `תכין סיכום מלא מההרצאה "${title}" ותשמור אותו במחברת של ${nb}` : `Make notes from my lecture "${title}" and save them to my ${nb} notebook`;
+    return c && c.lang === 'he' ? `תכין סיכום מלא מההרצאה "${title}" ותשמור אותו ב-Study Notebook, בקורס ${nb}` : `Make notes from my lecture "${title}" and save them in Study Notebook, course ${nb}`;
   }
   function askPractice(c, topic) {
     const nb = courseNum(c) || c.name;
-    if (c.lang === 'he') return topic ? `תכין לי שאלות תרגול וכרטיסיות על "${topic}" במחברת של ${nb}` : `תכין לי שאלות תרגול לקראת המבחן במחברת של ${nb}, תתמקד בנושאים שאני חלש בהם`;
-    return topic ? `Make practice questions and flashcards on "${topic}" in my ${nb} notebook` : `Make exam practice questions for my ${nb} notebook, focusing on my weak topics`;
+    if (c.lang === 'he') return topic ? `תכין לי שאלות תרגול וכרטיסיות על "${topic}" ב-Study Notebook, בקורס ${nb}` : `תכין לי שאלות תרגול לקראת המבחן ב-Study Notebook, בקורס ${nb}, ותתמקד בנושאים שאני חלש בהם`;
+    return topic ? `Make practice questions and flashcards on "${topic}" in Study Notebook, course ${nb}` : `Make exam practice questions in Study Notebook, course ${nb}, focusing on my weak topics`;
   }
   const copy = text => navigator.clipboard.writeText(text).then(() => toast(t('Copied. Paste it into Claude.'))).catch(() => {});
 
@@ -250,12 +250,13 @@
     const list = []; walk(secs, (s, d) => list.push([s, d]));
     if (!list.length) {
       const num = courseNum(c);
-      const say = c.lang === 'he' ? `“תשמור את זה במחברת של ${num || c.name}”` : `“Save this to my ${num || c.name} notebook”`;
+      const say = c.lang === 'he' ? `“תשמור את מה שלמדנו ב-Study Notebook, בקורס ${num || c.name}”` : `“Save what we covered in Study Notebook, course ${num || c.name}”`;
       sheet.setAttribute('dir', UIDIR);
       sheet.innerHTML = `<div class="empty"><h2>${t('This notebook is empty')}</h2>
-        <p>${esc(t('Open the Claude app and study {course} as usual. When you understand something, Claude saves it here. You can also ask it directly:', { course: c.name }))}</p>
+        <p>${esc(t('Open the Claude app and study a topic from {course}: ask questions until it makes sense. Then say:', { course: c.name }))}</p>
         <p class="say" dir="auto">${esc(say)}</p>
-        ${lastClaude() ? '' : `<button class="btn primary" type="button" data-act="settings">${t('Connect to Claude')}</button>`}</div>`;
+        <p class="small">${esc(t('Claude saves the final explanation here, under the right topic.'))}</p>
+        ${lastClaude() ? `<p class="small">${esc(t('If Claude says it can’t find Study Notebook, start a new chat in the Claude desktop app, or tell it: “Search your tools for study-notebook”.'))}</p>` : `<button class="btn primary" type="button" data-act="settings">${t('Connect to Claude')}</button>`}</div>`;
       return;
     }
     const q = norm(S.search);
@@ -664,7 +665,8 @@
     let html;
     if (seen && st.configured) {
       html = `<div class="cs-state ok"><span class="cs-ico">✓</span><div><b>${t('Connected to Claude')}</b><p>${esc(t('Claude can save notes to this notebook. Last contact {when}.', { when: ago(seen) }))}</p></div></div>
-        <p class="small">${t('In the Claude app, just study. Say “save this to my notebook” any time.')}</p>`;
+        <p class="small">${t('In the Claude app, study as usual. When you understand something, say “save this in Study Notebook”.')}</p>
+        <p class="small">${esc(t('If Claude says it can’t find Study Notebook, start a new chat in the Claude desktop app, or tell it: “Search your tools for study-notebook”.'))}</p>`;
     } else if (!st.installed) {
       html = `<div class="cs-state"><span class="cs-ico">1</span><div><b>${t('Install the Claude desktop app')}</b><p>${t('Study Notebook works with the Claude app for Windows or Mac, with your normal Claude account.')}</p></div></div>
         <div class="row"><button class="btn primary" type="button" data-url="https://claude.ai/download">${t('Download the Claude app')}</button><button class="btn ghost" type="button" id="csRecheck">${t('I installed it')}</button></div>`;
