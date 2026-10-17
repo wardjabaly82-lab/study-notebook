@@ -6,15 +6,15 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' app:; script-src 'self' app: 'unsafe-inline'; style-src 'self' app: 'unsafe-inline'; font-src 'self' app: data:; img-src 'self' app: data: blob:; worker-src 'self' app: blob:; connect-src 'self' app:">
 <title>Study Notebook</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#19191b" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#e5e4df" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18181a" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="vendor/fonts/rubik/index.css">
 <link rel="stylesheet" href="vendor/fonts/frank-ruhl-libre/index.css">
 <link rel="stylesheet" href="app.css">
 <script src="i18n.js"></script>
 <script>
   // Apply the saved theme before anything draws, so there is no flash.
-  (function () { var t = 'system'; try { t = localStorage.getItem('sn-theme') || 'system'; } catch (e) {} document.documentElement.setAttribute('data-theme', t); })();
+  (function () { var t = 'system', w = 'paper'; try { t = localStorage.getItem('sn-theme') || 'system'; w = localStorage.getItem('sn-warmth') || 'paper'; } catch (e) {} document.documentElement.setAttribute('data-theme', t); document.documentElement.setAttribute('data-warmth', w); })();
 </script>
 </head>
 <body>
@@ -41,6 +41,7 @@
     <div class="body">
       <nav class="contents" id="contents" data-i18n-aria="Contents"></nav>
       <div class="sheet-wrap" id="sheetWrap"><article class="sheet" id="sheet"></article></div>
+      <aside class="slip" id="slip" hidden></aside>
     </div>
   </main>
 </div>

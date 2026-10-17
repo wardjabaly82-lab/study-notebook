@@ -103,8 +103,7 @@
   // Deleting keeps a copy for a few seconds, so "Undo" can bring it all back.
   function removeDocs(test) { const kept = {}; for (const p of Object.keys(docs)) if (test(p)) { kept[p] = docs[p]; delete docs[p]; } return kept; }
   function undoable(msg, kept, after) { toast(msg, { label: t('Undo'), fn: () => { Object.assign(docs, kept); save(); if (after) after(); else render(); toast(t('Restored')); } }); }
-  const COVERS = ['#0a7cff', '#30b350', '#ff8a00', '#af52de', '#5856d6', '#ff375f', '#1eaac4', '#ff5e3a'];
-  const coverOf = id => COVERS[[...String(id)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) % COVERS.length];
+  const COVERS = ['#6c2330', '#24533f', '#2c3a5e', '#7a4f1d', '#523061', '#255a5e', '#53562a', '#3d4650'];   // bookcloth
   const dirOf = c => (c && c.lang === 'he') ? 'rtl' : (c && c.lang === 'en') ? 'ltr' : (/[֐-׿]/.test(c ? c.name : '') ? 'rtl' : 'ltr');
   const dirFor = lang => (lang === 'he' || lang === 'ar') ? 'rtl' : 'ltr';
   const courseNum = c => ((c && c.name.match(/\d{4,6}/)) || [])[0];
@@ -144,6 +143,7 @@
   function decorateShape(el) {
     el.querySelectorAll('p,li,blockquote,td,th').forEach(n => n.setAttribute('dir', 'auto'));
     el.querySelectorAll('pre').forEach(n => n.setAttribute('dir', 'ltr'));
+    el.querySelectorAll('p > strong:first-child').forEach(b => { if (b === b.parentNode.firstChild) b.classList.add('lead'); });   // "**Definition.** …" reads as a label
     el.querySelectorAll('table').forEach(tb => { if (!tb.parentElement.classList.contains('tbl')) { const w = document.createElement('div'); w.className = 'tbl'; tb.replaceWith(w); w.appendChild(tb); } });
   }
   function wireLinks(el) {
@@ -184,13 +184,17 @@
     const list = courses();
     if (S.courseId && !list.some(c => c.id === S.courseId)) S.courseId = list[0] ? list[0].id : '';
     if (!S.courseId && list[0]) S.courseId = list[0].id;
-    $('courses').innerHTML = list.map(c => {
+    // Each course is a volume on the shelf: its name on the spine, its course number as the call number.
+    $('courses').innerHTML = list.map((c, i) => {
       const n = children(c.id, 'sections').length, nl = lectures(c.id).length, due = dueCount(c.id);
       const parts = [n ? tn(n, '1 section', '{n} sections') : t('Empty')];
       if (nl) parts.push(tn(nl, '1 lecture', '{n} lectures'));
-      return `<button class="course" type="button" data-course="${esc(c.id)}" aria-current="${c.id === S.courseId}" style="--c:${coverOf(c.id)}"><span class="tab" aria-hidden="true"></span><span><b dir="auto">${esc(c.name)}</b><small>${esc(parts.join(t(', ')))}</small></span>${due ? `<span class="due-pill" title="${esc(tn(due, '1 practice item due', '{n} practice items due'))}">${due}</span>` : ''}</button>`;
+      if (due) parts.push(tn(due, '1 practice item due', '{n} practice items due'));
+      const num = courseNum(c), title = (num ? c.name.replace(num, '').replace(/^[\s·:–-]+|[\s·:–-]+$/g, '') : '') || c.name;
+      const call = num || title.split(/\s+/).filter(Boolean).slice(0, 3).map(w => w[0]).join('').toUpperCase();
+      return `<button class="course" type="button" data-course="${esc(c.id)}" aria-current="${c.id === S.courseId}" style="--c:${COVERS[i % COVERS.length]}" title="${esc(c.name + ' · ' + parts.join(t(', ')))}"><b class="sp-t" dir="auto">${esc(title)}</b><span class="cn" dir="auto">${esc(call)}</span>${due ? `<span class="due-pill" aria-hidden="true">${due}</span>` : ''}</button>`;
     }).join('') || `<p class="small" style="padding:6px 10px">${t('No courses yet.')}</p>`;
-    renderClaudePill();
+    renderClaudePill(); renderSlip();
     const th = theme();
     $('themeBtn').innerHTML = THEME_ICON[th];
     $('themeBtn').title = t('Appearance: {name} (click to change)', { name: t(THEME_NAME[th]) });
@@ -447,6 +451,35 @@
     if (!rows.length) rows.push(`<li><span><b>${t('All caught up for today')}</b><small>${t('Every topic is practiced. Come back tomorrow for what’s due.')}</small></span></li>`);
     return `<div class="plan"><div class="plan-head"><div><span class="plan-days">${esc(head)}</span><span class="small"> · ${esc(fmtDay(c.examDate))}${p.final ? '' : ' · ' + esc(tn(p.left, '1 topic left to cover', '{n} topics left to cover'))}</span></div><button type="button" class="sn-link" data-act="exam-date">${t('Change')}</button></div>
       <h3>${t('Today')}</h3><ul class="plan-list">${rows.join('')}</ul></div>`;
+  }
+  // The date-due slip beside the page: days already reviewed (stamped), today's cards, what comes next, the exam.
+  function renderSlip() {
+    const el = $('slip'), c = course();
+    const show = !!c && children(c.id, 'sections').length > 0;
+    el.hidden = !show; $('main').querySelector('.body').classList.toggle('no-slip', !show);
+    if (!show) { el.innerHTML = ''; return; }
+    const all = cards(c.id), now = Date.now(), DAY = 86400000;
+    const dayOf = ts => { const d = new Date(ts); d.setHours(0, 0, 0, 0); return +d; };
+    const today = dayOf(now), when = ts => new Date(ts).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' });
+    const hist = all.flatMap(k => k.hist || []).map(h => h.t);
+    const past = [...new Set(hist.filter(x => x < today && x > today - 21 * DAY).map(dayOf))].sort((a, b) => a - b).slice(-2);
+    const stamp = `<span class="stamp">${t('Reviewed')}</span>`;
+    const due = all.filter(k => !k.srs || k.srs.due <= now).length;
+    const secs = sections(c.id), next = new Map();
+    for (const k of all) if (k.srs && k.srs.due >= today + DAY) {
+      const d = dayOf(k.srs.due), r = k.topicId && rootOf(secs, k.topicId), e = next.get(d) || { n: 0, topics: new Set() };
+      e.n++; if (r) e.topics.add(r.title); next.set(d, e);
+    }
+    const rows = past.map(d => `<tr><td>${esc(when(d))}</td><td>${stamp}</td></tr>`);
+    rows.push(`<tr><td>${t('Today')}</td><td>${due ? esc(tn(due, '1 card · {m} min', '{n} cards · {m} min', { m: Math.max(1, Math.round(due * 0.75)) })) : hist.some(x => x >= today) ? stamp : `<span class="later">${t('Nothing due')}</span>`}</td></tr>`);
+    for (const [d, e] of [...next].sort((a, b) => a[0] - b[0]).slice(0, 2)) rows.push(`<tr><td>${esc(when(d))}</td><td class="later" dir="auto">${esc(e.topics.size ? [...e.topics].slice(0, 2).join(', ') : tn(e.n, '1 card', '{n} cards'))}</td></tr>`);
+    const n = daysTo(c.examDate);
+    const exam = n == null || n < 0 ? `<button type="button" class="sn-link" data-act="exam-date">${t('Set exam date')}</button>`
+      : `<div class="exam">${t('Exam')}<b>${esc(new Date(c.examDate + 'T12:00').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' }))} · ${esc(n === 0 ? t('today') : tn(n, '1 day', '{n} days'))}</b></div>`;
+    el.setAttribute('dir', UIDIR);
+    el.innerHTML = `<h2>${t('Date due')}</h2><p class="sub">${t('This course’s review slip')}</p>
+      ${all.length ? `<table>${rows.join('')}</table>` : `<p class="small">${t('Practice cards appear here once the app makes questions for your topics.')}</p>`}
+      ${due ? `<button class="btn primary" type="button" data-act="slip-review">${t('Review today’s cards')}</button>` : ''}${exam}`;
   }
   function planTopic(c, secs, id) {
     S.pracTopic = id; S.pracMode = 'all';
@@ -726,6 +759,7 @@
       case 'print-formulas': if (window.openPrint) window.openPrint('__formulas'); break;
       case 'plan-topic': planTopic(c, secs, b.dataset.id); break;
       case 'plan-due': S.pracTopic = ''; S.pracMode = 'due'; startPractice(c, secs); break;
+      case 'slip-review': S.pracTopic = ''; S.pracMode = 'due'; S.prac = null; showView('practice'); startPractice(c, secs); break;
       case 'plan-all': S.pracTopic = ''; S.pracMode = 'all'; startPractice(c, secs); break;
       case 'delete-course': S.menu = false; renderTop(); openDeleteCourse(); break;
       case 'back-notes': S.prac = null; showView('notes'); break;
@@ -822,6 +856,10 @@
     dark: '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>'
   };
   const theme = () => document.documentElement.getAttribute('data-theme') || 'system';
+  // How warm the paper, shelf and ink look; each student picks their own. Works in light and dark.
+  const WARMTH = { neutral: ['Neutral', '#f1f1ef'], paper: ['Paper', '#f4efe5'], warm: ['Warm', '#f1e4cc'], sepia: ['Sepia', '#e9d5ad'] };
+  const warmth = () => document.documentElement.getAttribute('data-warmth') || 'paper';
+  function setWarmth(w) { document.documentElement.setAttribute('data-warmth', w); store('sn-warmth', w); if (dlg && dlg.open && dlgKind === 'settings') renderSettings(); }
   function setTheme(th) { document.documentElement.setAttribute('data-theme', th); store('sn-theme', th); D.setTheme(th); renderSide(); if (dlg && dlg.open && dlgKind === 'settings') renderSettings(); }
 
   /* ================= dialogs ================= */
@@ -1133,6 +1171,8 @@
       <section class="group"><h3>${t('Appearance')}</h3>
         <div class="seg" role="group" aria-label="${esc(t('Appearance'))}">${['system', 'light', 'dark'].map(th => `<button type="button" data-theme-pick="${th}" aria-pressed="${theme() === th}">${THEME_ICON[th]}${t(THEME_NAME[th])}</button>`).join('')}</div>
         <p class="small">${t('Automatic follows your computer’s light or dark setting.')}</p>
+        <div class="seg" role="group" aria-label="${esc(t('Paper warmth'))}">${Object.entries(WARMTH).map(([k, [name, sw]]) => `<button type="button" data-warmth-pick="${k}" aria-pressed="${warmth() === k}"><i class="swatch" style="background:${sw}" aria-hidden="true"></i>${t(name)}</button>`).join('')}</div>
+        <p class="small">${t('Paper warmth: how warm the pages and the shelf look, in light and in dark.')}</p>
         ${WEB ? '' : `<p class="small">${t('Text size: Ctrl + and Ctrl − (Ctrl 0 for normal).')}`} <button type="button" class="sn-link" id="keysLink">${t('All keyboard shortcuts')}</button>${WEB ? '' : '</p>'}</section>
       <section class="group"><h3>${t('Language')}</h3>
         <div class="seg" role="group" aria-label="${esc(t('Language'))}"><button type="button" data-ui-lang="en" aria-pressed="${uiLang === 'en'}">English</button><button type="button" data-ui-lang="he" aria-pressed="${uiLang === 'he'}">עברית</button></div>
@@ -1146,6 +1186,7 @@
       drawCloud(d); if (!WEB) { wireClaude(d); drawSpeech(d); drawUpdates(d); }
       const kl = d.querySelector('#keysLink'); if (kl) kl.onclick = () => openShortcuts();
       d.querySelectorAll('[data-theme-pick]').forEach(b => b.onclick = () => setTheme(b.dataset.themePick));
+      d.querySelectorAll('[data-warmth-pick]').forEach(b => b.onclick = () => setWarmth(b.dataset.warmthPick));
       d.querySelectorAll('[data-ui-lang]').forEach(b => b.onclick = async () => { if (b.dataset.uiLang === uiLang) return; window.I18N.set(b.dataset.uiLang); await saveNow(); location.reload(); });
       if (d.querySelector('#folder')) d.querySelector('#folder').onclick = () => D.openDataFolder();
       d.querySelector('#backup').onclick = async () => { await saveNow(); const r = await D.exportBackup(JSON.stringify({ version: 1, app: 'Study Notebook', exportedAt: new Date().toISOString(), docs }, null, 1)); if (r.ok) toast(t('Backup saved')); else if (!r.cancelled) toast(r.message || t('Couldn’t save the backup')); };
