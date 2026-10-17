@@ -205,7 +205,7 @@
       const call = num || title.split(/\s+/).filter(Boolean).slice(0, 3).map(w => w[0]).join('').toUpperCase();
       const ex = daysTo(c.examDate), soon = ex != null && ex >= 0 && ex <= 7;
       if (soon) parts.push(ex === 0 ? t('Exam today') : ex === 1 ? t('Exam tomorrow') : t('Exam in {n} days', { n: ex }));
-      return `<button class="course${soon ? ' exam-soon' : ''}${c.photo ? ' has-photo' : ''}" type="button" data-course="${esc(c.id)}" aria-current="${c.id === S.courseId}" style="--c:${COVERS[(c.color ?? made.indexOf(c.id)) % COVERS.length]}${c.photo ? `;--photo:url(${c.photo})` : ''}" title="${esc(c.name + ' · ' + parts.join(t(', ')) + '\n' + t('Drag to move it on the shelf'))}"><b class="sp-t" dir="auto">${esc(title)}</b><span class="cn" dir="auto">${esc(call)}</span>${soon ? `<span class="sp-exam" aria-hidden="true">${ex === 0 ? '!' : ex}</span>` : ''}${due ? `<span class="due-pill" aria-hidden="true">${due}</span>` : ''}</button>`;
+      return `<button class="course${soon ? ' exam-soon' : ''}${c.photo ? ' has-photo' : ''}" type="button" data-course="${esc(c.id)}" aria-current="${c.id === S.courseId}" style="--c:${COVERS[(c.color ?? made.indexOf(c.id)) % COVERS.length]}${c.photo ? `;--photo:url(${c.photo})` : ''}" title="${esc(c.name + ' · ' + parts.join(t(', ')) + '\n' + t('Drag to move it on the shelf · right-click to edit'))}"><b class="sp-t" dir="auto">${esc(title)}</b><span class="cn" dir="auto">${esc(call)}</span>${soon ? `<span class="sp-exam" aria-hidden="true">${ex === 0 ? '!' : ex}</span>` : ''}${due ? `<span class="due-pill" aria-hidden="true">${due}</span>` : ''}</button>`;
     }).join('') || `<p class="small" style="padding:6px 10px">${t('No courses yet.')}</p>`;
     renderClaudePill(); renderSlip();
     const th = theme();
@@ -253,7 +253,7 @@
             <button type="button" role="menuitem" data-act="auto-save">${t('Auto-save Claude chats to this course')}</button>
             <button type="button" role="menuitem" data-act="add-topic">${t('Add a topic by hand')}</button>
             <button type="button" role="menuitem" data-act="export-md" ${has ? '' : 'disabled'}>${t('Export as Markdown')}</button>
-            <button type="button" role="menuitem" data-act="course-settings">${t('Rename or change language')}</button>
+            <button type="button" role="menuitem" data-act="course-settings">${t('Edit course details')}</button>
             <button type="button" role="menuitem" class="danger" data-act="delete-course">${t('Delete course')}</button>
           </div>` : ''}
         </div>
@@ -875,7 +875,8 @@
   shelf.addEventListener('pointerup', () => dragEnd(true));
   shelf.addEventListener('pointercancel', () => dragEnd(false));
   shelf.addEventListener('touchmove', e => { if (drag && drag.active) e.preventDefault(); }, { passive: false });
-  shelf.addEventListener('contextmenu', e => { if (drag) e.preventDefault(); });
+  // Right-click a book to edit that course (name, number, exam, colour, photo, page).
+  shelf.addEventListener('contextmenu', e => { e.preventDefault(); if (drag) return; const b = e.target.closest('.course'); if (b) { selectCourse(b.dataset.course); openCourseSettings(); } });
   shelf.addEventListener('click', e => { if (eatClick) { e.stopPropagation(); e.preventDefault(); } }, true);
   shelf.addEventListener('keydown', e => {
     const b = e.target.closest('.course'); if (!b || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;

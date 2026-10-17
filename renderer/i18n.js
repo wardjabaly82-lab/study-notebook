@@ -125,6 +125,7 @@
     '1 sub-topic': 'תת-נושא אחד', '{n} sub-topics': '{n} תתי-נושאים', 'No questions yet': 'אין עדיין שאלות', '1 question, not practiced': 'שאלה אחת, עוד לא תורגלה', '{n} questions, not practiced': '{n} שאלות, עוד לא תורגלו', '{p}% right': '{p}% נכון',
     'Course number': 'מספר קורס', 'Exam date (Moed A)': 'תאריך מבחן (מועד א׳)', 'Book colour': 'צבע הספר', 'Colour {n}': 'צבע {n}', 'Photo on the book': 'תמונה על הספר', 'Choose a photo': 'בחירת תמונה', 'Change photo': 'החלפת תמונה', 'Remove photo': 'הסרת התמונה', 'Photo chosen': 'התמונה נבחרה', 'Couldn’t read that image': 'לא הצלחנו לקרוא את התמונה',
     'Page': 'דף', 'Page width': 'רוחב הדף', 'Plain': 'חלק', 'Lined': 'שורות', 'Dotted': 'נקודות', 'Grid': 'משבצות', 'Narrow': 'צר', 'Normal': 'רגיל', 'Wide': 'רחב', 'Course details': 'פרטי הקורס', 'e.g. Probability for Statistics students': 'למשל: הסתברות לסטטיסטיקאים',
+    'Edit course details': 'עריכת פרטי הקורס', 'Drag to move it on the shelf · right-click to edit': 'גררו כדי להזיז על המדף · לחיצה ימנית לעריכה',
     'Fold the shelf': 'קיפול המדף', 'Unfold the shelf': 'פתיחת המדף',
     'Timer': 'טיימר', 'Paused': 'מושהה', 'Study timer': 'טיימר למידה', 'Timer type': 'סוג טיימר', 'Free timer': 'טיימר חופשי', 'Study plan': 'תוכנית למידה', 'Study method': 'שיטת למידה',
     'Studying': 'לומדים', 'Study · round {n}': 'למידה · סבב {n}', 'Long break': 'הפסקה ארוכה', 'Break': 'הפסקה',
