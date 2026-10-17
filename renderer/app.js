@@ -187,7 +187,7 @@
   }
 
   /* ================= rendering ================= */
-  function render() { renderSide(); renderTop(); renderContents(); renderSheet(); }
+  function render() { renderSide(); renderTop(); renderContents(); renderSheet(); requestAnimationFrame(markReading); }
 
   function renderSide() {
     const list = courses();
@@ -203,7 +203,9 @@
       if (due) parts.push(tn(due, '1 practice item due', '{n} practice items due'));
       const num = courseNum(c), title = (num ? c.name.replace(num, '').replace(/^[\s·:–-]+|[\s·:–-]+$/g, '') : '') || c.name;
       const call = num || title.split(/\s+/).filter(Boolean).slice(0, 3).map(w => w[0]).join('').toUpperCase();
-      return `<button class="course" type="button" data-course="${esc(c.id)}" aria-current="${c.id === S.courseId}" style="--c:${COVERS[made.indexOf(c.id) % COVERS.length]}" title="${esc(c.name + ' · ' + parts.join(t(', ')) + '\n' + t('Drag to move it on the shelf'))}"><b class="sp-t" dir="auto">${esc(title)}</b><span class="cn" dir="auto">${esc(call)}</span>${due ? `<span class="due-pill" aria-hidden="true">${due}</span>` : ''}</button>`;
+      const ex = daysTo(c.examDate), soon = ex != null && ex >= 0 && ex <= 7;
+      if (soon) parts.push(ex === 0 ? t('Exam today') : ex === 1 ? t('Exam tomorrow') : t('Exam in {n} days', { n: ex }));
+      return `<button class="course${soon ? ' exam-soon' : ''}" type="button" data-course="${esc(c.id)}" aria-current="${c.id === S.courseId}" style="--c:${COVERS[made.indexOf(c.id) % COVERS.length]}" title="${esc(c.name + ' · ' + parts.join(t(', ')) + '\n' + t('Drag to move it on the shelf'))}"><b class="sp-t" dir="auto">${esc(title)}</b><span class="cn" dir="auto">${esc(call)}</span>${soon ? `<span class="sp-exam" aria-hidden="true">${ex === 0 ? '!' : ex}</span>` : ''}${due ? `<span class="due-pill" aria-hidden="true">${due}</span>` : ''}</button>`;
     }).join('') || `<p class="small" style="padding:6px 10px">${t('No courses yet.')}</p>`;
     renderClaudePill(); renderSlip();
     const th = theme();
@@ -272,12 +274,36 @@
     const lecHtml = lecs.length ? `<h2 class="lec-h">${he ? 'הרצאות מוקלטות' : 'Recorded lectures'}</h2><ul class="lec-list">${lecs.map(l => `<li><button type="button" class="lec-link${S.view === 'lecture' && S.lecture === l.id ? ' on' : ''}" data-lecture="${esc(l.id)}"><span class="lec-state ${l.status === 'recording' ? 'live' : l.notesAt ? 'done' : ''}" aria-hidden="true"></span><span dir="auto">${esc(l.title)}</span><small>${esc(new Date(l.startedAt || 0).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' }))}${l.notesAt ? esc(t(', notes made')) : ''}</small></button></li>`).join('')}</ul>` : '';
     if (!roots.length) { el.innerHTML = lecHtml; return; }
     const dayAgo = Date.now() - 86400000;
+    // Each topic shows how far you are with it: sub-topics, practice questions and how many you got right.
+    const all = cards(c.id), byRoot = new Map();
+    for (const k of all) { const r = k.topicId && rootOf(secs, k.topicId); if (r) { const e = byRoot.get(r.id) || { n: 0, ok: 0, tries: 0 }; e.n++; for (const h of k.hist || []) { e.tries++; if (h.ok) e.ok++; } byRoot.set(r.id, e); } }
+    const clean = x => String(x || '').replace(/^\s*\d+(\.\d+)*[.)]?\s+/, '');   // the contents number it already; drop "1." typed into the title
     const item = (s, d) => {
       const ch = kids(secs, s.id); const open = !S.collapsed.has(s.id);
-      return `<li><div class="toc-row"><button type="button" class="toc-tog ${ch.length ? '' : 'none'}" data-tog="${esc(s.id)}" aria-expanded="${open}" aria-label="${esc(t('Show or hide sub-topics'))}">▼</button><button type="button" class="toc-link ${d ? 'sub' : ''} ${s.source === 'claude' && (s.updatedAt || 0) > dayAgo ? 'fresh' : ''}" data-go="${esc(s.id)}" dir="auto">${esc(s.title)}</button></div>${ch.length && open ? `<ul>${ch.map(k => item(k, d + 1)).join('')}</ul>` : ''}</li>`;
+      let meta = '';
+      if (d === 0) {
+        const e = byRoot.get(s.id), parts = [];
+        if (ch.length) parts.push(tn(ch.length, '1 sub-topic', '{n} sub-topics'));
+        const acc = e && e.tries ? Math.round(100 * e.ok / e.tries) : null;
+        parts.push(!e ? t('No questions yet') : acc == null ? tn(e.n, '1 question, not practiced', '{n} questions, not practiced') : t('{p}% right', { p: acc }));
+        meta = `<small class="toc-meta" dir="${UIDIR}"><i class="mastery ${acc == null ? '' : acc >= 70 ? 'high' : 'mid'}" aria-hidden="true"></i>${esc(parts.join(' · '))}</small>`;
+      }
+      return `<li><div class="toc-row"><button type="button" class="toc-tog ${ch.length ? '' : 'none'}" data-tog="${esc(s.id)}" aria-expanded="${open}" aria-label="${esc(t('Show or hide sub-topics'))}">▼</button><button type="button" class="toc-link ${d ? 'sub' : ''} ${s.source === 'claude' && (s.updatedAt || 0) > dayAgo ? 'fresh' : ''}" data-go="${esc(s.id)}" title="${esc(s.title)}"><span class="toc-t" dir="auto">${esc(clean(s.title))}</span>${meta}</button></div>${ch.length && open ? `<ul>${ch.map(k => item(k, d + 1)).join('')}</ul>` : ''}</li>`;
     };
     el.innerHTML = `<h2>${he ? 'תוכן העניינים' : 'Contents'}</h2><ul>${roots.map(s => item(s, 0)).join('')}</ul>${lecHtml}`;
+    markReading();
   }
+  // The topic you're reading is marked in the contents as you scroll.
+  function markReading() {
+    const w = $('sheetWrap'), list = $('contents'); if (!w || !list) return;
+    let cur = null; const top = w.getBoundingClientRect().top + 90;
+    for (const sec of w.querySelectorAll('.sec')) { if (sec.getBoundingClientRect().top <= top) cur = sec; else break; }
+    const id = cur ? cur.id.replace(/^sec-/, '') : (w.querySelector('.sec') || { id: '' }).id.replace(/^sec-/, '');
+    list.querySelectorAll('.toc-link.on').forEach(b => b.classList.remove('on'));
+    const b = id && list.querySelector(`[data-go="${CSS.escape(id)}"]`);
+    if (b) { b.classList.add('on'); if (S.view === 'notes') { const r = b.getBoundingClientRect(), lr = list.getBoundingClientRect(); if (r.top < lr.top || r.bottom > lr.bottom) b.scrollIntoView({ block: 'nearest' }); } }
+  }
+  { let raf = 0; $('sheetWrap').addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; if (S.view === 'notes') markReading(); }); }, { passive: true }); }
 
   function sectionHtml(c, s, d, secs) {
     const tag = ['h2', 'h3', 'h4', 'h4', 'h4'][Math.min(d, 4)];
@@ -492,7 +518,8 @@
     el.setAttribute('dir', UIDIR);
     el.innerHTML = `<h2>${t('Date due')}</h2><p class="sub">${t('This course’s review slip')}</p>
       ${all.length ? `<table>${rows.join('')}</table>` : `<p class="small">${t('Practice cards appear here once the app makes questions for your topics.')}</p>`}
-      ${due ? `<button class="btn primary" type="button" data-act="slip-review">${t('Review today’s cards')}</button>` : ''}${exam}`;
+      ${due ? `<button class="btn primary" type="button" data-act="slip-review">${t('Review today’s cards')}</button>` : ''}${exam}
+      ${window.StudyTimer ? `<p class="slip-study">${esc(t('Studied today: {a}', { a: window.StudyTimer.today() }))}</p>` : ''}`;
   }
   function planTopic(c, secs, id) {
     S.pracTopic = id; S.pracMode = 'all';
@@ -885,6 +912,7 @@
   $('foldBtn').addEventListener('click', toggleFold); paintFold();
   document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b' && !e.target.closest('input, textarea, [contenteditable]')) { e.preventDefault(); toggleFold(); } });
   if (window.StudyTimer) window.StudyTimer.init({ t, tn, esc, toast, dir: UIDIR });
+  window.__snSlip = () => renderSlip();
   syncTitleBar();
   $('settingsBtn').addEventListener('click', () => openSettings());
   $('claudePill').addEventListener('click', () => openSettings());

@@ -153,6 +153,7 @@
       if (b) { const c = b.querySelector('.t-clock'); if (c) c.textContent = clock(); b.classList.toggle('study', studying()); b.classList.toggle('rest', !studying()); }
       if (pop) { if (phase !== S.phase) draw(); else { const big = pop.querySelector('.t-big'), bar = pop.querySelector('.bar i'); if (big) big.textContent = clock(); if (bar) bar.style.width = Math.min(100, 100 * S.elapsed / phaseLen()) + '%'; } }
       title();
+      if (S.running && studying() && Date.now() % 60000 < 1000 && window.__snSlip) window.__snSlip();   // the slip's minutes, once a minute
     }, 1000);
     document.addEventListener('click', e => {
       if (e.target.closest('#timerBtn')) { open(); return; }
@@ -167,5 +168,5 @@
     addEventListener('resize', place);
     title();
   }
-  window.StudyTimer = { init, button, place: () => place() };
+  window.StudyTimer = { init, button, place: () => place(), today: () => A ? fmtLong(totals().today) : '' };
 })();

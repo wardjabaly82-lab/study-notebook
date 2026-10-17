@@ -122,6 +122,7 @@
     'The app restarts by itself when the download is done.': 'האפליקציה תופעל מחדש לבד כשההורדה תסתיים.',
     'Update now, or keep studying: it downloads in the background and installs when you close the app.': 'אפשר לעדכן עכשיו, או להמשיך ללמוד: ההורדה נעשית ברקע והעדכון מותקן כשסוגרים את האפליקציה.',
     'Downloading version {v}…': 'מוריד את גרסה {v}…',
+    '1 sub-topic': 'תת-נושא אחד', '{n} sub-topics': '{n} תתי-נושאים', 'No questions yet': 'אין עדיין שאלות', '1 question, not practiced': 'שאלה אחת, עוד לא תורגלה', '{n} questions, not practiced': '{n} שאלות, עוד לא תורגלו', '{p}% right': '{p}% נכון',
     'Fold the shelf': 'קיפול המדף', 'Unfold the shelf': 'פתיחת המדף',
     'Timer': 'טיימר', 'Paused': 'מושהה', 'Study timer': 'טיימר למידה', 'Timer type': 'סוג טיימר', 'Free timer': 'טיימר חופשי', 'Study plan': 'תוכנית למידה', 'Study method': 'שיטת למידה',
     'Studying': 'לומדים', 'Study · round {n}': 'למידה · סבב {n}', 'Long break': 'הפסקה ארוכה', 'Break': 'הפסקה',
