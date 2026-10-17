@@ -310,8 +310,8 @@ ipcMain.handle('cloud:connect', async (ev, req) => {
   const url = cleanUrl(req && req.url), password = String((req && req.password) || '');
   if (!url) return { ok: false, message: 'Enter the address of your online notebook, starting with https://' };
   if (password.length < 6) return { ok: false, message: 'Enter the password you chose when you set it up.' };
-  try { await cloud.test(url, password); }
-  catch (e) { return { ok: false, message: e.message || 'Couldn’t connect.' }; }
+  try { await cloud.test(url, password, typeof (req && req.confirm) === 'string' ? req.confirm : undefined); }
+  catch (e) { return { ok: false, code: e.code || '', message: e.message || 'Couldn’t connect.' }; }
   const s = loadSettings(); s.cloud = { url, ...seal(password), since: Date.now() }; saveSettings(s);
   cloud.reset(); cloud.configure({ url, password });
   const st = await cloud.sync();

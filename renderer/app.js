@@ -1063,10 +1063,11 @@
     }
     box.innerHTML = `<p class="small">${t('Study Notebook works in chats started from the Claude app on this computer. To use it in any chat, also on your phone or the web, put an online copy of your notebook in your own free Cloudflare account. The app keeps both in sync.')}</p>
       <ol class="steps">
-        <li><div><b>${t('Create your online notebook')}</b><span>${t('Sign up for Cloudflare (free) and choose a password for your notebook when asked (NOTEBOOK_PASSWORD). It takes about 3 minutes.')}</span><div class="row" style="margin-top:6px"><button class="btn primary" type="button" id="cloudDeploy">${t('Create it on Cloudflare')}</button></div></div></li>
-        <li><div><b>${t('Connect this app to it')}</b><span>${t('Copy your notebook’s address from Cloudflare (it ends in .workers.dev) and enter it with your password.')}</span>
+        <li><div><b>${t('Create your online notebook')}</b><span>${t('Sign up for Cloudflare (free) and press Create and deploy. It takes about 3 minutes. You don’t need to set anything else there.')}</span><div class="row" style="margin-top:6px"><button class="btn primary" type="button" id="cloudDeploy">${t('Create it on Cloudflare')}</button></div></div></li>
+        <li><div><b>${t('Connect this app to it')}</b><span>${t('Copy your notebook’s address from Cloudflare (it ends in .workers.dev) and paste it here. The first time, choose a password for your online notebook (at least 8 characters); later, enter the same one.')}</span>
           <form class="cloud-form" id="cloudForm"><label class="field">${t('Address')}<input id="cloudUrl" type="url" dir="ltr" placeholder="https://study-notebook.yourname.workers.dev" required></label>
           <label class="field">${t('Password')}<input id="cloudPw" type="password" dir="ltr" autocomplete="current-password" required></label>
+          <label class="field" id="cloudPw2Wrap" hidden>${t('Password again')}<input id="cloudPw2" type="password" dir="ltr" autocomplete="new-password"></label>
           <p class="status" id="cloudMsg" role="status"></p>
           <div class="row"><button class="btn primary" type="submit">${t('Connect')}</button></div></form></div></li>
         <li><div><b>${t('Add it to Claude')}</b><span>${t('After connecting, this page shows the address to add in Claude → Customize → Connectors. Then every chat can save to your notebook.')}</span></div></li>
@@ -1075,8 +1076,10 @@
     box.querySelector('#cloudForm').onsubmit = async e => {
       e.preventDefault(); const msg = box.querySelector('#cloudMsg'); const btn = e.target.querySelector('button[type=submit]');
       msg.className = 'status'; msg.textContent = t('Connecting…'); btn.disabled = true; box.dataset.busy = '1';
-      const r = await D.cloudConnect(box.querySelector('#cloudUrl').value, box.querySelector('#cloudPw').value);
+      const wrap = box.querySelector('#cloudPw2Wrap');
+      const r = await D.cloudConnect(box.querySelector('#cloudUrl').value, box.querySelector('#cloudPw').value, wrap.hidden ? undefined : box.querySelector('#cloudPw2').value);
       delete box.dataset.busy; btn.disabled = false;
+      if (!r.ok && r.code === 'confirm') { wrap.hidden = false; msg.className = 'status'; msg.textContent = t(r.message); box.querySelector('#cloudPw2').focus(); return; }
       if (!r.ok) { msg.className = 'status bad'; msg.textContent = t(r.message || 'Couldn’t connect.'); return; }
       cloudState = await D.cloudStatus(); paintCloud(box); toast(t('Connected. Your notes are now online too.'));
     };

@@ -113,10 +113,21 @@ function create({ dataDir, loadData, applyChanges, log, onStatus, fetchImpl }) {
       clearInterval(interval); interval = cfg ? setInterval(() => run(), 30000) : null;
       emit();
     },
-    // Checks an address and password before saving them.
-    async test(url, password) {
+    // Checks an address and password before saving them. A new online notebook without a
+    // password yet takes this one (first connection sets it).
+    async test(url, password, confirm) {
       const saved = cfg; cfg = { url, password };
-      try { return await api('GET', '/sync/ping'); } finally { cfg = saved; }
+      try {
+        try { return await api('GET', '/sync/ping'); }
+        catch (e) {
+          if (!(e instanceof SyncError) || e.code !== 'setup') throw e;
+          if (password.length < 8) throw new SyncError('short', 'Choose a password of at least 8 characters.');
+          // A new online notebook: the password is set now, so make sure it was typed right.
+          if (confirm !== password) throw new SyncError('confirm', confirm ? 'The two passwords don’t match. Type the same password twice.' : 'This online notebook is new. Type your password again to set it.');
+          await api('POST', '/sync/setup');
+          return await api('GET', '/sync/ping');
+        }
+      } finally { cfg = saved; }
     },
     sync: run,
     soon() { if (!cfg) return; clearTimeout(timer); timer = setTimeout(() => run(), 3000); },

@@ -15,9 +15,6 @@
   },
   "cloudflare": {
     "bindings": {
-      "NOTEBOOK_PASSWORD": {
-        "description": "Choose a password for your online notebook (at least 10 characters). You type it once when you add the connector in Claude, and once in the Study Notebook app on your laptop."
-      },
       "DB": {
         "description": "Where your notes are stored online."
       },

@@ -19,7 +19,8 @@ async function ensureSchema(env) {
   if (schemaReady) return;
   await env.DB.batch([
     env.DB.prepare('CREATE TABLE IF NOT EXISTS docs (path TEXT PRIMARY KEY, data TEXT, rev INTEGER NOT NULL, mtime INTEGER NOT NULL)'),
-    env.DB.prepare('CREATE INDEX IF NOT EXISTS docs_rev ON docs(rev)')
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS docs_rev ON docs(rev)'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)')
   ]);
   schemaReady = true;
 }
@@ -48,9 +49,31 @@ async function writeDocs(env, writes) {
 
 /* ---------------- the password ---------------- */
 
+// The password is either a Cloudflare secret (NOTEBOOK_PASSWORD) or, more simply, chosen from the
+// Study Notebook app the first time it connects: then only a salted hash of it is stored here.
+const envPassword = env => { const p = String(env.NOTEBOOK_PASSWORD || ''); return p.length >= 6 ? p : ''; };
+async function storedPassword(env) {
+  await ensureSchema(env);
+  const row = await env.DB.prepare("SELECT v FROM meta WHERE k = 'password'").first();
+  try { return row ? JSON.parse(row.v) : null; } catch (e) { return null; }
+}
+async function pbkdf2(password, salt) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 100000 }, key, 256);
+  return new Uint8Array(bits);
+}
+const toHex = a => [...a].map(b => b.toString(16).padStart(2, '0')).join('');
+const fromHex = h => new Uint8Array((h.match(/../g) || []).map(x => parseInt(x, 16)));
+async function hasPassword(env) { return !!envPassword(env) || !!(await storedPassword(env)); }
 async function samePassword(env, given) {
-  const want = String(env.NOTEBOOK_PASSWORD || '');
-  if (!want || typeof given !== 'string') return false;
+  if (typeof given !== 'string' || !given) return false;
+  if (!envPassword(env)) {
+    const st = await storedPassword(env); if (!st) return false;
+    const got = await pbkdf2(given, fromHex(st.salt)), want = fromHex(st.hash);
+    let d = got.length ^ want.length; for (let i = 0; i < Math.min(got.length, want.length); i++) d |= got[i] ^ want[i];
+    return d === 0;
+  }
+  const want = envPassword(env);
   const enc = new TextEncoder();
   const [a, b] = await Promise.all([crypto.subtle.digest('SHA-256', enc.encode(given)), crypto.subtle.digest('SHA-256', enc.encode(want))]);
   const x = new Uint8Array(a), y = new Uint8Array(b);
@@ -135,6 +158,19 @@ const McpHandler = {
 
 async function sync(request, env, url) {
   const auth = request.headers.get('Authorization') || '';
+  // First connection from the app: choose the password (only while none is set).
+  if (url.pathname === '/sync/setup' && request.method === 'POST') {
+    if (await hasPassword(env)) return Response.json({ error: 'already_set' }, { status: 409 });
+    const pw = auth.replace(/^Bearer\s+/i, '');
+    if (pw.length < 8) return Response.json({ error: 'too_short' }, { status: 400 });
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const hash = await pbkdf2(pw, salt);
+    // INSERT only if still missing, so two first connections can't both set it.
+    const r = await env.DB.prepare("INSERT INTO meta (k, v) VALUES ('password', ?1) ON CONFLICT(k) DO NOTHING").bind(JSON.stringify({ salt: toHex(salt), hash: toHex(hash), at: Date.now() })).run();
+    if (!r.meta || !r.meta.changes) return Response.json({ error: 'already_set' }, { status: 409 });
+    return Response.json({ ok: true });
+  }
+  if (!(await hasPassword(env))) return Response.json({ error: 'no_password' }, { status: 503 });
   if (!(await samePassword(env, auth.replace(/^Bearer\s+/i, '')))) { await slow(); return Response.json({ error: 'wrong_password' }, { status: 401 }); }
   const route = url.pathname.replace(/^\/sync\/?/, '');
   if (route === 'ping' && request.method === 'GET') {
@@ -257,8 +293,10 @@ function providerFor(origin) {
 
 export default {
   async fetch(request, env, ctx) {
-    if (!env.NOTEBOOK_PASSWORD || String(env.NOTEBOOK_PASSWORD).length < 6) {
-      return new Response(page('Set a password', '<h1>Almost there</h1><p>This online notebook has no password yet. In your Cloudflare dashboard open this Worker → <b>Settings → Variables and Secrets</b>, add a secret named <b>NOTEBOOK_PASSWORD</b>, and deploy again.</p>'), { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+    const url = new URL(request.url);
+    if (url.pathname.startsWith('/sync/')) return sync(request, env, url);
+    if (!(await hasPassword(env))) {
+      return new Response(page('Almost there', '<h1>Almost there</h1><p>Your online notebook is running. To finish, open the Study Notebook app on your laptop: <b>Settings → Use in any chat</b>, enter this page’s address and choose a password, then press <b>Connect</b>.</p>'), { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
     }
     return providerFor(new URL(request.url).origin).fetch(request, env, ctx);
   }
