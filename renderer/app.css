@@ -436,6 +436,12 @@ button.ts-row:hover { background: var(--fill); }
 .cs-more .btn { justify-self: start; }
 .claude-setup .status { margin: 0; }
 
+.upd-ready { display: flex; gap: 10px; align-items: center; text-align: start; border: 0; background: var(--accent); color: var(--accent-ink); border-radius: 10px; padding: 8px 11px; font-size: 12.5px; line-height: 1.35; animation: sheet-in var(--slow) var(--ease); transition: transform var(--fast) var(--ease), background-color var(--fast) ease; }
+.upd-ready:hover { background: color-mix(in srgb, var(--accent) 88%, #000); }
+.upd-ready:active { transform: scale(.97); transition-duration: 60ms; }
+.upd-ready b { display: block; font-weight: 600; font-size: 13px; }
+.upd-ico { flex: none; width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,.22); display: grid; place-items: center; font-size: 14px; font-weight: 700; }
+
 /* ---------- accessibility: motion, transparency, contrast ---------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }

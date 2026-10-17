@@ -16,12 +16,14 @@ function create({ log, notify, progress }) {
       updater.autoDownload = true;
       updater.autoInstallOnAppQuit = true;   // installs the next time the app closes
       updater.logger = null;
-      updater.on('checking-for-update', () => { st.state = 'checking'; });
+      // Every change of state goes to the window, so Settings updates by itself.
+      const push = () => { if (progress) progress({ ...st }); };
+      updater.on('checking-for-update', () => { st.state = 'checking'; push(); });
       updater.on('update-available', i => {
         st.state = 'available'; st.version = i.version; st.done = 0; st.total = 0; st.bps = 0;
         st.size = (i.files && i.files[0] && i.files[0].size) || 0;   // full installer size
         log.info('update.available', { version: i.version, size: st.size });
-        if (progress) progress({ ...st });
+        push();
       });
       // How much is downloaded and how fast. With a differential update "total" is only the changed parts.
       updater.on('download-progress', p => {
@@ -29,9 +31,9 @@ function create({ log, notify, progress }) {
         st.bps = st.bps ? st.bps * 0.7 + (p.bytesPerSecond || 0) * 0.3 : (p.bytesPerSecond || 0);   // smoothed speed
         const now = Date.now(); if (progress && now - lastSent > 400) { lastSent = now; progress({ ...st }); }
       });
-      updater.on('update-not-available', () => { st.state = 'latest'; });
-      updater.on('update-downloaded', i => { st.state = 'ready'; st.version = i.version; st.done = st.total; log.info('update.ready', { version: i.version }); notify(i.version); });
-      updater.on('error', e => { st.state = 'error'; log.warn('update.error', { error: e && e.message }); });
+      updater.on('update-not-available', () => { st.state = 'latest'; push(); });
+      updater.on('update-downloaded', i => { st.state = 'ready'; st.version = i.version; st.done = st.total; log.info('update.ready', { version: i.version }); push(); notify(i.version); });
+      updater.on('error', e => { st.state = 'error'; log.warn('update.error', { error: e && e.message }); push(); });
       st.enabled = true;
     }
   } catch (e) { log.warn('update.unavailable', { error: e.message }); }

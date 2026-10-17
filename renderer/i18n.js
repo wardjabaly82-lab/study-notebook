@@ -111,7 +111,7 @@
     'Version {v}.': 'גרסה {v}.', 'Automatic updates aren’t set up for this copy.': 'עדכונים אוטומטיים לא מוגדרים בעותק הזה.',
     'Version {v} is downloading…': 'גרסה {v} יורדת…', 'Version {v} is downloading ({size} MB)…': 'גרסה {v} יורדת ({size} MB)…', 'Downloading version {v}: {done} of {total} MB': 'מוריד את גרסה {v}: {done} מתוך {total} MB', 'less than a minute left': 'נשארה פחות מדקה', 'about {m} min left': 'נשארו בערך {m} דק׳', 'Only the changed parts are downloaded.': 'יורדים רק החלקים שהשתנו.', 'Version {v} is ready.': 'גרסה {v} מוכנה.', 'Checking for updates…': 'בודק עדכונים…',
     'Couldn’t check for updates. Try again later.': 'לא הצלחנו לבדוק עדכונים. נסו שוב מאוחר יותר.',
-    'You have the latest version ({v}).': 'יש לכם את הגרסה האחרונה ({v}).', 'Restart and update': 'הפעלה מחדש ועדכון', 'Check for updates': 'בדיקת עדכונים',
+    'You have the latest version ({v}).': 'יש לכם את הגרסה האחרונה ({v}).', 'Restart and update': 'הפעלה מחדש ועדכון', 'Update ready': 'עדכון מוכן', 'Restart to use version {v}': 'הפעילו מחדש כדי לעבור לגרסה {v}', 'Check for updates': 'בדיקת עדכונים',
     'Settings': 'הגדרות', 'Lecture recording': 'הקלטת הרצאות', 'Checking…': 'בודק…', 'Appearance': 'מראה',
     'Automatic': 'אוטומטי', 'Light': 'בהיר', 'Dark': 'כהה',
     'Automatic follows your computer’s light or dark setting.': 'אוטומטי עוקב אחרי הגדרת התצוגה הבהירה או הכהה של המחשב.',

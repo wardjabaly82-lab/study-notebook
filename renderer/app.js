@@ -717,14 +717,17 @@
   }
   function drawUpdates(d) {
     const box = d.querySelector('#updBox'); if (!box || !D.updateStatus) return;
-    D.updateStatus().then(u => {
+    D.updateStatus().then(u => renderUpdBox(box, u));
+  }
+  function renderUpdBox(box, u) {
+    {
       if (!u.enabled) { box.innerHTML = `<p class="small">${esc(t('Version {v}.', { v: (S.settings && S.settings.version) || '' }))} ${t('Automatic updates aren’t set up for this copy.')}</p>`; return; }
       if (u.state === 'available') { box.innerHTML = `<p class="small" id="updLine"></p><div class="bar"><i id="updBar" style="width:0%"></i></div>`; showUpdProgress(u); return; }
       const line = u.state === 'ready' ? t('Version {v} is ready.', { v: u.version }) : u.state === 'checking' ? t('Checking for updates…') : u.state === 'error' ? t('Couldn’t check for updates. Try again later.') : t('You have the latest version ({v}).', { v: u.current });
-      box.innerHTML = `<p class="small">${esc(line)}</p><div class="row">${u.state === 'ready' ? `<button class="btn primary" type="button" id="updNow">${t('Restart and update')}</button>` : `<button class="btn" type="button" id="updCheck">${t('Check for updates')}</button>`}</div>`;
+      box.innerHTML = `<p class="small">${esc(line)}</p><div class="row">${u.state === 'ready' ? `<button class="btn primary" type="button" id="updNow">${t('Restart and update')}</button>` : u.state === 'checking' ? '' : `<button class="btn" type="button" id="updCheck">${t('Check for updates')}</button>`}</div>`;
       const now = box.querySelector('#updNow'); if (now) now.onclick = async () => { await saveNow(); D.updateInstall(); };
-      const ck = box.querySelector('#updCheck'); if (ck) ck.onclick = async () => { ck.disabled = true; await D.updateCheck(); setTimeout(() => drawUpdates(d), 1500); };
-    });
+      const ck = box.querySelector('#updCheck'); if (ck) ck.onclick = () => { renderUpdBox(box, { ...u, state: 'checking' }); D.updateCheck(); };
+    }
   }
 
   // "Downloading version 1.4.1: 34 of 110 MB, about 1 min left"
@@ -743,7 +746,24 @@
     line.textContent = txt;
     if (bar) bar.style.width = (total ? Math.min(100, Math.round(100 * (u.done || 0) / total)) : 0) + '%';
   }
-  if (D.onUpdateProgress) D.onUpdateProgress(p => { if (p.state === 'available') showUpdProgress(p); });
+  // Live: Settings follows the update by itself (checking → downloading → ready), and a button
+  // in the sidebar offers the restart as soon as the download is done.
+  if (D.onUpdateProgress) D.onUpdateProgress(p => {
+    const box = document.getElementById('updBox');
+    if (box) { if (p.state === 'available' && document.getElementById('updLine')) showUpdProgress(p); else renderUpdBox(box, { enabled: true, ...p }); }
+    showUpdReady(p.state === 'ready' ? p.version : '');
+  });
+  function showUpdReady(v) {
+    let b = document.getElementById('updReady');
+    if (!v) { if (b) b.remove(); return; }
+    if (!b) {
+      b = document.createElement('button'); b.type = 'button'; b.id = 'updReady'; b.className = 'upd-ready';
+      b.onclick = async () => { await saveNow(); D.updateInstall(); };
+      const foot = document.querySelector('.side-foot'); if (foot) foot.prepend(b);
+    }
+    b.innerHTML = `<span class="upd-ico" aria-hidden="true">↻</span><span><b>${esc(t('Update ready'))}</b>${esc(t('Restart to use version {v}', { v }))}</span>`;
+  }
+  if (D.updateStatus) D.updateStatus().then(u => { if (u && u.state === 'ready') showUpdReady(u.version); }).catch(() => {});
 
   function renderSettings() {
     const s = S.settings || {};
