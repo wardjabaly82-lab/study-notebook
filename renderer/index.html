@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' app:; script-src 'self' app: 'unsafe-inline'; style-src 'self' app: 'unsafe-inline'; font-src 'self' app: data:; img-src 'self' app: data: blob:; worker-src 'self' app: blob:; connect-src 'self' app:">
 <title>Study Notebook</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#19191b" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="vendor/fonts/rubik/index.css">
 <link rel="stylesheet" href="vendor/fonts/frank-ruhl-libre/index.css">
 <link rel="stylesheet" href="app.css">
@@ -55,6 +58,7 @@ window.MathJax = {
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
 <script src="vendor/mathjax/tex-svg.js" async></script>
+<script src="web-bridge.js"></script>
 <script src="notebook-ops.js"></script>
 <script src="practice-gen.js"></script>
 <script src="app.js"></script>

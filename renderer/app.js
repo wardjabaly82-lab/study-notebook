@@ -5,6 +5,7 @@
 (() => {
   'use strict';
   const D = window.desktop;
+  const WEB = !!D.web;   // the notebook on the website (no recording, printing or local Claude setup there)
   const Ops = window.NotebookOps;
   const { t, tn, lang: uiLang } = window.I18N;
   const BASE = Ops.BASE;
@@ -196,7 +197,7 @@
     $('themeBtn').setAttribute('aria-label', t('Appearance: {name}', { name: t(THEME_NAME[th]) }));
   }
 
-  function lastClaude() { return Math.max(S.lastClaude, S.claudeSeen || 0, (S.settings && (S.settings.connectorLastUse || S.settings.connectorSeen)) || 0); }
+  function lastClaude() { if (WEB) return cloudState && cloudState.claude ? Math.max(S.lastClaude, 1) : S.lastClaude; return Math.max(S.lastClaude, S.claudeSeen || 0, (S.settings && (S.settings.connectorLastUse || S.settings.connectorSeen)) || 0); }
   function renderClaudePill() {
     const ts = lastClaude();
     $('claudePill').innerHTML = ts
@@ -205,6 +206,7 @@
   }
 
   function recButton() {
+    if (WEB) return '';
     const r = window.recorderState ? window.recorderState() : { active: false };
     return r.active ? `<button class="btn rec-btn live" id="recBtn" type="button"><span class="rec-dot on"></span>${t('Recording')} ${r.state === 'recording' ? fmtTs(r.seconds) : '…'}</button>`
       : `<button class="btn rec-btn" id="recBtn" type="button"><span class="rec-dot"></span>${t('Record lecture')}</button>`;
@@ -212,17 +214,19 @@
 
   function renderTop() {
     const c = course(); const top = $('top');
-    if (!c) { top.innerHTML = `<h1>Study Notebook</h1>`; return; }
+    const navBtn = `<button class="icon-btn nav-btn" id="navBtn" type="button" aria-label="${esc(t('Courses'))}" aria-controls="courses" aria-expanded="false"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></button>`;
+    if (!c) { top.innerHTML = `${navBtn}<h1>Study Notebook</h1>`; return; }
     const secs = children(c.id, 'sections');
     const newest = secs.reduce((m, s) => Math.max(m, s.updatedAt || 0), 0);
     const has = secs.length > 0, due = dueCount(c.id), nCards = cards(c.id).length;
-    top.innerHTML = `
+    top.innerHTML = `${navBtn}
       <h1><span dir="auto">${esc(c.name)}</span><span class="meta" dir="${UIDIR}">${has ? esc(tn(secs.length, '1 section, updated {when}', '{n} sections, updated {when}', { when: ago(newest) })) : t('No notes yet')}${examChip(c)}</span></h1>
       <div class="tools">
         <label class="search"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="search" type="search" placeholder="${esc(t('Search this course'))}" value="${esc(S.search)}" aria-label="${esc(t('Search this course'))}" ${has ? '' : 'disabled'}></label>
+        <button class="btn toc-btn" id="tocBtn" type="button" aria-controls="contents" ${has ? '' : 'disabled'}><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${t('Topics')}</button>
         <button class="btn${S.view === 'practice' ? ' on' : ''}" id="pracBtn" type="button"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="13" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7.5 3.5h10a3 3 0 0 1 3 3v10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>${t('Practice')}${due ? `<span class="count">${due}</span>` : nCards ? '' : ''}</button>
         ${recButton()}
-        <button class="btn" id="printBtn" type="button" ${has ? '' : 'disabled'}><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>${t('Print / PDF')}</button>
+        ${WEB ? '' : `<button class="btn" id="printBtn" type="button" ${has ? '' : 'disabled'}><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>${t('Print / PDF')}</button>`}
         <div class="menu-wrap">
           <button class="btn" id="moreBtn" type="button" aria-haspopup="menu" aria-expanded="${S.menu}" aria-label="${esc(t('More'))}">⋯</button>
           ${S.menu ? `<div class="menu" role="menu">
@@ -458,7 +462,7 @@
     const items = formulaItems(c, secs);
     sheet.setAttribute('dir', dirOf(c));
     sheet.innerHTML = `<div class="fs-top" dir="${UIDIR}"><div><h2>${t('Formula sheet')}</h2><p class="small">${t('Definitions, claims and formulas from your notes, on as few pages as possible.')}</p></div>
-        <div class="row"><button class="btn primary" type="button" data-act="print-formulas">${t('Print / PDF')}</button><button class="btn ghost" type="button" data-act="back-notes">${t('← Back to notes')}</button></div></div>
+        <div class="row">${WEB ? '' : `<button class="btn primary" type="button" data-act="print-formulas">${t('Print / PDF')}</button>`}<button class="btn ghost" type="button" data-act="back-notes">${t('← Back to notes')}</button></div></div>
       ${items.length ? `<div class="fsheet">${items.map(x => `<div class="fs-item d${Math.min(x.depth, 2)}"><div class="fs-title" dir="auto">${esc(x.title)}</div>${x.md ? `<div class="note fs-note" data-fs="${esc(x.id)}"></div>` : ''}</div>`).join('')}</div>`
         : `<div class="empty"><p>${t('No definitions or formulas found yet. They appear here as your notes grow.')}</p></div>`}`;
     const byId = Object.fromEntries(items.map(x => [x.id, x]));
@@ -542,7 +546,7 @@
     const he = dirOf(c) === 'rtl';
     if (!all.length) {
       sheet.innerHTML = `<div class="prac"><div class="prac-head"><h2>${t('Practice')}</h2><p>${esc(t('Make questions from your notes, then practice them with spaced repetition.'))}</p></div>${planPanel(c, secs)}${genBox(c, secs, true)}
-        <div class="ask"><p>${t('Claude also adds questions by itself when it saves a new topic. You can ask it for more in the Claude app, for example:')}</p><p class="say-box" dir="auto">${esc(askPractice(c))}</p><button class="btn" type="button" data-act="copy-prac">${t('Copy')}</button></div></div>`;
+        <div class="ask"><p>${t('The app also makes questions by itself for each new topic Claude saves. For harder ones, ask Claude in any chat, for example:')}</p><p class="say-box" dir="auto">${esc(askPractice(c))}</p><button class="btn" type="button" data-act="copy-prac">${t('Copy')}</button></div></div>`;
       const ps = sheet.querySelector('#pracTopic'); if (ps) ps.onchange = e => { S.pracTopic = e.target.value; renderSheet(); };
       return;
     }
@@ -748,6 +752,21 @@
     if (!title) return;
     if (title !== s.title || content !== s.content) putSection(c.id, { ...s, title, content, prevTitle: s.title, prevContent: s.content, rev: (s.rev || 1) + 1, updatedAt: Date.now(), source: 'me' });
     S.editing = null; render(); toast(t('Changes saved'));
+  });
+  // Phone: the course list slides in from the side, the topic list rises from the bottom.
+  const scrim = document.createElement('div'); scrim.className = 'nav-scrim'; document.body.appendChild(scrim);
+  function phonePanel(which) {
+    document.body.classList.toggle('nav-open', which === 'nav');
+    document.body.classList.toggle('toc-open', which === 'toc');
+    const nb = $('navBtn'); if (nb) nb.setAttribute('aria-expanded', String(which === 'nav'));
+    if (which === 'nav') { const cur = document.querySelector('.course[aria-current="true"]') || document.querySelector('.course'); if (cur) setTimeout(() => cur.focus({ preventScroll: true }), 50); }
+  }
+  scrim.addEventListener('click', () => phonePanel(null));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && (document.body.classList.contains('nav-open') || document.body.classList.contains('toc-open'))) phonePanel(null); });
+  document.addEventListener('click', e => {
+    if (e.target.closest('#navBtn')) { phonePanel(document.body.classList.contains('nav-open') ? null : 'nav'); return; }
+    if (e.target.closest('#tocBtn')) { phonePanel(document.body.classList.contains('toc-open') ? null : 'toc'); return; }
+    if (e.target.closest('.side .course, .side .new-course, .side .claude-pill, .side #settingsBtn, .side #searchAllBtn, .contents .toc-link')) setTimeout(() => phonePanel(null), 0);
   });
   $('newCourseBtn').addEventListener('click', openNewCourse);
   $('settingsBtn').addEventListener('click', () => openSettings());
@@ -1069,67 +1088,67 @@
     const box = d.querySelector('#cloudBox'); if (!box || !D.cloudStatus) return;
     cloudState = await D.cloudStatus(); paintCloud(box);
   }
+  // Your account: signed in with Google, the notebook is online, on the web, and Claude can use it in any chat.
   function paintCloud(box) {
     const s = cloudState || {};
-    if (s.enabled) {
+    if (s.enabled && s.email) {
       const when = s.syncing ? t('Syncing…') : s.lastSync ? t('Last synced {when}', { when: ago(s.lastSync) }) : t('Not synced yet');
-      const mcp = s.url.replace(/\/+$/, '') + '/mcp';
-      box.innerHTML = `<div class="cs-state ${s.error ? '' : 'ok'}"><span class="cs-ico">${s.error ? '!' : '✓'}</span><div><b>${s.error ? esc(t('Online notebook: needs attention')) : esc(t('Online notebook connected'))}</b><p>${esc(s.error ? t(s.error) : when)}${!s.error && s.online ? ' · ' + esc(tn(s.online, '1 item online', '{n} items online')) : ''}</p></div></div>
-        <p class="small">${t('To use it in any Claude chat (web, phone or desktop): in Claude open Customize → Connectors → Add custom connector, paste this address, press Add, then Connect and enter your password.')}</p>
-        <div class="row"><code class="path" dir="ltr">${esc(mcp)}</code><button class="btn" type="button" id="cloudCopy">${t('Copy address')}</button></div>
-        <div class="row"><button class="btn" type="button" id="cloudNow">${t('Sync now')}</button><button class="btn ghost" type="button" id="cloudOff">${t('Disconnect')}</button></div>`;
-      box.querySelector('#cloudCopy').onclick = () => copy(mcp, t('Address copied. Paste it in Claude → Customize → Connectors.'));
-      box.querySelector('#cloudNow').onclick = () => D.cloudSync();
-      box.querySelector('#cloudOff').onclick = async () => { if (!confirm(t('Stop syncing with the online notebook? Your notes stay on this computer and online; they just stop updating each other.'))) return; await D.cloudDisconnect(); cloudState = await D.cloudStatus(); paintCloud(box); };
+      const who = s.name ? `${esc(s.name)}<span class="cs-sub">${esc(s.email)}</span>` : esc(s.email);
+      const site = (s.mcp || '').replace(/\/mcp$/, '');
+      box.innerHTML = `<div class="cs-state ${s.error ? '' : 'ok'}"><span class="cs-ico">${s.error ? '!' : '✓'}</span><div><b>${who}</b><p>${esc(s.error ? t(s.error) : WEB ? t('Your notes are saved online and sync with the app on your computer.') : when)}</p></div></div>
+        ${s.claude ? `<p class="small">${t('Claude is connected: in any chat (web, phone or desktop) it saves to this notebook.')}</p>`
+          : `<p class="small">${t('To use your notebook in any Claude chat (web, phone or desktop): in Claude open Customize → Connectors → Add custom connector, paste this address, press Add, then Connect and sign in with Google.')}</p>`}
+        <div class="row"><code class="path" dir="ltr">${esc(s.mcp || '')}</code><button class="btn" type="button" id="cloudCopy">${t('Copy address')}</button></div>
+        <div class="row">${WEB ? '' : `<button class="btn" type="button" id="cloudNow">${t('Sync now')}</button><button class="btn" type="button" id="cloudWeb">${t('Open on the web')}</button>`}<button class="btn" type="button" id="cloudAcct">${t('Your account')}</button><button class="btn ghost" type="button" id="cloudOff">${t('Sign out')}</button></div>`;
+      box.querySelector('#cloudCopy').onclick = () => copy(s.mcp, t('Address copied. Paste it in Claude → Customize → Connectors.'));
+      if (box.querySelector('#cloudNow')) box.querySelector('#cloudNow').onclick = () => D.cloudSync();
+      if (box.querySelector('#cloudWeb')) box.querySelector('#cloudWeb').onclick = () => D.openExternal(site + '/app/');
+      box.querySelector('#cloudAcct').onclick = () => D.openExternal(site + '/account');
+      box.querySelector('#cloudOff').onclick = async () => {
+        if (!WEB && !confirm(t('Sign out on this computer? Your notes stay here and in your account; they just stop syncing until you sign in again.'))) return;
+        await D.cloudDisconnect(); if (WEB) return; cloudState = await D.cloudStatus(); paintCloud(box);
+      };
       return;
     }
-    box.innerHTML = `<p class="small">${t('Study Notebook works in chats started from the Claude app on this computer. To use it in any chat, also on your phone or the web, put an online copy of your notebook in your own free Cloudflare account. The app keeps both in sync.')}</p>
-      <ol class="steps">
-        <li><div><b>${t('Create your online notebook')}</b><span>${t('Sign up for Cloudflare (free) and press Create and deploy. It takes about 3 minutes. You don’t need to set anything else there.')}</span><div class="row" style="margin-top:6px"><button class="btn primary" type="button" id="cloudDeploy">${t('Create it on Cloudflare')}</button></div></div></li>
-        <li><div><b>${t('Connect this app to it')}</b><span>${t('Copy your notebook’s address from Cloudflare (it ends in .workers.dev) and paste it here. The first time, choose a password for your online notebook (at least 8 characters); later, enter the same one.')}</span>
-          <form class="cloud-form" id="cloudForm"><label class="field">${t('Address')}<input id="cloudUrl" type="url" dir="ltr" placeholder="https://study-notebook.yourname.workers.dev" required></label>
-          <label class="field">${t('Password')}<input id="cloudPw" type="password" dir="ltr" autocomplete="current-password" required></label>
-          <label class="field" id="cloudPw2Wrap" hidden>${t('Password again')}<input id="cloudPw2" type="password" dir="ltr" autocomplete="new-password"></label>
-          <p class="status" id="cloudMsg" role="status"></p>
-          <div class="row"><button class="btn primary" type="submit">${t('Connect')}</button></div></form></div></li>
-        <li><div><b>${t('Add it to Claude')}</b><span>${t('After connecting, this page shows the address to add in Claude → Customize → Connectors. Then every chat can save to your notebook.')}</span></div></li>
-      </ol>`;
-    box.querySelector('#cloudDeploy').onclick = () => D.openExternal(DEPLOY_URL);
-    box.querySelector('#cloudForm').onsubmit = async e => {
-      e.preventDefault(); const msg = box.querySelector('#cloudMsg'); const btn = e.target.querySelector('button[type=submit]');
-      msg.className = 'status'; msg.textContent = t('Connecting…'); btn.disabled = true; box.dataset.busy = '1';
-      const wrap = box.querySelector('#cloudPw2Wrap');
-      const r = await D.cloudConnect(box.querySelector('#cloudUrl').value, box.querySelector('#cloudPw').value, wrap.hidden ? undefined : box.querySelector('#cloudPw2').value);
+    if (!D.cloudSignIn) { box.innerHTML = `<p class="small">${t('Checking…')}</p>`; return; }
+    box.innerHTML = `<p class="small" style="color:var(--ink)">${t('Sign in with Google to use your notebook in any Claude chat, on your phone and on the web. The notes on this computer are copied to your account and kept in sync.')}</p>
+      ${s.url && !s.email ? `<p class="small">${t('This app was connected to an online notebook with a password. That way of connecting has been replaced: sign in with Google instead.')}</p>` : ''}
+      <p class="status" id="cloudMsg" role="status"></p>
+      <div class="row"><button class="btn primary big google-btn" type="button" id="cloudGoogle"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>${t('Sign in with Google')}</button></div>`;
+    box.querySelector('#cloudGoogle').onclick = async () => {
+      const msg = box.querySelector('#cloudMsg'), btn = box.querySelector('#cloudGoogle');
+      btn.disabled = true; box.dataset.busy = '1'; msg.className = 'status'; msg.textContent = t('Finish signing in in your browser. This page updates by itself.');
+      const r = await D.cloudSignIn();
       delete box.dataset.busy; btn.disabled = false;
-      if (!r.ok && r.code === 'confirm') { wrap.hidden = false; msg.className = 'status'; msg.textContent = t(r.message); box.querySelector('#cloudPw2').focus(); return; }
-      if (!r.ok) { msg.className = 'status bad'; msg.textContent = t(r.message || 'Couldn’t connect.'); return; }
-      cloudState = await D.cloudStatus(); paintCloud(box); toast(t('Connected. Your notes are now online too.'));
+      if (!r.ok) { msg.className = 'status bad'; msg.textContent = t(r.message || 'Couldn’t sign in.'); return; }
+      cloudState = await D.cloudStatus(); paintCloud(box); toast(t('Signed in. Your notes are now in your account too.'));
     };
   }
 
   function renderSettings() {
     const s = S.settings || {};
     openDlg('settings', `<div class="dlg-in">${head(t('Settings'))}
-      ${claudeSection()}
-      <section class="group"><h3>${t('Use in any chat')}</h3><div class="box" id="cloudBox"><p class="small">${t('Checking…')}</p></div></section>
-      <section class="group"><h3>${t('Lecture recording')}</h3><div class="box" id="speechBox"><p class="small">${t('Checking…')}</p></div></section>
+      <section class="group"><h3>${t('Your account')}</h3><div class="box" id="cloudBox"><p class="small">${t('Checking…')}</p></div></section>
+      ${WEB ? '' : claudeSection()}
+      ${WEB ? `<section class="group"><h3>${t('Lecture recording')}</h3><div class="box"><p class="small">${t('Recording lectures needs the Study Notebook app on a Windows computer. Transcripts you record there show up here too.')}</p></div></section>` : `<section class="group"><h3>${t('Lecture recording')}</h3><div class="box" id="speechBox"><p class="small">${t('Checking…')}</p></div></section>`}
       <section class="group"><h3>${t('Appearance')}</h3>
         <div class="seg" role="group" aria-label="${esc(t('Appearance'))}">${['system', 'light', 'dark'].map(th => `<button type="button" data-theme-pick="${th}" aria-pressed="${theme() === th}">${THEME_ICON[th]}${t(THEME_NAME[th])}</button>`).join('')}</div>
         <p class="small">${t('Automatic follows your computer’s light or dark setting.')}</p>
-        <p class="small">${t('Text size: Ctrl + and Ctrl − (Ctrl 0 for normal).')} <button type="button" class="sn-link" id="keysLink">${t('All keyboard shortcuts')}</button></p></section>
+        ${WEB ? '' : `<p class="small">${t('Text size: Ctrl + and Ctrl − (Ctrl 0 for normal).')}`} <button type="button" class="sn-link" id="keysLink">${t('All keyboard shortcuts')}</button>${WEB ? '' : '</p>'}</section>
       <section class="group"><h3>${t('Language')}</h3>
         <div class="seg" role="group" aria-label="${esc(t('Language'))}"><button type="button" data-ui-lang="en" aria-pressed="${uiLang === 'en'}">English</button><button type="button" data-ui-lang="he" aria-pressed="${uiLang === 'he'}">עברית</button></div>
         <p class="small">${t('The language of the app’s buttons and menus. Each course’s notes keep their own language.')}</p></section>
       <section class="group"><h3>${t('Your notes')}</h3><div class="box">
-        <p class="small">${s.lastBackup ? esc(t('Notes save automatically on this computer, and a backup copy is kept each day (the last 14); the latest is from {date}. To move your notes to another laptop, back them up to a file and restore it there.', { date: new Date(s.lastBackup + 'T12:00').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' }) })) : t('Notes save automatically on this computer, and a backup copy is kept each day (the last 14). To move your notes to another laptop, back them up to a file and restore it there.')}</p>
+        ${WEB ? `<p class="small">${t('Your notes are saved in your account as you go. You can also keep a copy as a file, or replace everything with a backup.')}</p>
+        <div class="row"><button class="btn" type="button" id="backup">${t('Back up all notes')}</button><button class="btn" type="button" id="restore">${t('Restore from a backup')}</button></div></div></section></div>` : `<p class="small">${s.lastBackup ? esc(t('Notes save automatically on this computer, and a backup copy is kept each day (the last 14); the latest is from {date}. To move your notes to another laptop, back them up to a file and restore it there.', { date: new Date(s.lastBackup + 'T12:00').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' }) })) : t('Notes save automatically on this computer, and a backup copy is kept each day (the last 14). To move your notes to another laptop, back them up to a file and restore it there.')}</p>
         <div class="row"><button class="btn" type="button" id="backup">${t('Back up all notes')}</button><button class="btn" type="button" id="restore">${t('Restore from a backup')}</button><button class="btn ghost" type="button" id="folder">${t('Open notes folder')}</button></div>
         <div class="path" dir="ltr">${esc(s.dataDir || '')}</div></div></section>
-      <section class="group"><h3>${t('Updates')}</h3><div class="box" id="updBox"><p class="small">${esc(t('Version {v}.', { v: s.version || '' }))}</p></div></section></div>`, d => {
-      wireClaude(d); drawSpeech(d); drawUpdates(d); drawCloud(d);
+      <section class="group"><h3>${t('Updates')}</h3><div class="box" id="updBox"><p class="small">${esc(t('Version {v}.', { v: s.version || '' }))}</p></div></section></div>`}`, d => {
+      drawCloud(d); if (!WEB) { wireClaude(d); drawSpeech(d); drawUpdates(d); }
       const kl = d.querySelector('#keysLink'); if (kl) kl.onclick = () => openShortcuts();
       d.querySelectorAll('[data-theme-pick]').forEach(b => b.onclick = () => setTheme(b.dataset.themePick));
       d.querySelectorAll('[data-ui-lang]').forEach(b => b.onclick = async () => { if (b.dataset.uiLang === uiLang) return; window.I18N.set(b.dataset.uiLang); await saveNow(); location.reload(); });
-      d.querySelector('#folder').onclick = () => D.openDataFolder();
+      if (d.querySelector('#folder')) d.querySelector('#folder').onclick = () => D.openDataFolder();
       d.querySelector('#backup').onclick = async () => { await saveNow(); const r = await D.exportBackup(JSON.stringify({ version: 1, app: 'Study Notebook', exportedAt: new Date().toISOString(), docs }, null, 1)); if (r.ok) toast(t('Backup saved')); else if (!r.cancelled) toast(r.message || t('Couldn’t save the backup')); };
       d.querySelector('#restore').onclick = async () => {
         const r = await D.importBackup();
@@ -1143,6 +1162,13 @@
   async function openSettings() { S.settings = await D.getSettings(); claudeMsg = null; renderSettings(); }
 
   function openWelcome() {
+    if (WEB) {
+      openDlg('welcome', `<div class="dlg-in">${head(t('Welcome to Study Notebook'), t('Your notes, written by Claude while you study.'))}
+        <p class="small" style="font-size:14px;color:var(--ink)">${t('Study with Claude as usual, in any chat. When you understand something, Claude saves the final explanation here, under the right course and topic, and makes practice questions for it.')}</p>
+        <div class="box" id="cloudBox"><p class="small">${t('Checking…')}</p></div>
+        <div class="row"><button class="btn ghost" type="button" data-close>${t('Later')}</button></div></div>`, d => drawCloud(d));
+      store('sn-welcomed', '1'); return;
+    }
     openDlg('welcome', `<div class="dlg-in">${head(t('Welcome to Study Notebook'), t('Your notes, written by Claude while you study.'))}
       <p class="small" style="font-size:14px;color:var(--ink)">${t('Study with Claude in the Claude app as usual. When you understand something, Claude saves the final explanation here, under the right course and topic. You can also record lectures here and practice for exams.')}</p>
       ${claudeBox()}
@@ -1255,6 +1281,7 @@
     D.setTheme(theme());
     render(); restorePos();
     $('sheetWrap').addEventListener('scroll', () => { clearTimeout(posTimer); posTimer = setTimeout(savePos, 250); }, { passive: true });
-    if (store('sn-welcomed') !== '1' && !settings.connectorLastUse) setTimeout(openWelcome, 250);
+    if (WEB) { cloudState = await D.cloudStatus(); renderClaudePill(); if (store('sn-welcomed') !== '1' && !cloudState.claude) setTimeout(openWelcome, 250); }
+    else if (store('sn-welcomed') !== '1' && !settings.connectorLastUse) setTimeout(openWelcome, 250);
   })();
 })();

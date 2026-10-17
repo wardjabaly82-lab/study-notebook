@@ -80,7 +80,7 @@ footer a{color:inherit}
 export function layout(title, body, { wide = false, user = null, bare = false } = {}) {
   const end = user ? `<a class="end" href="/account">${esc(user.name || user.email)}</a>` : '';
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="color-scheme" content="light dark"><meta name="referrer" content="no-referrer"><title>${esc(title)}</title><style>${CSS}</style></head>
+<meta name="color-scheme" content="light dark"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><meta name="referrer" content="no-referrer"><title>${esc(title)}</title><style>${CSS}</style></head>
 <body>${bare ? '' : `<header class="bar"><a class="home" href="/">${MARK}<span>Study Notebook</span></a>${end}</header>`}
 <main class="${wide ? 'wide' : ''}">${body}</main>
 <footer><a href="/privacy">Privacy</a>${user ? '<a href="/account">Your account</a><a href="/app/">Open notebook</a>' : ''}</footer></body></html>`;

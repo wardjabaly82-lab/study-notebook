@@ -299,26 +299,80 @@ async function applyCloudChanges(changes) {
 }
 const seal = pw => safeStorage.isEncryptionAvailable() ? { key: safeStorage.encryptString(pw).toString('base64'), sealed: true } : { key: Buffer.from(pw, 'utf8').toString('base64'), sealed: false };
 const unseal = c => { try { return c.sealed ? safeStorage.decryptString(Buffer.from(c.key, 'base64')) : Buffer.from(c.key, 'base64').toString('utf8'); } catch (e) { return ''; } };
-function cloudConfig() { const c = loadSettings().cloud; return c && c.url && c.key ? { url: c.url, password: unseal(c) } : null; }
+// The shared Study Notebook site. Each student signs in there with Google; this app links to that account.
+const SITE = (process.env.SN_SITE || 'https://study-notebook.wardjabaly82.workers.dev').replace(/\/+$/, '');
+function cloudConfig() {
+  const c = loadSettings().cloud;
+  if (!c || c.kind !== 'google' || !c.url || !c.key) return null;     // an old password connection no longer works
+  return { url: c.url, token: unseal(c), email: c.email, name: c.name };
+}
 function startCloud() {
   cloud = CloudSync.create({ dataDir, loadData, applyChanges: applyCloudChanges, log, onStatus: s => { if (win && !win.isDestroyed()) win.webContents.send('cloud:status', s); } });
   cloud.configure(cloudConfig());
 }
-const cleanUrl = u => { try { const x = new URL(String(u || '').trim()); if (x.protocol !== 'https:' && !(x.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(x.hostname))) return null; return x.origin; } catch (e) { return null; } };
-ipcMain.handle('cloud:status', () => cloud ? cloud.status() : { enabled: false });
-ipcMain.handle('cloud:connect', async (ev, req) => {
-  const url = cleanUrl(req && req.url), password = String((req && req.password) || '');
-  if (!url) return { ok: false, message: 'Enter the address of your online notebook, starting with https://' };
-  if (password.length < 6) return { ok: false, message: 'Enter the password you chose when you set it up.' };
-  try { await cloud.test(url, password, typeof (req && req.confirm) === 'string' ? req.confirm : undefined); }
-  catch (e) { return { ok: false, code: e.code || '', message: e.message || 'Couldn’t connect.' }; }
-  const s = loadSettings(); s.cloud = { url, ...seal(password), since: Date.now() }; saveSettings(s);
-  cloud.reset(); cloud.configure({ url, password });
-  const st = await cloud.sync();
-  log.info('cloud.connected');
-  return { ok: !st.error, status: st, message: st.error || '' };
+ipcMain.handle('cloud:status', () => {
+  const st = cloud ? cloud.status() : { enabled: false };
+  const c = loadSettings().cloud;
+  if (!st.enabled && c && c.kind !== 'google' && c.url) st.url = c.url;   // shows "sign in with Google instead"
+  return st;
 });
-ipcMain.handle('cloud:disconnect', () => { const s = loadSettings(); delete s.cloud; saveSettings(s); cloud.configure(null); cloud.reset(); log.info('cloud.disconnected'); return { ok: true }; });
+
+// Opens a link in the person's browser. Tests set SN_OPEN_LOG to receive the link instead.
+function openInBrowser(url) {
+  if (process.env.SN_OPEN_LOG) { fs.appendFileSync(process.env.SN_OPEN_LOG, url + '\n'); return; }
+  shell.openExternal(url);
+}
+const b64url = buf => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+let signingIn = null;
+// Sign in with Google: the browser opens the site, the student approves linking this computer, and the
+// site hands a one-time code back to a small listener on this computer only (127.0.0.1), which the app
+// trades (with a secret it never sent) for its own sign-in.
+ipcMain.handle('cloud:signin', async () => {
+  if (signingIn) { signingIn.abort(); }
+  const http = require('http'); const os = require('os');
+  const state = b64url(crypto.randomBytes(24)), verifier = b64url(crypto.randomBytes(32));
+  const challenge = b64url(crypto.createHash('sha256').update(verifier).digest());
+  let server; const ctl = { abort: () => {} }; signingIn = ctl;
+  try {
+    const code = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(Object.assign(new Error('timeout'), { msg: 'Signing in took too long. Try again.' })), 10 * 60 * 1000);
+      ctl.abort = () => { clearTimeout(timer); reject(Object.assign(new Error('aborted'), { msg: 'Signing in was restarted.' })); };
+      server = http.createServer((req, res) => {
+        const u = new URL(req.url, 'http://127.0.0.1');
+        if (u.pathname !== '/done' || u.searchParams.get('state') !== state) { res.writeHead(404); res.end(); return; }
+        const ok = !!u.searchParams.get('code');
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Study Notebook</title><style>body{font:16px/1.5 -apple-system,"Segoe UI",system-ui,sans-serif;background:#f5f5f7;color:#1d1d1f;display:grid;place-items:center;min-height:100vh;margin:0;padding:16px}@media(prefers-color-scheme:dark){body{background:#19191b;color:#f5f5f7}}main{max-width:420px}h1{font-size:24px;letter-spacing:-.02em;margin:0 0 8px}</style><main><h1>${ok ? 'You’re signed in' : 'Not linked'}</h1><p>${ok ? 'Go back to the Study Notebook app. You can close this tab.' : 'Nothing was changed. You can close this tab.'}</p></main>`);
+        clearTimeout(timer);
+        if (ok) resolve(u.searchParams.get('code')); else reject(Object.assign(new Error('denied'), { msg: 'Signing in was cancelled.' }));
+      });
+      server.on('error', e => { clearTimeout(timer); reject(Object.assign(e, { msg: 'Couldn’t start signing in on this computer.' })); });
+      server.listen(0, '127.0.0.1', () => {
+        const port = server.address().port;
+        const q = new URLSearchParams({ port: String(port), state, challenge, device: os.hostname().slice(0, 60) });
+        openInBrowser(`${SITE}/link?${q}`);
+      });
+    });
+    let r;
+    try {
+      r = await fetch(`${SITE}/auth/app/token`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, verifier }), signal: AbortSignal.timeout(30000) });
+    } catch (e) { return { ok: false, message: 'Can’t reach Study Notebook online. Check the internet connection.' }; }
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.token) return { ok: false, message: 'Signing in didn’t finish. Try again.' };
+    const s = loadSettings(); s.cloud = { kind: 'google', url: SITE, ...seal(j.token), email: j.email, name: j.name, since: Date.now() }; saveSettings(s);
+    cloud.reset(); cloud.configure({ url: SITE, token: j.token, email: j.email, name: j.name });
+    const st = await cloud.sync();
+    log.info('cloud.signedin');
+    if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.focus(); }
+    return { ok: !st.error, status: st, message: st.error || '' };
+  } catch (e) {
+    return { ok: false, message: e.msg || 'Couldn’t sign in.' };
+  } finally {
+    if (signingIn === ctl) signingIn = null;
+    if (server) server.close();
+  }
+});
+ipcMain.handle('cloud:disconnect', async () => { if (cloud) await cloud.signOut(); const s = loadSettings(); delete s.cloud; saveSettings(s); cloud.configure(null); cloud.reset(); log.info('cloud.signedout'); return { ok: true }; });
 ipcMain.handle('cloud:sync', () => cloud ? cloud.sync() : { enabled: false });
 
 async function handleConnector(op, args) {

@@ -28,7 +28,7 @@ contextBridge.exposeInMainWorld('desktop', {
   updateCheck: () => ipcRenderer.invoke('update:check'),
   updateInstall: () => ipcRenderer.invoke('update:install'),
   cloudStatus: () => ipcRenderer.invoke('cloud:status'),
-  cloudConnect: (url, password, confirm) => ipcRenderer.invoke('cloud:connect', { url, password, confirm }),
+  cloudSignIn: () => ipcRenderer.invoke('cloud:signin'),
   cloudDisconnect: () => ipcRenderer.invoke('cloud:disconnect'),
   cloudSync: () => ipcRenderer.invoke('cloud:sync'),
   onCloudStatus(fn) { ipcRenderer.on('cloud:status', (e, s) => fn(s)); },

@@ -527,3 +527,96 @@ kbd { font-family: var(--f-ui); font-size: 12px; font-weight: 500; background: v
   .side { background: var(--side-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media (forced-colors: active) { .btn, .choice, .grade, .search { border: 1px solid ButtonText; } }
+
+/* ---------- phone ----------
+   Not the desktop shrunk: the page of notes takes the whole screen, the course list slides in
+   from the side (menu button), the topic list rises from the bottom (Topics), and dialogs
+   become sheets. Every control is at least 44px tall for a thumb. */
+.nav-btn, .toc-btn, .nav-scrim { display: none; }
+@media (max-width: 700px) {
+  html, body { height: 100%; }
+  body { font-size: 15px; }
+  .shell { grid-template-columns: minmax(0, 1fr); height: 100dvh; }
+  .side {
+    position: fixed; inset-block: 0; inset-inline-start: 0; z-index: 60; width: min(86vw, 330px);
+    background: var(--side-solid); -webkit-backdrop-filter: none; backdrop-filter: none; border: 0;
+    padding: calc(14px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+    transform: translateX(-102%); visibility: hidden;
+    transition: transform 320ms var(--ease), visibility 0s linear 320ms;
+  }
+  [dir="rtl"] .side { transform: translateX(102%); }
+  body.nav-open .side { transform: none; visibility: visible; transition: transform 320ms var(--ease); box-shadow: var(--shadow-pop); }
+  .nav-scrim { display: block; position: fixed; inset: 0; z-index: 55; background: var(--scrim); opacity: 0; pointer-events: none; transition: opacity 240ms ease; }
+  body.nav-open .nav-scrim, body.toc-open .nav-scrim { opacity: 1; pointer-events: auto; }
+  .course { padding: 10px 10px; min-height: 52px; }
+  .course b { font-size: 15px; }
+  .new-course, .icon-btn, .text-btn { min-height: 44px; }
+  .brand { font-size: 17px; }
+
+  .top { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px 8px; padding: calc(8px + env(safe-area-inset-top)) 12px 10px; }
+  .nav-btn { display: inline-flex; width: 44px; height: 44px; justify-content: center; padding: 0; color: var(--ink); margin-inline-start: -6px; }
+  .top h1 { font-size: 19px; line-height: 1.2; flex: none; }
+  .top h1 > span:first-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .top .meta { font-size: 13px; margin-top: 2px; }
+  .tools { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
+  .tools .search { grid-column: 1 / -1; width: 100%; min-height: 44px; }
+  .tools .search input { font-size: 16px; }   /* 16px keeps phones from zooming in on focus */
+  .tools > .btn, .tools .menu-wrap > .btn { min-height: 44px; justify-content: center; }
+  .toc-btn { display: inline-flex; }
+  .menu { inset-inline-end: 0; max-width: calc(100vw - 24px); }
+  .menu button { min-height: 44px; }
+
+  .body { padding: 0; grid-template-columns: minmax(0, 1fr); }
+  .sheet-wrap { padding: 0 0 env(safe-area-inset-bottom); }
+  .sheet, .sheet[dir="rtl"] { max-width: none; border-radius: 0; box-shadow: none; padding: 22px 18px 64px; min-height: 100%; animation: none; }
+  .sec.d0 h2 { font-size: 21px; }
+  .sec.d1 h3 { font-size: 18px; }
+  .sec + .sec { margin-top: 24px; }
+  .sec.d0 + .sec, .sec + .sec.d0 { margin-top: 36px; }
+  .note { font-size: 16.5px; line-height: 1.6; max-width: none; }
+  .note mjx-container[display="true"] { overflow-x: auto; overflow-y: hidden; max-width: 100%; padding-block: 4px; }
+  .note table { display: block; overflow-x: auto; max-width: 100%; }
+  .note pre { overflow-x: auto; }
+
+  /* Topics: a sheet from the bottom, reachable with a thumb */
+  .contents {
+    display: block !important; position: fixed; inset-inline: 0; bottom: 0; z-index: 60; max-height: 72dvh; overflow: auto;
+    background: var(--raised); border-radius: 18px 18px 0 0; box-shadow: var(--shadow-pop);
+    padding: 10px 14px calc(18px + env(safe-area-inset-bottom)); font-size: 15px;
+    transform: translateY(104%); visibility: hidden; transition: transform 320ms var(--ease), visibility 0s linear 320ms;
+  }
+  .contents::before { content: ""; display: block; width: 36px; height: 5px; border-radius: 3px; background: var(--line-strong); margin: 0 auto 8px; }
+  body.toc-open .contents { transform: none; visibility: visible; transition: transform 320ms var(--ease); }
+  .contents .toc-link { padding-block: 10px; }
+
+  /* Dialogs become sheets that rise from the bottom */
+  dialog.dlg, dialog.dlg.wide { width: 100vw; max-width: 100vw; max-height: 92dvh; margin: auto 0 0; border-radius: 18px 18px 0 0; }
+  dialog.dlg[open] { animation: sheet-up 320ms var(--ease); }
+  dialog.dlg > .dlg-top { padding: 16px 18px 10px; }
+  .dlg-in { padding: 16px 18px calc(22px + env(safe-area-inset-bottom)); }
+  .dlg .row { flex-wrap: wrap; }
+  .dlg .btn { min-height: 44px; }
+  .sn-x { width: 36px; height: 36px; }
+  .toast { inset-inline: 12px; transform: none; justify-content: center; text-align: center; border-radius: 14px; bottom: calc(16px + env(safe-area-inset-bottom)); max-width: none; animation: sheet-up 320ms var(--ease); }
+}
+@keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } }
+@media (max-width: 700px) and (prefers-reduced-motion: reduce) {
+  .side, .contents, body.nav-open .side, body.toc-open .contents { transition: none; }
+  dialog.dlg[open] { animation: none; }
+}
+/* Practice panels never grow wider than the page */
+.prac, .prac-done, .card-view, .gen, .plan, .prac-start { grid-template-columns: minmax(0, 1fr); }
+.seg { max-width: 100%; flex-wrap: wrap; }
+@media (max-width: 700px) {
+  .prac, .prac-done, .card-view { gap: 14px; }
+  .gen, .plan, .prac-start { padding: 16px; }
+  .seg button { min-height: 40px; padding: 6px 14px; font-size: 14px; }
+  .gen .field, .prac-start .field { width: 100%; }
+  .gen .btn, .prac-start .btn, .card-view .btn { min-height: 44px; }
+  .choice { min-height: 48px; }
+}
+@media (max-width: 700px) {
+  .gen select, .gen input, .prac-start select, .field select, .field input { width: 100%; max-width: 100%; min-height: 44px; font-size: 16px; }
+  #keysLink { display: none; }
+}
+.cs-sub { display: block; font-weight: 400; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }

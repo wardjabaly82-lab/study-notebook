@@ -11,6 +11,7 @@ import { currentUser, startGoogle, finishGoogle, signInResponse, signOutResponse
 import * as P from './pages.js';
 import { landingPage } from './landing.js';
 
+const FAVICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 26"><rect x="4" y="2.5" width="18" height="21" rx="3" fill="#0071e3"/><rect x="7" y="2.5" width="2" height="21" fill="#005bb8"/><path d="M12 9h7M12 13h7M12 17h4.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>`;
 const json = (data, status = 200, headers = {}) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
 const redirect = (to, headers = {}) => new Response(null, { status: 302, headers: { Location: to, 'Cache-Control': 'no-store', ...headers } });
 const here = url => url.pathname + url.search;
@@ -29,7 +30,8 @@ async function api(request, env, url, user) {
   // Reading and changing data needs this header, which other sites can't send with the cookie.
   if (request.method !== 'GET' && request.headers.get('X-Study-Notebook') !== '1') return json({ error: 'forbidden' }, 403);
   if (route === 'me' && request.method === 'GET') {
-    return json({ email: user.email, name: user.name || '', mcp: `${url.origin}/mcp`, rev: await store.currentRev(env, user.id) });
+    let claude = 0; try { claude = (await env.OAUTH_PROVIDER.listUserGrants(user.id)).items.length; } catch (e) {}
+    return json({ email: user.email, name: user.name || '', mcp: `${url.origin}/mcp`, claude, rev: await store.currentRev(env, user.id) });
   }
   if (route === 'docs' && request.method === 'GET') {
     const rev = await store.currentRev(env, user.id);
@@ -236,10 +238,14 @@ const Pages = {
     const user = await currentUser(request, env);
     if (p === '/') return user ? redirect('/app/') : P.html(landingPage({ ready: googleReady(env, url) }), 200, { 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; script-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" });
     if (p.startsWith('/landing/') && request.method === 'GET') return env.ASSETS.fetch(new Request(new URL(p, url.origin), request));
+    if (p === '/favicon.ico' || p === '/favicon.svg') return new Response(FAVICON, { headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' } });
+    const NEEDS_SIGN_IN = p === '/app' || p.startsWith('/app/') || p === '/authorize' || p === '/link' || p === '/account' || p.startsWith('/account/');
     if (!user) {
       if (p.startsWith('/api/')) return json({ error: 'signed_out' }, 401);
-      if (request.method === 'GET') return signInFirst(url);
-      return redirect('/');
+      // Only real pages start a sign-in; stray requests (icons, typos) must not restart one in progress.
+      if (request.method === 'GET' && NEEDS_SIGN_IN && /text\/html|\*\/\*/.test(request.headers.get('Accept') || '*/*')) return signInFirst(url);
+      if (NEEDS_SIGN_IN) return redirect('/');
+      return P.html(P.messagePage('Not found', 'There’s nothing at this address.', { action: '<a class="btn" href="/">Go to Study Notebook</a>' }), 404);
     }
     if (p === '/app' || p.startsWith('/app/')) return notebook(request, env, url, user);
     if (p.startsWith('/api/')) return api(request, env, url, user);

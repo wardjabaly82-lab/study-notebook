@@ -24,21 +24,20 @@ function create({ dataDir, loadData, applyChanges, log, onStatus, fetchImpl }) {
   const readState = () => { try { return JSON.parse(fs.readFileSync(stateFile(), 'utf8')); } catch (e) { return { rev: 0, hashes: {} }; } };
   const writeState = s => { const tmp = stateFile() + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(s), { mode: 0o600 }); fs.renameSync(tmp, stateFile()); };
 
-  let cfg = null;              // { url, password }
+  let cfg = null;              // { url, token }: the site and this computer's sign-in to the student's account
   let running = null, again = false, timer = null, interval = null;
-  const status = { enabled: false, url: '', lastSync: 0, error: '', syncing: false, pulled: 0, pushed: 0, online: 0 };
+  const status = { enabled: false, url: '', email: '', name: '', mcp: '', claude: 0, lastSync: 0, error: '', syncing: false, pulled: 0, pushed: 0, online: 0 };
   const emit = () => { try { onStatus && onStatus({ ...status }); } catch (e) {} };
 
   async function api(method, route, body) {
     let res;
     try {
       res = await doFetch(cfg.url.replace(/\/+$/, '') + route, {
-        method, headers: { Authorization: 'Bearer ' + cfg.password, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+        method, headers: { Authorization: 'Bearer ' + cfg.token, ...(body ? { 'Content-Type': 'application/json' } : {}) },
         body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(30000)
       });
     } catch (e) { throw new SyncError('offline', 'Can’t reach your online notebook. Check the internet connection.'); }
-    if (res.status === 401) throw new SyncError('password', 'The password doesn’t match your online notebook.');
-    if (res.status === 503) throw new SyncError('setup', 'Your online notebook has no password yet. Finish its setup in Cloudflare.');
+    if (res.status === 401) throw new SyncError('signed_out', 'This computer was signed out of your account. Sign in with Google again.');
     if (!res.ok) throw new SyncError('server', `Your online notebook answered with an error (${res.status}).`);
     try { return await res.json(); } catch (e) { throw new SyncError('server', 'That address doesn’t look like a Study Notebook online server.'); }
   }
@@ -87,7 +86,7 @@ function create({ dataDir, loadData, applyChanges, log, onStatus, fetchImpl }) {
     }
     writeState(st);
     const ping = await api('GET', '/sync/ping');
-    Object.assign(status, { lastSync: Date.now(), error: '', pulled: incoming.length, pushed, online: ping.docs || 0 });
+    Object.assign(status, { lastSync: Date.now(), error: '', pulled: incoming.length, pushed, online: ping.docs || 0, email: ping.email || status.email, name: ping.name || status.name, mcp: ping.mcp || status.mcp });
     if (incoming.length || pushed) log.info('cloud.synced', { pulled: incoming.length, pushed });
   }
 
@@ -106,29 +105,15 @@ function create({ dataDir, loadData, applyChanges, log, onStatus, fetchImpl }) {
   }
 
   return {
-    // url + password come from the app's settings (the password is stored encrypted).
+    // The site and this computer's sign-in come from the app's settings (the sign-in is stored encrypted).
     configure(next) {
-      cfg = next && next.url && next.password ? { url: next.url, password: next.password } : null;
-      Object.assign(status, { enabled: !!cfg, url: cfg ? cfg.url : '', error: '' });
+      cfg = next && next.url && next.token ? { url: next.url, token: next.token } : null;
+      Object.assign(status, { enabled: !!cfg, url: cfg ? cfg.url : '', email: (next && next.email) || '', name: (next && next.name) || '', mcp: cfg ? cfg.url.replace(/\/+$/, '') + '/mcp' : '', error: '' });
       clearInterval(interval); interval = cfg ? setInterval(() => run(), 30000) : null;
       emit();
     },
-    // Checks an address and password before saving them. A new online notebook without a
-    // password yet takes this one (first connection sets it).
-    async test(url, password, confirm) {
-      const saved = cfg; cfg = { url, password };
-      try {
-        try { return await api('GET', '/sync/ping'); }
-        catch (e) {
-          if (!(e instanceof SyncError) || e.code !== 'setup') throw e;
-          if (password.length < 8) throw new SyncError('short', 'Choose a password of at least 8 characters.');
-          // A new online notebook: the password is set now, so make sure it was typed right.
-          if (confirm !== password) throw new SyncError('confirm', confirm ? 'The two passwords don’t match. Type the same password twice.' : 'This online notebook is new. Type your password again to set it.');
-          await api('POST', '/sync/setup');
-          return await api('GET', '/sync/ping');
-        }
-      } finally { cfg = saved; }
-    },
+    // Tells the site this computer is signing out (best effort).
+    async signOut() { if (!cfg) return; try { await api('POST', '/sync/signout'); } catch (e) {} },
     sync: run,
     soon() { if (!cfg) return; clearTimeout(timer); timer = setTimeout(() => run(), 3000); },
     reset() { try { fs.rmSync(stateFile(), { force: true }); } catch (e) {} },
