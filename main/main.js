@@ -414,6 +414,11 @@ ipcMain.handle('connector:install', async () => {
 });
 ipcMain.handle('connector:reveal', () => { const f = connectorBundle(); if (fs.existsSync(f)) shell.showItemInFolder(f); });
 
+const HEX = /^#[0-9a-f]{6}$/i;
+ipcMain.on('app:titleBar', (ev, c) => {
+  if (!win || win.isDestroyed() || process.platform === 'darwin' || !c || !HEX.test(c.color) || !HEX.test(c.symbol)) return;
+  try { win.setTitleBarOverlay({ color: c.color, symbolColor: c.symbol, height: 40 }); win.setBackgroundColor(c.color); } catch (e) {}
+});
 ipcMain.handle('app:setTheme', (ev, t) => {
   if (['system', 'light', 'dark'].includes(t)) nativeTheme.themeSource = t;
   const s = loadSettings(); if (s.theme !== t && ['system', 'light', 'dark'].includes(t)) { s.theme = t; saveSettings(s); }
@@ -491,6 +496,9 @@ function createWindow() {
     title: 'Study Notebook',
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#18181a' : '#e5e4df',
     icon: path.join(__dirname, '..', 'build', 'icon.png'),
+    // No grey system title bar or menu row: the app draws its own top, and Windows draws the
+    // minimise/maximise/close buttons over it in the app's colours (see app:titleBar).
+    ...(process.platform === 'darwin' ? {} : { titleBarStyle: 'hidden', titleBarOverlay: { color: nativeTheme.shouldUseDarkColors ? '#18181a' : '#e5e4df', symbolColor: nativeTheme.shouldUseDarkColors ? '#ece8e1' : '#1f1d1a', height: 40 }, autoHideMenuBar: true }),
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

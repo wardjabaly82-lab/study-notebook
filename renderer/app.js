@@ -238,6 +238,7 @@
       <h1><span dir="auto">${esc(c.name)}</span><span class="meta" dir="${UIDIR}">${has ? esc(tn(secs.length, '1 section, updated {when}', '{n} sections, updated {when}', { when: ago(newest) })) : t('No notes yet')}${examChip(c)}</span></h1>
       <div class="tools">
         <label class="search"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="search" type="search" placeholder="${esc(t('Search this course'))}" value="${esc(S.search)}" aria-label="${esc(t('Search this course'))}" ${has ? '' : 'disabled'}></label>
+        ${window.StudyTimer ? window.StudyTimer.button() : ''}
         <button class="btn toc-btn" id="tocBtn" type="button" aria-controls="contents" ${has ? '' : 'disabled'}><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${t('Topics')}</button>
         <button class="btn${S.view === 'practice' ? ' on' : ''}" id="pracBtn" type="button"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="13" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7.5 3.5h10a3 3 0 0 1 3 3v10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>${t('Practice')}${due ? `<span class="count">${due}</span>` : nCards ? '' : ''}</button>
         ${recButton()}
@@ -255,6 +256,7 @@
           </div>` : ''}
         </div>
       </div>`;
+    if (window.StudyTimer) window.StudyTimer.place();
     const inp = $('search');
     if (inp) inp.addEventListener('input', e => { clearTimeout(inp._t); inp._t = setTimeout(() => { S.search = e.target.value; if (S.view !== 'notes') { S.view = 'notes'; renderContents(); } renderSheet(); }, 160); });
   }
@@ -854,7 +856,7 @@
   shelf.addEventListener('click', e => { if (eatClick) { e.stopPropagation(); e.preventDefault(); } }, true);
   shelf.addEventListener('keydown', e => {
     const b = e.target.closest('.course'); if (!b || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
-    e.preventDefault();
+    e.preventDefault(); e.stopPropagation();   // not the page's Alt+↑/↓ (next / previous topic)
     const sib = e.key === 'ArrowUp' ? b.previousElementSibling : b.nextElementSibling; if (!sib) return;
     shelf.insertBefore(b, e.key === 'ArrowUp' ? sib : sib.nextElementSibling);
     const id = b.dataset.course; saveShelfOrder();
@@ -877,6 +879,13 @@
     if (e.target.closest('.side .course, .side .new-course, .side .claude-pill, .side #settingsBtn, .side #searchAllBtn, .contents .toc-link')) setTimeout(() => phonePanel(null), 0);
   });
   $('newCourseBtn').addEventListener('click', openNewCourse);
+  // Fold the shelf down to a strip of thin spines, and back.
+  function paintFold() { const f = document.documentElement.getAttribute('data-shelf') === 'folded'; const b = $('foldBtn'); const label = f ? t('Unfold the shelf') : t('Fold the shelf'); b.title = label + ' (Ctrl+B)'; b.setAttribute('aria-label', label); b.setAttribute('aria-expanded', String(!f)); }
+  function toggleFold() { const f = document.documentElement.getAttribute('data-shelf') !== 'folded'; if (f) document.documentElement.setAttribute('data-shelf', 'folded'); else document.documentElement.removeAttribute('data-shelf'); store('sn-shelf', f ? 'folded' : 'open'); paintFold(); }
+  $('foldBtn').addEventListener('click', toggleFold); paintFold();
+  document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b' && !e.target.closest('input, textarea, [contenteditable]')) { e.preventDefault(); toggleFold(); } });
+  if (window.StudyTimer) window.StudyTimer.init({ t, tn, esc, toast, dir: UIDIR });
+  syncTitleBar();
   $('settingsBtn').addEventListener('click', () => openSettings());
   $('claudePill').addEventListener('click', () => openSettings());
   $('searchAllBtn').addEventListener('click', () => openSearchAll());
@@ -917,6 +926,7 @@
   function openShortcuts() {
     const rows = [['Ctrl+K', t('Search all courses')], ['Ctrl+F', t('Search this course')], ['Ctrl+N', t('New course')], ['Ctrl+P', t('Print / PDF')], ['Ctrl+E', t('Practice')],
       ['Alt+↓ / Alt+↑', t('Next / previous topic')], ['Ctrl + / Ctrl −', t('Bigger / smaller text')], ['Ctrl+0', t('Normal text size')], ['Ctrl+Enter', t('Save changes')], ['Esc', t('Close')],
+      ['Ctrl+B', t('Fold or unfold the shelf')], ['Alt+↑ / Alt+↓', t('On a course: move it on the shelf')],
       [t('Space, 1–4'), t('In practice: show the answer, then rate it')], ['?', t('This list')]];
     openDlg('keys', `<div class="dlg-in">${head(t('Keyboard shortcuts'))}<div class="keys">${rows.map(([k, l]) => `<div class="krow"><span>${esc(l)}</span><kbd dir="ltr">${esc(k)}</kbd></div>`).join('')}</div></div>`);
   }
@@ -933,8 +943,18 @@
   // How warm the paper, shelf and ink look; each student picks their own. Works in light and dark.
   const WARMTH = { neutral: ['Neutral', '#f1f1ef'], paper: ['Paper', '#f4efe5'], warm: ['Warm', '#f1e4cc'], sepia: ['Sepia', '#e9d5ad'] };
   const warmth = () => document.documentElement.getAttribute('data-warmth') || 'paper';
-  function setWarmth(w) { document.documentElement.setAttribute('data-warmth', w); store('sn-warmth', w); if (dlg && dlg.open && dlgKind === 'settings') renderSettings(); }
-  function setTheme(th) { document.documentElement.setAttribute('data-theme', th); store('sn-theme', th); D.setTheme(th); renderSide(); if (dlg && dlg.open && dlgKind === 'settings') renderSettings(); }
+  function setWarmth(w) { document.documentElement.setAttribute('data-warmth', w); store('sn-warmth', w); syncTitleBar(); if (dlg && dlg.open && dlgKind === 'settings') renderSettings(); }
+  // The window buttons Windows draws at the top right take the colour of the page behind them.
+  function syncTitleBar() {
+    if (!D.setTitleBar) return;
+    requestAnimationFrame(() => {
+      const hex = css => { const c = document.createElement('canvas').getContext('2d'); c.fillStyle = css; c.fillRect(0, 0, 1, 1); const [r, g, b] = c.getImageData(0, 0, 1, 1).data; return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join(''); };
+      const st = getComputedStyle(document.body);
+      D.setTitleBar(hex(st.backgroundColor), hex(st.color));
+    });
+  }
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => syncTitleBar());
+  function setTheme(th) { document.documentElement.setAttribute('data-theme', th); store('sn-theme', th); Promise.resolve(D.setTheme(th)).then(syncTitleBar); renderSide(); if (dlg && dlg.open && dlgKind === 'settings') renderSettings(); }
 
   /* ================= dialogs ================= */
   let dlg = null, dlgKind = '';

@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('desktop', {
 
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setTheme: t => ipcRenderer.invoke('app:setTheme', t),
+  setTitleBar: (color, symbol) => ipcRenderer.send('app:titleBar', { color, symbol }),
 
   loadData: () => ipcRenderer.invoke('store:load'),
   saveData: text => ipcRenderer.invoke('store:save', text),

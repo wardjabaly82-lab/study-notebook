@@ -117,7 +117,7 @@ button { cursor: default; -webkit-tap-highlight-color: transparent; }
 .btn:active:not([disabled]), .icon-btn:active, .text-btn:active, .new-course:active, .claude-pill:active, .seg button:active, .grade:active, .choice:active:not([disabled]) { transform: scale(.97); transition-duration: 60ms; }
 .course:active, .toc-link:active, .lec-link:active, .sa-hit:active, .ts-row:active { transform: scale(.985); transition-duration: 60ms; }
 
-.shell { height: 100%; display: grid; grid-template-columns: 188px minmax(0, 1fr); }
+.shell { height: 100%; display: grid; grid-template-columns: 204px minmax(0, 1fr); }
 
 /* ---------- the shelf: each course is a cloth-bound volume ---------- */
 .side { background: var(--shelf); color: var(--shelf-ink); display: flex; flex-direction: column; min-height: 0; padding: 18px 14px 10px; gap: 8px; }
@@ -694,3 +694,78 @@ kbd { font-family: var(--f-ui); font-size: 12px; font-weight: 500; background: v
 .upd-note .bar { margin-bottom: 8px; }
 .upd-note .row { gap: 6px; }
 @media (max-width: 700px) { .upd-note { top: auto; bottom: calc(16px + env(safe-area-inset-bottom)); inset-inline: 12px; width: auto; } }
+
+/* ---------- the window's top (Windows/Linux app): no grey title bar ----------
+   The top 40px drags the window; Windows draws its buttons at the top right over the page colour. */
+.drag-strip { display: none; }
+.frameless .drag-strip { display: block; position: fixed; top: 0; inset-inline: 0; height: 40px; -webkit-app-region: drag; z-index: 1; pointer-events: none; }
+.frameless .main { padding-top: 30px; }
+.frameless .top { padding-top: 10px; }
+.frameless .side { padding-top: 14px; }
+.frameless .brand button, .frameless dialog, .frameless .timer-pop, .frameless .upd-note, .frameless .menu, .frameless .toast { -webkit-app-region: no-drag; }
+
+/* ---------- folding the shelf ---------- */
+.shell { transition: grid-template-columns var(--med) var(--ease); }
+.fold-btn { padding: 6px; margin-inline-start: auto; }
+.fold-btn + .search-all { margin-inline-start: 0; }
+.fold-btn svg { transition: transform var(--med) var(--ease); }
+[dir="rtl"] .fold-btn svg { transform: scaleX(-1); }
+@media (min-width: 701px) {
+  :root[data-shelf="folded"] .shell { grid-template-columns: 70px minmax(0, 1fr); }
+  :root[data-shelf="folded"] .side { padding-inline: 10px; }
+  :root[data-shelf="folded"] .brand { flex-direction: column; gap: 6px; padding-bottom: 10px; }
+  :root[data-shelf="folded"] .brand-name { display: none; }
+  :root[data-shelf="folded"] .fold-btn { margin: 0; }
+  :root[data-shelf="folded"] .fold-btn svg { transform: rotate(180deg); }
+  :root[dir="rtl"][data-shelf="folded"] .fold-btn svg { transform: none; }
+  :root[data-shelf="folded"] .courses { margin: 0 -4px; padding-inline: 4px; }
+  :root[data-shelf="folded"] .course { min-height: 140px; padding: 18px 0 8px; }
+  :root[data-shelf="folded"] .sp-t { display: none; }
+  :root[data-shelf="folded"] .cn { writing-mode: vertical-rl; transform: rotate(180deg); min-width: 0; padding: 6px 3px; }
+  :root[data-shelf="folded"] .due-pill { inset-inline-end: -6px; }
+  :root[data-shelf="folded"] .new-course { justify-content: center; padding: 8px 0; }
+  :root[data-shelf="folded"] .new-course span, :root[data-shelf="folded"] .claude-pill > span:last-child,
+  :root[data-shelf="folded"] .text-btn span, :root[data-shelf="folded"] .upd-ready > span:last-child { display: none; }
+  :root[data-shelf="folded"] .claude-pill, :root[data-shelf="folded"] .upd-ready { justify-content: center; padding: 10px 0; }
+  :root[data-shelf="folded"] .side-row { flex-direction: column; align-items: center; }
+  :root[data-shelf="folded"] .text-btn { flex: none; }
+}
+
+/* ---------- study timer ---------- */
+.timer-btn.live { font-variant-numeric: tabular-nums; gap: 8px; }
+.t-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.timer-btn.rest .t-dot { background: var(--green); }
+.timer-btn.live:not(.paused) .t-dot { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.timer-btn.paused .t-dot { background: transparent; box-shadow: inset 0 0 0 2px var(--muted); }
+.t-pause { color: var(--muted); font-weight: 500; font-size: 12.5px; }
+.timer-pop { position: fixed; z-index: 46; width: min(360px, calc(100vw - 24px)); max-height: calc(100vh - 90px); overflow: auto; background: var(--raised); color: var(--ink); border-radius: 12px; box-shadow: var(--shadow-pop); padding: 16px 18px 14px; display: grid; gap: 12px; font-family: var(--f-ui); animation: pop var(--med) var(--ease); transform-origin: top right; }
+[dir="rtl"] .timer-pop { transform-origin: top left; }
+.t-head { display: flex; align-items: center; justify-content: space-between; }
+.t-head h2 { margin: 0; font-size: 16px; font-weight: 650; }
+.methods { display: grid; gap: 6px; }
+.method { display: grid; gap: 2px; text-align: start; border: 0; background: var(--fill); border-radius: 10px; padding: 9px 12px; color: var(--ink); transition: background-color var(--fast) ease, box-shadow var(--fast) ease; }
+.method:hover { background: var(--fill-hover); }
+.method[aria-checked="true"] { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.method b { font-size: 14px; font-weight: 650; }
+.method small { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.timer-pop .custom { gap: 10px; flex-wrap: nowrap; }
+.timer-pop .custom .field { flex: 1; }
+.t-face { text-align: center; display: grid; gap: 8px; padding: 6px 0 2px; }
+.t-phase { font-size: 13px; font-weight: 650; color: var(--accent); }
+.t-face.rest .t-phase { color: var(--green-ink); }
+.t-big { font: 600 46px/1 var(--f-head); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.t-face.rest .bar i { background: var(--green); }
+.t-next { margin: 0; }
+.timer-pop > .row { gap: 8px; }
+.t-total { margin: 0; padding-top: 10px; border-top: 1px solid var(--line); }
+@media (max-width: 700px) {
+  .tools { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto; }
+  .timer-btn { min-height: 44px; }
+  .timer-pop .btn { min-height: 44px; }
+}
+.brand { gap: 6px; }
+.brand-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.brand .fold-btn, .brand .search-all { flex: none; padding: 5px; margin: 0; }
+.brand-mark { display: none; }
+:root[data-shelf="folded"] .brand-mark { display: block; }
+@media (max-width: 700px) { .brand-mark { display: block; } }
