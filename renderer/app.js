@@ -1176,45 +1176,57 @@
   }
   // A notice in the corner of the window: while a new version downloads, and again when it's ready to install.
   // "Hide" / "Later" put it away for that version; the sidebar button stays until the restart.
+  // A notice in the corner of the window as soon as a new version is out ("Update now" or "Later").
+  // It downloads in the background either way; "Update now" restarts as soon as the download is done.
+  // "Later" puts it away for that version until the download is ready; the sidebar button stays.
   const updHidden = { available: '', ready: '' };
   function updNotice(u) {
     let el = document.getElementById('updNote');
     const show = u && (u.state === 'available' || u.state === 'ready') && u.version && updHidden[u.state] !== u.version;
     if (!show) { if (el) el.remove(); return; }
     if (!el) { el = document.createElement('div'); el.id = 'updNote'; el.className = 'upd-note'; el.setAttribute('role', 'status'); el.dir = UIDIR; document.body.appendChild(el); }
-    if (el.dataset.state !== u.state || el.dataset.v !== u.version) {
-      el.dataset.state = u.state; el.dataset.v = u.version;
-      el.innerHTML = u.state === 'ready'
-        ? `<span class="upd-ico" aria-hidden="true">↻</span><div><b>${esc(t('Version {v} is ready', { v: u.version }))}</b><p>${esc(t('Restart the app to update. It takes a few seconds, and your notes are saved first.'))}</p><div class="row"><button class="btn primary" type="button" data-upd="install">${esc(t('Restart now'))}</button><button class="btn ghost" type="button" data-upd="later">${esc(t('Later'))}</button></div></div>`
-        : `<span class="upd-ico" aria-hidden="true">↓</span><div><b>${esc(t('A new version is on its way'))}</b><p id="updNoteLine"></p><div class="bar"><i id="updNoteBar"></i></div><div class="row"><button class="btn ghost" type="button" data-upd="later">${esc(t('Hide'))}</button></div></div>`;
-      el.querySelector('[data-upd="later"]').onclick = () => { updHidden[u.state] = u.version; el.remove(); };
+    const kind = u.state === 'ready' ? 'ready' : u.installWhenReady ? 'going' : 'out';
+    if (el.dataset.kind !== kind || el.dataset.v !== u.version) {
+      el.dataset.kind = kind; el.dataset.v = u.version;
+      const btns = kind === 'going' ? '' : `<div class="row"><button class="btn primary" type="button" data-upd="install">${esc(kind === 'ready' ? t('Restart now') : t('Update now'))}</button><button class="btn ghost" type="button" data-upd="later">${esc(t('Later'))}</button></div>`;
+      el.innerHTML = kind === 'ready'
+        ? `<span class="upd-ico" aria-hidden="true">↻</span><div><b>${esc(t('Version {v} is ready', { v: u.version }))}</b><p>${esc(t('Restart the app to update. It takes a few seconds, and your notes are saved first.'))}</p>${btns}</div>`
+        : kind === 'going'
+          ? `<span class="upd-ico" aria-hidden="true">↓</span><div><b>${esc(t('Updating to version {v}', { v: u.version }))}</b><p id="updNoteLine"></p><div class="bar"><i id="updNoteBar"></i></div><p>${esc(t('The app restarts by itself when the download is done.'))}</p></div>`
+          : `<span class="upd-ico" aria-hidden="true">↓</span><div><b>${esc(t('Version {v} is out', { v: u.version }))}</b><p>${esc(t('Update now, or keep studying: it downloads in the background and installs when you close the app.'))}</p>${btns}</div>`;
+      const later = el.querySelector('[data-upd="later"]'); if (later) later.onclick = () => { updHidden[u.state] = u.version; el.remove(); };
       const go = el.querySelector('[data-upd="install"]'); if (go) go.onclick = () => installUpdate();
     }
-    if (u.state === 'available') { el.querySelector('#updNoteLine').textContent = updText(u); el.querySelector('#updNoteBar').style.width = updPct(u) + '%'; }
+    if (kind === 'going') { el.querySelector('#updNoteLine').textContent = updText(u); el.querySelector('#updNoteBar').style.width = updPct(u) + '%'; }
   }
   // Live: Settings follows the update by itself (checking → downloading → ready), and a button
   // in the sidebar offers the restart as soon as the download is done.
   if (D.onUpdateProgress) D.onUpdateProgress(p => {
     const box = document.getElementById('updBox');
     if (box) { if (p.state === 'available' && document.getElementById('updLine')) showUpdProgress(p); else renderUpdBox(box, { enabled: true, ...p }); }
-    showUpdReady(p.state === 'ready' ? p.version : '');
+    showUpdReady(p.state === 'ready' || p.state === 'available' ? p : null);
     updNotice(p);
   });
   async function installUpdate() {
     if (window.recorderState && window.recorderState().active) { toast(t('Stop the recording first, then restart to update.')); return; }
-    await saveNow(); toast(t('Updating… Study Notebook will open again in a moment.')); setTimeout(() => D.updateInstall(), 600);
+    await saveNow();
+    const u = D.updateStatus ? await D.updateStatus() : null;
+    if (!u || u.state === 'ready') toast(t('Updating… Study Notebook will open again in a moment.'));
+    setTimeout(() => D.updateInstall(), 600);
   }
-  function showUpdReady(v) {
+  function showUpdReady(u) {
     let b = document.getElementById('updReady');
-    if (!v) { if (b) b.remove(); return; }
+    if (!u || !u.version) { if (b) b.remove(); return; }
     if (!b) {
       b = document.createElement('button'); b.type = 'button'; b.id = 'updReady'; b.className = 'upd-ready';
       b.onclick = () => installUpdate();
       const foot = document.querySelector('.side-foot'); if (foot) foot.prepend(b);
     }
-    b.innerHTML = `<span class="upd-ico" aria-hidden="true">↻</span><span><b>${esc(t('Update ready'))}</b>${esc(t('Restart to use version {v}', { v }))}</span>`;
+    const v = u.version;
+    b.innerHTML = u.state === 'ready' ? `<span class="upd-ico" aria-hidden="true">↻</span><span><b>${esc(t('Update ready'))}</b>${esc(t('Restart to use version {v}', { v }))}</span>`
+      : `<span class="upd-ico" aria-hidden="true">↓</span><span><b>${esc(t('Update available'))}</b>${esc(u.installWhenReady ? t('Downloading version {v}…', { v }) : t('Version {v} is out', { v }))}</span>`;
   }
-  if (D.updateStatus) D.updateStatus().then(u => { if (u && u.state === 'ready') { showUpdReady(u.version); updNotice(u); } }).catch(() => {});
+  if (D.updateStatus) D.updateStatus().then(u => { if (u && (u.state === 'ready' || u.state === 'available')) { showUpdReady(u); updNotice(u); } }).catch(() => {});
 
   /* ---------- online notebook: use Study Notebook in any Claude chat ---------- */
   const DOC_RX = /^data\/users\/local\/[A-Za-z0-9_-]{1,64}(\/(sections|sources|lectures|cards)\/[A-Za-z0-9_-]{1,64})?$/;

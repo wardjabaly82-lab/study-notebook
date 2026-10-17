@@ -6,7 +6,7 @@ const path = require('path');
 const { app } = require('electron');
 
 function create({ log, notify, progress }) {
-  const st = { enabled: false, state: 'idle', version: '', current: app.getVersion(), size: 0, done: 0, total: 0, bps: 0 };
+  const st = { enabled: false, state: 'idle', version: '', current: app.getVersion(), size: 0, done: 0, total: 0, bps: 0, installWhenReady: false };
   let lastSent = 0;
   let updater = null;
   try {
@@ -32,7 +32,10 @@ function create({ log, notify, progress }) {
         const now = Date.now(); if (progress && now - lastSent > 400) { lastSent = now; progress({ ...st }); }
       });
       updater.on('update-not-available', () => { st.state = 'latest'; push(); });
-      updater.on('update-downloaded', i => { st.state = 'ready'; st.version = i.version; st.done = st.total; log.info('update.ready', { version: i.version }); push(); notify(i.version); });
+      updater.on('update-downloaded', i => {
+        st.state = 'ready'; st.version = i.version; st.done = st.total; log.info('update.ready', { version: i.version }); push(); notify(i.version);
+        if (st.installWhenReady) setTimeout(() => updater.quitAndInstall(true, true), 800);   // the student already pressed "Update now"
+      });
       updater.on('error', e => { st.state = 'error'; log.warn('update.error', { error: e && e.message }); push(); });
       st.enabled = true;
     }
@@ -43,8 +46,13 @@ function create({ log, notify, progress }) {
     check: async () => { if (!updater) return st; try { await updater.checkForUpdates(); } catch (e) {} return { ...st }; },
     // Silent: no installer window. The app closes, updates in the background (same folder,
     // notes and settings untouched) and opens again by itself.
-    install: () => { if (updater && st.state === 'ready') updater.quitAndInstall(true, true); },
-    startChecking: () => { if (!updater) return; const run = () => updater.checkForUpdates().catch(() => {}); setTimeout(run, 15000); setInterval(run, 6 * 3600 * 1000); }
+    // "Update now": installs at once if the download is done, otherwise as soon as it is.
+    install: () => {
+      if (!updater) return;
+      if (st.state === 'ready') updater.quitAndInstall(true, true);
+      else if (st.state === 'available') { st.installWhenReady = true; if (progress) progress({ ...st }); }
+    },
+    startChecking: () => { if (!updater) return; const run = () => updater.checkForUpdates().catch(() => {}); setTimeout(run, 15000); setInterval(run, 30 * 60 * 1000); }   // a new release shows up within half an hour
   };
 }
 module.exports = { create };
