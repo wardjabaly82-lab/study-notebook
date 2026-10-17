@@ -35,11 +35,11 @@
   };
 
   const LABEL = {
-    definition: /^(הגדרה|הגדרות|ההגדרה|definition|definitions)\b/i,
-    claim: /^(טענה|הטענה|משפט|המשפט|למה|תכונה|theorem|claim|lemma|proposition|property)\b/i,
-    proof: /^(הוכחה|ההוכחה|proof)\b/i,
-    mistakes: /^(טעויות נפוצות|טעויות|שגיאות נפוצות|common mistakes|mistakes|pitfalls)\b/i,
-    skip: /^(דוגמה|דוגמא|דוגמאות|example|examples|סיכום|summary|הערה|note|remark)\b/i
+    definition: /^(הגדרה|הגדרות|ההגדרה|definition|definitions)(?![\p{L}])/iu,
+    claim: /^(טענה|הטענה|משפט|המשפט|תכונה|theorem|claim|lemma|proposition|property)(?![\p{L}])|^למה\s*\d*\s*$/iu,
+    proof: /^(הוכחה|ההוכחה|proof)(?![\p{L}])/iu,
+    mistakes: /^(טעויות נפוצות|טעויות|שגיאות נפוצות|common mistakes|mistakes|pitfalls)(?![\p{L}])/iu,
+    skip: /^(דוגמה|דוגמא|דוגמאות|example|examples|סיכום|summary|הערה|note|remark)(?![\p{L}])/iu
   };
 
   const norm = s => String(s || '').toLowerCase().replace(/[*_`>#]/g, '').replace(/\s+/g, ' ').trim();
@@ -115,15 +115,18 @@
       const proof = bs.find(b => LABEL.proof.test(b.label));
       for (const b of bs) {
         if (!b.label || LABEL.skip.test(b.label) || !b.text) continue;
-        if (LABEL.definition.test(b.label)) {
-          const term = (b.text.match(/\*\*([^*\n]{2,60}?)\*\*/) || [])[1] || title;
+        if (/\?\s*$/.test(b.label)) {
+          if (b.text.length >= 40) flash.push({ kind: 'flashcard', question: T.inTopic(b.label, title), answer: clip(b.text, 3000) });
+        } else if (LABEL.definition.test(b.label)) {
+          // The defined term: a bold term after "called / נקרא", a single bold word, or else the section title.
+          const named = b.text.match(/(?:נקרא|נקראת|נקראים|נקראות|נסמן|called|termed|denoted)\s*\*\*([^*\n]{2,60}?)\*\*/i);
+          const bolds = [...b.text.matchAll(/\*\*([^*\n]{2,60}?)\*\*/g)].map(x => x[1]);
+          const term = named ? named[1] : bolds.length === 1 && !/\s/.test(bolds[0].trim()) ? bolds[0] : title;
           flash.push({ kind: 'flashcard', question: T.define(term), answer: clip(b.text, 3000) });
         } else if (LABEL.claim.test(b.label)) {
           if (proof && b.text.length < 400) flash.push({ kind: 'open_question', question: T.prove(b.text.replace(/\s+/g, ' ')), answer: clip(proof.text, 5000) });
         } else if (LABEL.mistakes.test(b.label)) {
           flash.push({ kind: 'flashcard', question: T.mistakes(title), answer: clip(b.text, 2500) });
-        } else if (/\?\s*$/.test(b.label) && b.text.length >= 40) {
-          flash.push({ kind: 'flashcard', question: T.inTopic(b.label, title), answer: clip(b.text, 3000) });
         }
       }
       // The section as a whole: its opening explanation.
@@ -187,5 +190,42 @@
     return picked;
   }
 
-  return { generate, _blocks: blocks, _clozes: clozes };
+  // A compact revision sheet: per section, its definitions, claims, summary tables and display formulas.
+  // sections must be in reading order: [{ id, title, depth, content }]. Returns [{ id, title, depth, md }].
+  function formulaSheet(sections, lang) {
+    const he = lang === 'he';
+    const out = [];
+    for (const s of sections) {
+      const md = tidy(s.content); if (!md) { out.push({ id: s.id, title: s.title, depth: s.depth, md: '' }); continue; }
+      const parts = [];
+      for (const b of blocks(md)) {
+        if (!b.text) continue;
+        if (LABEL.definition.test(b.label)) parts.push(`**${b.label}.** ${b.text}`);
+        else if (LABEL.claim.test(b.label) && b.text.length < 600) parts.push(`**${b.label}.** ${b.text}`);
+        else if (/^(סיכום|summary|נוסחאות|formulas)/i.test(b.label) && /\n\|/.test('\n' + b.text)) parts.push(`**${b.label}**\n\n${b.text}`);
+      }
+      // Display formulas not already inside a kept block, with the line that introduces them.
+      const kept = parts.join('\n');
+      const rx = /(^|\n)([^\n]{0,200})\n?(\$\$[\s\S]{3,1200}?\$\$)/g; let m;
+      while ((m = rx.exec(md))) {
+        if (kept.includes(m[3])) continue;
+        // Only the last sentence of the line before, without example/label prefixes.
+        const { out: masked, back } = mask(m[2].replace(/^\s*([-*]|\d+\.)\s+/, '').replace(/\*\*[^*]{1,60}\*\*\s*[.:]?\s*/g, '').trim());
+        const last = (masked.split(/(?<=[.!?])\s+/).pop() || '').trim();
+        const ctx = back(last);
+        parts.push((ctx && ctx.length <= 160 && !ctx.startsWith('$$') ? ctx + '\n' : '') + m[3]);
+      }
+      out.push({ id: s.id, title: s.title, depth: s.depth, md: parts.join('\n\n') });
+    }
+    // Keep a heading only if it, or something under it, has content.
+    const keep = new Array(out.length).fill(false);
+    for (let i = out.length - 1; i >= 0; i--) {
+      if (out[i].md) keep[i] = true;
+      if (keep[i]) for (let j = i - 1; j >= 0; j--) if (out[j].depth < out[i].depth) { keep[j] = true; if (out[j].depth === 0) break; }
+    }
+    void he;
+    return out.filter((x, i) => keep[i]);
+  }
+
+  return { generate, formulaSheet, _blocks: blocks, _clozes: clozes };
 });

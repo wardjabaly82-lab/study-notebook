@@ -58,6 +58,10 @@ Ask Claude in the Claude app, e.g. *"Make practice questions for my 52324 notebo
 Notes Claude makes from a lecture end with links like *[Lecture 4, 12:30]*: click one to open the transcript at that moment.
 
 ### 6. Read, edit and print
+Your place in each course is remembered, so the app reopens where you stopped reading. Deleted something by mistake? Press **Undo** on the message that appears. Text size: Ctrl + and Ctrl − (Ctrl 0 for normal). Press **?** for all keyboard shortcuts.
+
+**Before an exam:** in the course's **⋯** menu, choose **Set exam date**. The course header counts down, and **Practice** shows a **Today** plan that spreads the topics you haven't covered (or keep getting wrong) over the days left, with the last two days kept for a full review. **⋯ → Formula sheet** gathers every definition, claim and formula onto as few pages as possible, ready to print or save as PDF.
+
 Settings → Language switches the interface between English and Hebrew. Every section can be edited, undone (back to the version before the last change) or deleted. Search finds words across the course. Click **Print / PDF** at the top. Choose the whole course or one topic, the paper size (A3, A4, A5, A6, B5, Letter, Legal, Tabloid or a custom size), orientation, margins, text size and paper style (plain, grid, lined or dotted). The preview shows exactly how each page will look. Then **Save as PDF**, or **Print…** to choose your printer, the paper type (card, photo, colored…), copies and double-sided printing.
 
 ### 7. Back up your notes

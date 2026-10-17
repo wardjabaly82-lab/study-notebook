@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld('desktop', {
   updateStatus: () => ipcRenderer.invoke('update:status'),
   updateCheck: () => ipcRenderer.invoke('update:check'),
   updateInstall: () => ipcRenderer.invoke('update:install'),
+  textSize: dir => ipcRenderer.invoke('text-size', dir),
+  onTextSize(fn) { ipcRenderer.on('text-size', (e, p) => fn(p)); },
   onUpdateReady(fn) { ipcRenderer.on('update:ready', (e, v) => fn(v)); },
   onUpdateProgress(fn) { ipcRenderer.on('update:progress', (e, p) => fn(p)); },
 

@@ -247,7 +247,9 @@
   let goodTail = '';
   function promptFor(cid) {
     const c = SN.courseById && SN.courseById(cid);
-    return [c && c.name ? c.name + '.' : '', goodTail.trim()].filter(Boolean).join(' ');
+    const vocab = SN.courseVocab ? SN.courseVocab(cid) : [];
+    // Course words first, the last reliable sentence at the end (Whisper weighs the end most).
+    return [c && c.name ? c.name + '.' : '', vocab.length ? vocab.join(', ') + '.' : '', goodTail.trim().slice(-160)].filter(Boolean).join(' ');
   }
 
   // Drops what speech engines tend to "hear" in music or noise.

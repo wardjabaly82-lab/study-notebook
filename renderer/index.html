@@ -47,14 +47,13 @@
 <script>
 window.MathJax = {
   tex: { inlineMath: [['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
-  svg: { fontCache: 'global' },
+  svg: { fontCache: 'local' },
   startup: { typeset: false },
   options: { enableMenu: false, menuOptions: { settings: { assistiveMml: false, explorer: false } } }
 };
 </script>
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
-<script src="vendor/pdf.min.js"></script>
 <script src="vendor/mathjax/tex-svg.js" async></script>
 <script src="notebook-ops.js"></script>
 <script src="practice-gen.js"></script>

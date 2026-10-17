@@ -64,8 +64,11 @@
     return src;
   }
   function sendOpts() {
-    return { paper: opts.paper, width: Number(opts.width), height: Number(opts.height), orientation: opts.orientation, margins: opts.margins,
+    const o = { paper: opts.paper, width: Number(opts.width), height: Number(opts.height), orientation: opts.orientation, margins: opts.margins,
       fontSize: Number(opts.fontSize), style: opts.style, titlePage: opts.titlePage, contents: opts.contents, topicBreaks: opts.topicBreaks, pageNumbers: opts.pageNumbers, ink: opts.ink };
+    // A formula sheet is meant to be short: no title page, no contents, topics run on, smaller text.
+    if (opts.what === '__formulas') Object.assign(o, { titlePage: false, contents: false, topicBreaks: false, fontSize: Math.min(o.fontSize, 9.5), margins: opts.margins === 'wide' ? 'normal' : opts.margins });
+    return o;
   }
   const payloadOf = s => ({ course: s.course, lang: s.lang, sections: s.sections, subtitle: s.subtitle });
 
@@ -81,7 +84,7 @@
       <div class="pr-main">
         <div class="pr-side">
           <label class="pr-f"><span>${T('What to print')}</span>
-            <select data-k="what"><option value="">${T('Whole course')}${s ? ' · ' + esc(s.course) : ''}</option>${topics.map(t => `<option value="${esc(t.id)}"${t.id === opts.what ? ' selected' : ''}>${esc(T('Only: {title}', { title: t.title }))}</option>`).join('')}</select>
+            <select data-k="what"><option value="">${T('Whole course')}${s ? ' · ' + esc(s.course) : ''}</option><option value="__formulas"${opts.what === '__formulas' ? ' selected' : ''}>${T('Formula sheet')}</option>${topics.map(t => `<option value="${esc(t.id)}"${t.id === opts.what ? ' selected' : ''}>${esc(T('Only: {title}', { title: t.title }))}</option>`).join('')}</select>
           </label>
           <label class="pr-f"><span>${T('Paper size')}</span>
             <select data-k="paper">${PAPERS.map(([v, l, tr]) => `<option value="${v}"${v === opts.paper ? ' selected' : ''}>${esc(tr ? T(l) : l)}</option>`).join('')}</select>
@@ -176,6 +179,7 @@
     if (id !== reqId || !dlg.open) return;
     if (!r.ok) { badge.remove(); if (/Already preparing/.test(r.message || '')) { schedule(); return; } info(T(r.message || 'Couldn’t make the preview.'), true); return; }
     try {
+      if (!window.pdfjsLib) await new Promise((ok, bad) => { const sc = document.createElement('script'); sc.src = 'vendor/pdf.min.js'; sc.onload = ok; sc.onerror = () => bad(new Error('reader')); document.head.appendChild(sc); });
       if (!window.pdfjsLib) throw new Error('reader');
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
       const pdf = await pdfjsLib.getDocument({ data: r.data, isEvalSupported: false }).promise;
@@ -204,10 +208,11 @@
     } catch (e) { badge.remove(); info(T('Couldn’t show the preview, but saving and printing still work.'), true); }
   }
 
-  window.openPrint = () => {
+  window.openPrint = what => {
+    if (typeof what === 'string') opts.what = what;
     if (!dlg) { dlg = document.createElement('dialog'); dlg.className = 'pr-dlg'; document.body.appendChild(dlg); dlg.addEventListener('close', () => { reqId++; }); }
     src = null; lastInfo = '';
-    if (opts.what && !(source() || { topics: [] }).topics.some(t => t.id === opts.what)) opts.what = '';
+    if (opts.what && opts.what !== '__formulas' && !(source() || { topics: [] }).topics.some(t => t.id === opts.what)) opts.what = '';
     src = null; source();
     render();
     if (!dlg.open) dlg.showModal();

@@ -352,7 +352,7 @@ ipcMain.handle('speech:transcribe', async (ev, req) => {
   if (!(pcm instanceof Uint8Array) || pcm.byteLength % 2 || pcm.byteLength > 16000 * 2 * 40 || !SPEECH_LANGS.has(lang)) return { ok: false, code: 'failed' };
   try {
     const copy = new Int16Array(pcm.byteLength / 2); new Uint8Array(copy.buffer).set(pcm);
-    const r = await engine.transcribe(copy, lang, typeof prompt === 'string' ? prompt.slice(-500) : '');
+    const r = await engine.transcribe(copy, lang, typeof prompt === 'string' ? prompt.slice(-600) : '');
     return { ok: true, text: r.text, doubtful: r.doubtful };
   } catch (e) { log.warn('speech.transcribe.failed', { code: e.code, error: e.message }); return engineErr(e); }
 });
@@ -367,6 +367,17 @@ ipcMain.handle('speech:testAudio', () => process.env.SN_TEST_AUDIO && fs.existsS
 /* ---------- updates ---------- */
 let updates = null;
 // Copy text for the student (the page itself isn't allowed to write to the clipboard).
+// Text size for the whole app (Ctrl + / Ctrl − / Ctrl 0), remembered between starts.
+const ZOOMS = [0.8, 0.9, 1, 1.1, 1.2, 1.35, 1.5, 1.75];
+function textSize(dir) {
+  if (!win || win.isDestroyed()) return;
+  const s = loadSettings(); const cur = Number(s.zoom) || 1;
+  let i = ZOOMS.findIndex(z => Math.abs(z - cur) < 0.01); if (i < 0) i = 2;
+  const z = dir === 0 ? 1 : ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, i + dir))];
+  s.zoom = z; saveSettings(s); win.webContents.setZoomFactor(z);
+  win.webContents.send('text-size', Math.round(z * 100));
+}
+ipcMain.handle('text-size', (ev, dir) => { if ([-1, 0, 1].includes(dir)) textSize(dir); });
 ipcMain.handle('clipboard:write', (ev, text) => { if (typeof text !== 'string' || text.length > 200000) return false; clipboard.writeText(text); return true; });
 ipcMain.handle('update:status', () => updates ? updates.status() : { enabled: false });
 ipcMain.handle('update:check', () => updates ? updates.check() : { enabled: false });
@@ -415,6 +426,7 @@ function createWindow() {
     if (lvl === 3 || lvl === 'error') log.warn('renderer.error', { message: msg });
   });
   win.once('ready-to-show', () => win.show());
+  win.webContents.on('did-finish-load', () => { const z = Number(loadSettings().zoom) || 1; if (z !== 1) win.webContents.setZoomFactor(z); });
   win.loadURL('app://notebook/index.html');
 
   // Links open in the normal browser; the app window never navigates away.
@@ -447,7 +459,12 @@ app.whenReady().then(() => {
     return net.fetch(pathToFileURL(file).toString());
   });
   // Developer tools appear only when running from source, never in the installed app.
-  const view = [{ role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { type: 'separator' }, { role: 'togglefullscreen' }];
+  const view = [
+    { label: 'Bigger text', accelerator: 'CmdOrCtrl+=', click: () => textSize(+1) },
+    { label: 'Bigger text', accelerator: 'CmdOrCtrl+Plus', visible: false, acceleratorWorksWhenHidden: true, click: () => textSize(+1) },
+    { label: 'Smaller text', accelerator: 'CmdOrCtrl+-', click: () => textSize(-1) },
+    { label: 'Normal text size', accelerator: 'CmdOrCtrl+0', click: () => textSize(0) },
+    { type: 'separator' }, { role: 'togglefullscreen' }];
   if (DEV) view.push({ type: 'separator' }, { role: 'reload' }, { role: 'toggleDevTools' });
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),

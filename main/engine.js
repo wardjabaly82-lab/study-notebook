@@ -272,7 +272,7 @@ function create({ dataDir, log, onProgress, vadModel }) {
     // Start sure; if the result looks garbled or repetitive, Whisper retries more loosely.
     form.append('temperature', '0');
     form.append('temperature_inc', '0.2');
-    form.append('prompt', String(prompt || '').slice(-220));
+    form.append('prompt', String(prompt || '').slice(-600));
     const res = await fetch(`http://127.0.0.1:${s.port}/inference`, { method: 'POST', body: form });
     if (!res.ok) throw new EngineError('transcribe_failed', `HTTP ${res.status}`);
     const j = await res.json();

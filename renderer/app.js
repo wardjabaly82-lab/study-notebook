@@ -58,7 +58,28 @@
   // view: 'notes' | 'lecture' | 'practice'
   const S = { claudeSeen: 0, view: 'notes', lecture: null, lecAt: null, confirmLec: false, renamingLec: false, courseId: store('sn-course') || '', search: '', editing: null, confirmDel: null, collapsed: new Set(), flash: new Set(), menu: false, settings: null, lastClaude: 0, prac: null, pracTopic: '', pracMode: 'due', genType: 'mixed' };
   const course = () => courses().find(c => c.id === S.courseId) || null;
-  function selectCourse(id) { S.courseId = id || ''; store('sn-course', S.courseId); S.view = 'notes'; S.lecture = null; S.prac = null; S.editing = S.confirmDel = null; S.search = ''; render(); const w = $('sheetWrap'); if (w) w.scrollTop = 0; }
+  function selectCourse(id) { S.courseId = id || ''; store('sn-course', S.courseId); S.view = 'notes'; S.lecture = null; S.prac = null; S.editing = S.confirmDel = null; S.search = ''; render(); const w = $('sheetWrap'); if (w) w.scrollTop = 0; restorePos(); }
+  // Remembers, per course, which section you were reading and where in it, and goes back there.
+  let posTimer = null;
+  function savePos() {
+    if (S.view !== 'notes' || S.search || !S.courseId) return;
+    const w = $('sheetWrap'), top = w.getBoundingClientRect().top;
+    const sec = [...$('sheet').querySelectorAll(':scope > .sec')].find(el => el.getBoundingClientRect().bottom > top + 8);
+    store('sn-pos-' + S.courseId, sec ? JSON.stringify({ id: sec.id, off: Math.round(top - sec.getBoundingClientRect().top) }) : '');
+  }
+  function restorePos() {
+    let p = null; try { p = JSON.parse(store('sn-pos-' + S.courseId) || 'null'); } catch (e) {}
+    if (!p || !p.id || S.view !== 'notes') return;
+    let moved = false; const stop = () => { moved = true; };
+    for (const ev of ['wheel', 'keydown', 'pointerdown', 'touchstart']) addEventListener(ev, stop, { once: true, passive: true });
+    const w = $('sheetWrap');
+    const go = () => { if (moved) return; const el = document.getElementById(p.id); if (!el) return; w.scrollTop += el.getBoundingClientRect().top - w.getBoundingClientRect().top + (p.off || 0); };
+    // Wait (out of sight) until the formulas are drawn, jump straight there, then show the page.
+    w.classList.add('restoring');
+    Promise.race([S.drawing || Promise.resolve(), new Promise(r => setTimeout(r, 1500))]).then(() => {
+      go(); requestAnimationFrame(() => { go(); w.classList.remove('restoring'); });
+    });
+  }
 
   /* ================= helpers ================= */
   function ago(ts) {
@@ -71,7 +92,16 @@
     return new Date(ts).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' });
   }
   let toastT;
-  function toast(msg) { const el = $('toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (el.hidden = true), 3600); }
+  function toast(msg, action) {
+    const el = $('toast'); clearTimeout(toastT);
+    el.textContent = '';
+    const span = document.createElement('span'); span.textContent = msg; el.appendChild(span);
+    if (action) { const b = document.createElement('button'); b.type = 'button'; b.className = 'toast-act'; b.textContent = action.label; b.onclick = () => { el.hidden = true; action.fn(); }; el.appendChild(b); }
+    el.hidden = false; toastT = setTimeout(() => (el.hidden = true), action ? 8000 : 3600);
+  }
+  // Deleting keeps a copy for a few seconds, so "Undo" can bring it all back.
+  function removeDocs(test) { const kept = {}; for (const p of Object.keys(docs)) if (test(p)) { kept[p] = docs[p]; delete docs[p]; } return kept; }
+  function undoable(msg, kept, after) { toast(msg, { label: t('Undo'), fn: () => { Object.assign(docs, kept); save(); if (after) after(); else render(); toast(t('Restored')); } }); }
   const COVERS = ['#0a7cff', '#30b350', '#ff8a00', '#af52de', '#5856d6', '#ff375f', '#1eaac4', '#ff5e3a'];
   const coverOf = id => COVERS[[...String(id)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) % COVERS.length];
   const dirOf = c => (c && c.lang === 'he') ? 'rtl' : (c && c.lang === 'en') ? 'ltr' : (/[֐-׿]/.test(c ? c.name : '') ? 'rtl' : 'ltr');
@@ -108,9 +138,14 @@
     return html.replace(/MATHPH(\d+)X/g, (_, i) => esc(math[+i]));
   }
   function decorate(el) {
+    decorateShape(el); wireLinks(el);
+  }
+  function decorateShape(el) {
     el.querySelectorAll('p,li,blockquote,td,th').forEach(n => n.setAttribute('dir', 'auto'));
     el.querySelectorAll('pre').forEach(n => n.setAttribute('dir', 'ltr'));
     el.querySelectorAll('table').forEach(tb => { if (!tb.parentElement.classList.contains('tbl')) { const w = document.createElement('div'); w.className = 'tbl'; tb.replaceWith(w); w.appendChild(tb); } });
+  }
+  function wireLinks(el) {
     el.querySelectorAll('a').forEach(a => {
       const href = a.getAttribute('href') || '';
       if (href.startsWith('#lec=')) { a.classList.add('lec-ref'); a.title = t('Open this moment in the lecture transcript'); a.addEventListener('click', e => { e.preventDefault(); openLectureAt(href.slice(5)); }); }
@@ -118,10 +153,16 @@
     });
   }
   function typeset(el) {
+    const els = (Array.isArray(el) ? el : [el]).filter(Boolean);
+    if (!els.length) return Promise.resolve();
     const MJ = window.MathJax;
-    if (MJ && MJ.typesetPromise) { try { MJ.typesetClear && MJ.typesetClear([el]); } catch (e) {} MJ.typesetPromise([el]).catch(() => {}); }
-    else setTimeout(() => typeset(el), 400);
+    if (MJ && MJ.typesetPromise) { try { MJ.typesetClear && MJ.typesetClear(els); } catch (e) {} return MJ.typesetPromise(els).catch(() => {}); }
+    return new Promise(r => setTimeout(() => typeset(els).then(r), 300));
   }
+  // Notes already drawn (math included) are kept, so a redraw only draws what changed.
+  const drawn = new Map();
+  const drawnKey = s => `${s.id}|${s.rev || 1}|${s.updatedAt || 0}|${String(s.content || '').length}|${UIDIR}`;
+  const hasMath = el => /\\\(|\\\[|\$\$/.test(el.textContent);
   const setMd = (el, md) => { el.innerHTML = mdToHtml(md); decorate(el); typeset(el); };
   function highlight(el, q) {
     if (!q) return;
@@ -176,7 +217,7 @@
     const newest = secs.reduce((m, s) => Math.max(m, s.updatedAt || 0), 0);
     const has = secs.length > 0, due = dueCount(c.id), nCards = cards(c.id).length;
     top.innerHTML = `
-      <h1><span dir="auto">${esc(c.name)}</span><span class="meta" dir="${UIDIR}">${has ? esc(tn(secs.length, '1 section, updated {when}', '{n} sections, updated {when}', { when: ago(newest) })) : t('No notes yet')}</span></h1>
+      <h1><span dir="auto">${esc(c.name)}</span><span class="meta" dir="${UIDIR}">${has ? esc(tn(secs.length, '1 section, updated {when}', '{n} sections, updated {when}', { when: ago(newest) })) : t('No notes yet')}${examChip(c)}</span></h1>
       <div class="tools">
         <label class="search"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="search" type="search" placeholder="${esc(t('Search this course'))}" value="${esc(S.search)}" aria-label="${esc(t('Search this course'))}" ${has ? '' : 'disabled'}></label>
         <button class="btn${S.view === 'practice' ? ' on' : ''}" id="pracBtn" type="button"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="13" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7.5 3.5h10a3 3 0 0 1 3 3v10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>${t('Practice')}${due ? `<span class="count">${due}</span>` : nCards ? '' : ''}</button>
@@ -185,6 +226,8 @@
         <div class="menu-wrap">
           <button class="btn" id="moreBtn" type="button" aria-haspopup="menu" aria-expanded="${S.menu}" aria-label="${esc(t('More'))}">⋯</button>
           ${S.menu ? `<div class="menu" role="menu">
+            <button type="button" role="menuitem" data-act="formulas" ${has ? '' : 'disabled'}>${t('Formula sheet')}</button>
+            <button type="button" role="menuitem" data-act="exam-date">${c.examDate ? t('Change exam date') : t('Set exam date')}</button>
             <button type="button" role="menuitem" data-act="auto-save">${t('Auto-save Claude chats to this course')}</button>
             <button type="button" role="menuitem" data-act="add-topic">${t('Add a topic by hand')}</button>
             <button type="button" role="menuitem" data-act="export-md" ${has ? '' : 'disabled'}>${t('Export as Markdown')}</button>
@@ -253,6 +296,7 @@
     const secs = sections(c.id);
     if (S.view === 'lecture') { const l = lectures(c.id).find(x => x.id === S.lecture); if (l) { renderLecture(sheet, c, l, secs); return; } S.view = 'notes'; }
     if (S.view === 'practice') { renderPractice(sheet, c, secs); return; }
+    if (S.view === 'formulas') { renderFormulas(sheet, c, secs); return; }
     sheet.setAttribute('dir', dirOf(c));
     const list = []; walk(secs, (s, d) => list.push([s, d]));
     if (!list.length) {
@@ -270,8 +314,21 @@
     const shown = q ? list.filter(([s]) => norm(s.title).includes(q) || norm(s.content).includes(q)) : list;
     if (q && !shown.length) { sheet.setAttribute('dir', UIDIR); sheet.innerHTML = `<div class="empty"><h2>${esc(t('Nothing matches “{q}”', { q: S.search }))}</h2><p>${t('Try a different word, or search all courses with Ctrl+K.')}</p><button class="btn" type="button" data-act="clear-search">${t('Clear search')}</button></div>`; return; }
     sheet.innerHTML = shown.map(([s, d]) => sectionHtml(c, s, q ? Math.min(d, 1) : d, secs)).join('');
-    sheet.querySelectorAll('[data-note]').forEach(el => { const s = secs[el.dataset.note]; el.innerHTML = mdToHtml(s.content); decorate(el); highlight(el, q); });
-    typeset(sheet);
+    fillNotes(sheet, secs, q);
+  }
+  // Fills in the notes inside root, reusing what's already drawn and drawing only new math.
+  function fillNotes(root, secs, q) {
+    const fresh = [];
+    root.querySelectorAll('[data-note]').forEach(el => {
+      const s = secs[el.dataset.note], key = drawnKey(s);
+      if (!q && drawn.has(key)) { el.innerHTML = drawn.get(key); wireLinks(el); return; }
+      el.innerHTML = mdToHtml(s.content); decorate(el); highlight(el, q);
+      if (hasMath(el)) fresh.push([el, key]); else if (!q) drawn.set(key, el.innerHTML);
+    });
+    const heads = [...root.querySelectorAll('.sec-head')].filter(hasMath);
+    const pending = fresh.map(x => x[0]).concat(heads);
+    S.drawing = pending.length ? typeset(pending).then(() => { if (!q) for (const [el, key] of fresh) if (el.isConnected && !hasMath(el)) drawn.set(key, el.innerHTML); }) : Promise.resolve();
+    if (drawn.size > 3000) drawn.clear();
   }
 
   /* ---------- lecture page ---------- */
@@ -338,6 +395,77 @@
     if (S.pracMode === 'mistakes') pool = pool.filter(k => (k.hist || []).slice(-3).some(h => !h.ok));
     return pool;
   }
+  /* ---------- exam date, countdown and today's plan ---------- */
+  function daysTo(dateStr) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return null;
+    const [y, m, d] = dateStr.split('-').map(Number); const now = new Date();
+    return Math.round((new Date(y, m - 1, d) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
+  }
+  const fmtDay = ds => { const [y, m, d] = ds.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(LOCALE, { weekday: 'short', day: 'numeric', month: 'short' }); };
+  function examChip(c) {
+    const n = daysTo(c.examDate); if (n == null || n < 0) return '';
+    const txt = n === 0 ? t('Exam today') : n === 1 ? t('Exam tomorrow') : t('Exam in {n} days', { n });
+    return ` <button type="button" class="exam-chip${n <= 3 ? ' soon' : ''}" data-act="exam-date" title="${esc(fmtDay(c.examDate))}">${esc(txt)}</button>`;
+  }
+  function openExamDate(c) {
+    const today = new Date(); const min = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    openDlg('exam', `<form class="dlg-in" id="exForm">${head(esc(t('Exam date for “{course}”', { course: c.name })), esc(t('The app counts down and plans what to review each day so every topic is covered in time.')))}
+      <label class="field">${t('Exam date')}<input type="date" id="exDate" required min="${min}" value="${esc(c.examDate || '')}"></label>
+      <div class="row"><button class="btn primary" type="submit">${t('Save')}</button>${c.examDate ? `<button class="btn ghost" type="button" id="exClear">${t('Remove date')}</button>` : ''}<button class="btn ghost" type="button" data-close>${t('Cancel')}</button></div></form>`, d => {
+      const setDate = v => { const cur = docs[coursePath(c.id)] || {}; const next = { ...cur }; if (v) next.examDate = v; else delete next.examDate; docs[coursePath(c.id)] = next; save(); dlg.close(); render(); };
+      d.querySelector('#exForm').onsubmit = e => { e.preventDefault(); const v = d.querySelector('#exDate').value; if (daysTo(v) == null || daysTo(v) < 0) return; setDate(v); toast(t('Exam date saved')); };
+      const cl = d.querySelector('#exClear'); if (cl) cl.onclick = () => { setDate(''); toast(t('Exam date removed')); };
+    });
+  }
+  // Spreads the topics that are new or weak over the days left, keeping the last 2 days for a full review.
+  function todayPlan(c, secs) {
+    const n = daysTo(c.examDate); if (n == null || n < 0) return null;
+    const all = cards(c.id), now = Date.now();
+    const topics = kids(secs, null).map(r => {
+      const ks = all.filter(k => k.topicId && rootOf(secs, k.topicId) && rootOf(secs, k.topicId).id === r.id);
+      const hist = ks.flatMap(k => k.hist || []);
+      const acc = hist.length ? hist.filter(h => h.ok).length / hist.length : null;
+      return { r, n: ks.length, acc, status: !hist.length ? 'new' : acc < 0.7 ? 'weak' : 'ok' };
+    });
+    const todo = topics.filter(x => x.status !== 'ok').sort((a, b) => (a.status === b.status ? (a.acc || 0) - (b.acc || 0) : a.status === 'new' ? -1 : 1));
+    const studyDays = Math.max(1, n - 2);
+    const today = n <= 2 ? [] : todo.slice(0, Math.max(1, Math.ceil(todo.length / studyDays)));
+    return { days: n, today, left: todo.length, due: all.filter(k => !k.srs || k.srs.due <= now).length, final: n <= 2 };
+  }
+  function planPanel(c, secs) {
+    const p = todayPlan(c, secs);
+    if (!p) return `<div class="plan plan-empty"><div><b>${t('Have an exam coming up?')}</b><p class="small">${t('Set its date and the app plans what to review each day.')}</p></div><button class="btn" type="button" data-act="exam-date">${t('Set exam date')}</button></div>`;
+    const head = p.days === 0 ? t('Exam today') : p.days === 1 ? t('Exam tomorrow') : t('Exam in {n} days', { n: p.days });
+    const rows = [];
+    if (p.due) rows.push(`<li><span><b>${esc(tn(p.due, 'Review 1 due question', 'Review {n} due questions'))}</b><small>${t('Spaced repetition: these are due now.')}</small></span><button class="btn" type="button" data-act="plan-due">${t('Start')}</button></li>`);
+    for (const x of p.today) rows.push(`<li><span><b dir="auto">${esc(x.r.title)}</b><small>${x.status === 'new' ? (x.n ? t('Not practiced yet') : t('No questions yet: the app makes them')) : esc(t('{p}% right so far', { p: Math.round(x.acc * 100) }))}</small></span><button class="btn" type="button" data-act="plan-topic" data-id="${esc(x.r.id)}">${t('Practice')}</button></li>`);
+    if (p.final) rows.push(`<li><span><b>${t('Final review')}</b><small>${t('Read the formula sheet, then practice everything once more.')}</small></span><span class="row"><button class="btn" type="button" data-act="formulas">${t('Formula sheet')}</button><button class="btn" type="button" data-act="plan-all">${t('Practice all')}</button></span></li>`);
+    if (!rows.length) rows.push(`<li><span><b>${t('All caught up for today')}</b><small>${t('Every topic is practiced. Come back tomorrow for what’s due.')}</small></span></li>`);
+    return `<div class="plan"><div class="plan-head"><div><span class="plan-days">${esc(head)}</span><span class="small"> · ${esc(fmtDay(c.examDate))}${p.final ? '' : ' · ' + esc(tn(p.left, '1 topic left to cover', '{n} topics left to cover'))}</span></div><button type="button" class="sn-link" data-act="exam-date">${t('Change')}</button></div>
+      <h3>${t('Today')}</h3><ul class="plan-list">${rows.join('')}</ul></div>`;
+  }
+  function planTopic(c, secs, id) {
+    S.pracTopic = id; S.pracMode = 'all';
+    if (pracPool(c, secs).length) startPractice(c, secs); else { S.genType = 'mixed'; makeQuestions(c, secs); }
+  }
+
+  /* ---------- formula sheet ---------- */
+  function formulaItems(c, secs) {
+    const list = []; walk(secs, (s, d) => list.push({ id: s.id, title: s.title, depth: d, content: s.content }));
+    return window.PracticeGen ? window.PracticeGen.formulaSheet(list, dirOf(c) === 'rtl' ? 'he' : 'en') : [];
+  }
+  function renderFormulas(sheet, c, secs) {
+    const items = formulaItems(c, secs);
+    sheet.setAttribute('dir', dirOf(c));
+    sheet.innerHTML = `<div class="fs-top" dir="${UIDIR}"><div><h2>${t('Formula sheet')}</h2><p class="small">${t('Definitions, claims and formulas from your notes, on as few pages as possible.')}</p></div>
+        <div class="row"><button class="btn primary" type="button" data-act="print-formulas">${t('Print / PDF')}</button><button class="btn ghost" type="button" data-act="back-notes">${t('← Back to notes')}</button></div></div>
+      ${items.length ? `<div class="fsheet">${items.map(x => `<div class="fs-item d${Math.min(x.depth, 2)}"><div class="fs-title" dir="auto">${esc(x.title)}</div>${x.md ? `<div class="note fs-note" data-fs="${esc(x.id)}"></div>` : ''}</div>`).join('')}</div>`
+        : `<div class="empty"><p>${t('No definitions or formulas found yet. They appear here as your notes grow.')}</p></div>`}`;
+    const byId = Object.fromEntries(items.map(x => [x.id, x]));
+    sheet.querySelectorAll('[data-fs]').forEach(el => { el.innerHTML = mdToHtml(byId[el.dataset.fs].md); decorate(el); });
+    typeset(sheet);
+  }
+
   // Make new practice questions from the notes, here in the app (no Claude needed).
   function genBox(c, secs, first) {
     const roots = kids(secs, null);
@@ -394,7 +522,7 @@
     const all = cards(c.id);
     const he = dirOf(c) === 'rtl';
     if (!all.length) {
-      sheet.innerHTML = `<div class="prac"><div class="prac-head"><h2>${t('Practice')}</h2><p>${esc(t('Make questions from your notes, then practice them with spaced repetition.'))}</p></div>${genBox(c, secs, true)}
+      sheet.innerHTML = `<div class="prac"><div class="prac-head"><h2>${t('Practice')}</h2><p>${esc(t('Make questions from your notes, then practice them with spaced repetition.'))}</p></div>${planPanel(c, secs)}${genBox(c, secs, true)}
         <div class="ask"><p>${t('Claude also adds questions by itself when it saves a new topic. You can ask it for more in the Claude app, for example:')}</p><p class="say-box" dir="auto">${esc(askPractice(c))}</p><button class="btn" type="button" data-act="copy-prac">${t('Copy')}</button></div></div>`;
       const ps = sheet.querySelector('#pracTopic'); if (ps) ps.onchange = e => { S.pracTopic = e.target.value; renderSheet(); };
       return;
@@ -422,6 +550,7 @@
     const due = all.filter(k => !k.srs || k.srs.due <= now).length;
     sheet.innerHTML = `<div class="prac">
       <div class="prac-head"><h2>${t('Practice')}</h2><p>${esc(t('{n} questions and flashcards, {due} due now', { n: all.length, due }))}</p></div>
+      ${planPanel(c, secs)}
       <div class="prac-start">
         <div class="seg" role="group" aria-label="${esc(t('What to practice'))}">
           <button type="button" data-pmode="due" aria-pressed="${S.pracMode === 'due'}">${t('Due now')}</button>
@@ -480,6 +609,18 @@
     const first = sheet.querySelector('[data-grade][autofocus], [data-act="show-answer"]'); if (first) first.focus();
   }
 
+  // Redraws just one section in place (e.g. after Claude updates it), instead of the whole page.
+  function patchSection(c, id) {
+    if (S.view !== 'notes' || S.search || S.editing || S.confirmDel) return false;
+    const old = document.getElementById('sec-' + id); const secs = sections(c.id); const s = secs[id];
+    if (!old || !s) return false;
+    let d = 0, p = s; while (p.parentId && secs[p.parentId] && d < 10) { p = secs[p.parentId]; d++; }
+    const tmp = document.createElement('div'); tmp.innerHTML = sectionHtml(c, s, d, secs);
+    const el = tmp.firstElementChild; if (!el || el.id !== 'sec-' + id) return false;
+    old.replaceWith(el); fillNotes(el, secs, '');
+    return true;
+  }
+
   function flash(id) {
     S.flash.add(id); setTimeout(() => { S.flash.delete(id); }, 2500);
     const el = document.getElementById('sec-' + id);
@@ -499,9 +640,9 @@
     save(); selectCourse(id);
   }
   function deleteCourse(id) {
-    for (const p of Object.keys(docs)) if (p === coursePath(id) || p.startsWith(coursePath(id) + '/')) delete docs[p];
+    const kept = removeDocs(p => p === coursePath(id) || p.startsWith(coursePath(id) + '/'));
     save(); S.courseId = ''; selectCourse(courses()[0] ? courses()[0].id : '');
-    toast(t('Course deleted'));
+    undoable(t('Course deleted'), kept, () => selectCourse(id));
   }
   function addSection(parentId) {
     const c = course(); if (!c) return;
@@ -546,7 +687,7 @@
       case 'cancel-edit': S.editing = null; renderSheet(); break;
       case 'delete': S.confirmDel = id; S.editing = null; renderSheet(); break;
       case 'cancel-delete': S.confirmDel = null; renderSheet(); break;
-      case 'do-delete': for (const sid of subtree(secs, id)) delete docs[secPath(c.id, sid)]; S.confirmDel = null; save(); render(); toast(t('Section deleted')); break;
+      case 'do-delete': { const gone = new Set(subtree(secs, id).map(sid => secPath(c.id, sid))); const kept = removeDocs(p => gone.has(p)); S.confirmDel = null; save(); render(); undoable(t('Section deleted'), kept, () => { render(); flash(id); }); break; }
       case 'undo': {
         const s = secs[id]; if (!s || s.prevContent == null) break;
         putSection(c.id, { ...s, title: s.prevTitle || s.title, content: s.prevContent, prevTitle: s.title, prevContent: s.content, rev: (s.rev || 1) + 1, updatedAt: Date.now(), source: 'me' });
@@ -557,6 +698,12 @@
       case 'export-md': S.menu = false; renderTop(); exportMd(); break;
       case 'course-settings': S.menu = false; renderTop(); openCourseSettings(); break;
       case 'auto-save': S.menu = false; renderTop(); openAutoSave(c); break;
+      case 'formulas': S.menu = false; showView('formulas'); break;
+      case 'exam-date': S.menu = false; renderTop(); openExamDate(c); break;
+      case 'print-formulas': if (window.openPrint) window.openPrint('__formulas'); break;
+      case 'plan-topic': planTopic(c, secs, b.dataset.id); break;
+      case 'plan-due': S.pracTopic = ''; S.pracMode = 'due'; startPractice(c, secs); break;
+      case 'plan-all': S.pracTopic = ''; S.pracMode = 'all'; startPractice(c, secs); break;
       case 'delete-course': S.menu = false; renderTop(); openDeleteCourse(); break;
       case 'back-notes': S.prac = null; showView('notes'); break;
       case 'copy-ask': copy(askClaude(c.id, S.lecture)); break;
@@ -565,7 +712,7 @@
       case 'cancel-rename': S.renamingLec = false; renderSheet(); break;
       case 'delete-lec': S.confirmLec = true; renderSheet(); break;
       case 'cancel-delete-lec': S.confirmLec = false; renderSheet(); break;
-      case 'do-delete-lec': delete docs[lecPath(c.id, S.lecture)]; save(); S.confirmLec = false; S.lecture = null; showView('notes'); renderSide(); toast(t('Recording deleted')); break;
+      case 'do-delete-lec': { const lp = lecPath(c.id, S.lecture), lid = S.lecture; const kept = removeDocs(p => p === lp); save(); S.confirmLec = false; S.lecture = null; showView('notes'); renderSide(); undoable(t('Recording deleted'), kept, () => { S.lecture = lid; showView('lecture'); renderSide(); }); break; }
       case 'export-lec': { const l = lectures(c.id).find(x => x.id === S.lecture); if (l) D.saveFile((l.title.replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'lecture') + '.txt', `${l.title}\n\n${l.text || ''}\n`).then(r => { if (r && r.ok) toast(t('Exported')); }); break; }
       case 'prac-start': startPractice(c, secs); break;
       case 'gen-make': makeQuestions(c, secs); break;
@@ -594,6 +741,24 @@
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') { const i = $('search'); if (i && !i.disabled) { e.preventDefault(); i.focus(); i.select(); } }
     if (e.key === 'Escape') { if (S.menu) { S.menu = false; renderTop(); } else if (S.editing && !document.querySelector('dialog[open]')) { S.editing = null; renderSheet(); } }
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { const f = document.querySelector('form.edit'); if (f) f.requestSubmit(); }
+    const open = document.querySelector('dialog[open]');
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && !open) {
+      const k = e.key.toLowerCase();
+      if (k === 'p') { e.preventDefault(); const b = $('printBtn'); if (b && !b.disabled && window.openPrint) window.openPrint(); return; }
+      if (k === 'n') { e.preventDefault(); openNewCourse(); return; }
+      if (k === 'e') { e.preventDefault(); if (S.view === 'practice' && !S.prac) showView('notes'); else { S.prac = null; showView('practice'); } return; }
+    }
+    if (e.key === '?' && !typing && !open) { e.preventDefault(); openShortcuts(); return; }
+    // Alt + ↑ / ↓: previous / next topic
+    if (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && !typing && !open && S.view === 'notes') {
+      e.preventDefault();
+      const w = $('sheetWrap'), top = w.getBoundingClientRect().top + 12;
+      const secsEls = [...$('sheet').querySelectorAll(':scope > .sec')];
+      const cur = secsEls.findIndex(el => el.getBoundingClientRect().bottom > top);
+      const next = e.key === 'ArrowDown' ? secsEls[Math.min(secsEls.length - 1, cur + 1)] : secsEls[Math.max(0, (secsEls[cur] && secsEls[cur].getBoundingClientRect().top < top - 4) ? cur : cur - 1)];
+      if (next) next.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+      return;
+    }
     // practice keys
     if (S.view === 'practice' && S.prac && S.prac.i < S.prac.ids.length && !typing && !document.querySelector('dialog[open]')) {
       const c = course(); const k = c && cards(c.id).find(x => x.id === S.prac.ids[S.prac.i]); if (!k) return;
@@ -602,6 +767,14 @@
       else if (k.kind !== 'choice' && S.prac.shown && /^[1-4]$/.test(e.key)) { grade(c, k, +e.key - 1); e.preventDefault(); }
     }
   });
+
+  function openShortcuts() {
+    const rows = [['Ctrl+K', t('Search all courses')], ['Ctrl+F', t('Search this course')], ['Ctrl+N', t('New course')], ['Ctrl+P', t('Print / PDF')], ['Ctrl+E', t('Practice')],
+      ['Alt+↓ / Alt+↑', t('Next / previous topic')], ['Ctrl + / Ctrl −', t('Bigger / smaller text')], ['Ctrl+0', t('Normal text size')], ['Ctrl+Enter', t('Save changes')], ['Esc', t('Close')],
+      [t('Space, 1–4'), t('In practice: show the answer, then rate it')], ['?', t('This list')]];
+    openDlg('keys', `<div class="dlg-in">${head(t('Keyboard shortcuts'))}<div class="keys">${rows.map(([k, l]) => `<div class="krow"><span>${esc(l)}</span><kbd dir="ltr">${esc(k)}</kbd></div>`).join('')}</div></div>`);
+  }
+  if (D.onTextSize) D.onTextSize(p => toast(t('Text size {p}%', { p })));
 
   /* ================= theme ================= */
   const THEME_NAME = { system: 'Automatic', light: 'Light', dark: 'Dark' };
@@ -616,8 +789,10 @@
   /* ================= dialogs ================= */
   let dlg = null, dlgKind = '';
   function openDlg(kind, html, onOpen) {
-    if (!dlg) { dlg = document.createElement('dialog'); dlg.className = 'dlg'; document.body.appendChild(dlg); dlg.addEventListener('scroll', () => dlg.classList.toggle('scrolled', dlg.scrollTop > 4)); dlg.addEventListener('close', () => { dlg.classList.remove('scrolled'); if (dlgKind === 'welcome') store('sn-welcomed', '1'); dlgKind = ''; D.getSettings().then(st => { S.settings = st; renderClaudePill(); if (S.view === 'notes') renderSheet(); }); }); }
-    dlgKind = kind; dlg.innerHTML = html; dlg.classList.toggle('wide', kind === 'search'); dlg.scrollTop = 0; dlg.classList.remove('scrolled');
+    if (!dlg) { dlg = document.createElement('dialog'); dlg.className = 'dlg'; document.body.appendChild(dlg); dlg.addEventListener('scroll', e => { if (e.target.classList && e.target.classList.contains('dlg-in')) dlg.classList.toggle('scrolled', e.target.scrollTop > 4); }, true); dlg.addEventListener('close', () => { dlg.classList.remove('scrolled'); if (dlgKind === 'welcome') store('sn-welcomed', '1'); dlgKind = ''; D.getSettings().then(st => { S.settings = st; renderClaudePill(); if (S.view === 'notes') renderSheet(); }); }); }
+    dlgKind = kind; dlg.innerHTML = html; dlg.classList.toggle('wide', kind === 'search'); dlg.classList.remove('scrolled');
+    // Move the title and × out of the scrolling area.
+    const top = dlg.querySelector('.dlg-in > .dlg-head:first-child'); if (top) { top.classList.add('dlg-top'); dlg.prepend(top); }
     dlg.querySelectorAll('[data-close]').forEach(x => x.onclick = () => dlg.close());
     if (!dlg.open) dlg.showModal();
     if (onOpen) onOpen(dlg);
@@ -674,7 +849,7 @@
   function openDeleteCourse() {
     const c = course(); if (!c) return;
     const n = children(c.id, 'sections').length;
-    openDlg('delete', `<div class="dlg-in">${head(esc(t('Delete “{name}”?', { name: c.name })), esc(tn(n, 'This removes the course and its 1 section from this computer. It can’t be undone. Back up your notes first if you might want them later.', 'This removes the course and its {n} sections from this computer. It can’t be undone. Back up your notes first if you might want them later.')))}
+    openDlg('delete', `<div class="dlg-in">${head(esc(t('Delete “{name}”?', { name: c.name })), esc(tn(n, 'This removes the course and its 1 section. You can undo it right after.', 'This removes the course and its {n} sections. You can undo it right after.')))}
       <div class="row"><button class="btn danger solid" type="button" id="dcYes">${t('Delete course')}</button><button class="btn ghost" type="button" data-close>${t('Keep it')}</button></div></div>`,
       d => { d.querySelector('#dcYes').onclick = () => { dlg.close(); deleteCourse(c.id); }; });
   }
@@ -853,7 +1028,8 @@
       <section class="group"><h3>${t('Lecture recording')}</h3><div class="box" id="speechBox"><p class="small">${t('Checking…')}</p></div></section>
       <section class="group"><h3>${t('Appearance')}</h3>
         <div class="seg" role="group" aria-label="${esc(t('Appearance'))}">${['system', 'light', 'dark'].map(th => `<button type="button" data-theme-pick="${th}" aria-pressed="${theme() === th}">${THEME_ICON[th]}${t(THEME_NAME[th])}</button>`).join('')}</div>
-        <p class="small">${t('Automatic follows your computer’s light or dark setting.')}</p></section>
+        <p class="small">${t('Automatic follows your computer’s light or dark setting.')}</p>
+        <p class="small">${t('Text size: Ctrl + and Ctrl − (Ctrl 0 for normal).')} <button type="button" class="sn-link" id="keysLink">${t('All keyboard shortcuts')}</button></p></section>
       <section class="group"><h3>${t('Language')}</h3>
         <div class="seg" role="group" aria-label="${esc(t('Language'))}"><button type="button" data-ui-lang="en" aria-pressed="${uiLang === 'en'}">English</button><button type="button" data-ui-lang="he" aria-pressed="${uiLang === 'he'}">עברית</button></div>
         <p class="small">${t('The language of the app’s buttons and menus. Each course’s notes keep their own language.')}</p></section>
@@ -863,6 +1039,7 @@
         <div class="path" dir="ltr">${esc(s.dataDir || '')}</div></div></section>
       <section class="group"><h3>${t('Updates')}</h3><div class="box" id="updBox"><p class="small">${esc(t('Version {v}.', { v: s.version || '' }))}</p></div></section></div>`, d => {
       wireClaude(d); drawSpeech(d); drawUpdates(d);
+      const kl = d.querySelector('#keysLink'); if (kl) kl.onclick = () => openShortcuts();
       d.querySelectorAll('[data-theme-pick]').forEach(b => b.onclick = () => setTheme(b.dataset.themePick));
       d.querySelectorAll('[data-ui-lang]').forEach(b => b.onclick = async () => { if (b.dataset.uiLang === uiLang) return; window.I18N.set(b.dataset.uiLang); await saveNow(); location.reload(); });
       d.querySelector('#folder').onclick = () => D.openDataFolder();
@@ -905,7 +1082,10 @@
           if (cid !== S.courseId && !busy) { S.courseId = cid; store('sn-course', cid); S.search = ''; }
           if (S.editing === result.section_id) S.editing = null;
           if (S.view !== 'notes' && !busy && cid === S.courseId && S.view !== 'lecture') S.view = 'notes';
-          render(); if (cid === S.courseId && S.view === 'notes') flash(result.section_id);
+          const c = course();
+          if (result.action === 'updated' && c && c.id === cid && !busy && patchSection(c, result.section_id)) { renderSide(); renderTop(); renderContents(); }
+          else render();
+          if (cid === S.courseId && S.view === 'notes') flash(result.section_id);
         }
       }
       return { ok: true, result };
@@ -916,6 +1096,24 @@
 
   /* ================= shared with the recorder ================= */
   window.SN = {
+    // Words from the course (topic titles and bold terms), to help speech recognition spell them right.
+    courseVocab(cid) {
+      const secs = sections(cid); const count = new Map();
+      const strip = w => String(w || '').replace(/\\\([\s\S]*?\\\)|\$[^$]*\$/g, ' ').replace(/\([^)]*\)/g, ' ').replace(/[*_`]/g, '').replace(/\s+/g, ' ').trim();
+      const add = w => { w = w.replace(/^[\s\p{P}]+|[\s\p{P}]+$/gu, ''); if (w.length < 2 || w.length > 40 || !/\p{L}{2}/u.test(w)) return; count.set(w, (count.get(w) || 0) + 1); };
+      for (const s of Object.values(secs)) {
+        for (const part of strip(s.title).split(/[:,;·–—→]/)) add(part);
+        // Bold terms inside sentences (not labels like "**Proof**" at the start of a line).
+        for (const line of String(s.content || '').split('\n')) for (const m of line.matchAll(/\*\*([^*\n]{2,40}?)\*\*/g)) {
+          const before = line.slice(0, m.index).replace(/^\s*([-*]|\d+\.)\s*/, '').trim(), after = line.slice(m.index + m[0].length).trim();
+          if (/[.:?]\s*$/.test(m[1]) || (!before && (!after || /^[.:]/.test(after)))) continue;
+          add(strip(m[1]));
+        }
+      }
+      const out = []; let len = 0;
+      for (const [w] of [...count.entries()].sort((a, b) => b[1] - a[1])) { if (len + w.length > 200) break; out.push(w); len += w.length + 2; }
+      return out;
+    },
     course, courseById: id => courses().find(c => c.id === id) || null, render, toast, saveNow, dirFor, askClaude, copy, t, tn,
     updateRecBtn() { const b = $('recBtn'); if (b) b.outerHTML = recButton(); },
     putLecture(cid, lid, data) { docs[lecPath(cid, lid)] = data; save(); if (cid === S.courseId) { renderContents(); renderSide(); } },
@@ -931,6 +1129,10 @@
   window.snPrintSource = topicId => {
     const c = course(); if (!c) return null;
     const secs = sections(c.id); const out = [];
+    if (topicId === '__formulas') {
+      const base = window.snPrintSource(null);
+      return { ...base, subtitle: t('Formula sheet'), sections: formulaItems(c, secs).map(x => ({ id: x.id, title: x.title, depth: x.depth, html: x.md ? mdToHtml(x.md) : '' })) };
+    }
     const add = (s, d) => out.push({ id: s.id, title: s.title, depth: d, html: mdToHtml(s.content) });
     if (topicId && secs[topicId]) { add(secs[topicId], 0); walk(secs, (s, d) => add(s, d + 1), topicId); }
     else walk(secs, add);
@@ -954,7 +1156,8 @@
     for (const [p, d] of Object.entries(docs)) if (p.includes('/lectures/') && d && d.status === 'recording') docs[p] = { ...d, status: 'stopped' };
     S.settings = settings;
     D.setTheme(theme());
-    render();
+    render(); restorePos();
+    $('sheetWrap').addEventListener('scroll', () => { clearTimeout(posTimer); posTimer = setTimeout(savePos, 250); }, { passive: true });
     if (store('sn-welcomed') !== '1' && !settings.connectorLastUse) setTimeout(openWelcome, 250);
   })();
 })();
