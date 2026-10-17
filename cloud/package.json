@@ -2,7 +2,7 @@
   "name": "study-notebook-online",
   "version": "1.0.0",
   "private": true,
-  "description": "The online copy of your Study Notebook: lets Claude use your notebook in any chat (web, phone, desktop), and syncs with the Study Notebook app on your laptop.",
+  "description": "Study Notebook online: one shared site where each student signs in with Google and keeps a private notebook that Claude can use in any chat.",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"
@@ -16,10 +16,16 @@
   "cloudflare": {
     "bindings": {
       "DB": {
-        "description": "Where your notes are stored online."
+        "description": "Where the notebooks are stored (each student’s notes separately)."
       },
       "OAUTH_KV": {
-        "description": "Stores Claude's sign-in to your notebook."
+        "description": "Short-lived sign-in data for Google and Claude."
+      },
+      "GOOGLE_CLIENT_ID": {
+        "description": "From Google Cloud: the OAuth client ID for Google sign-in."
+      },
+      "GOOGLE_CLIENT_SECRET": {
+        "description": "From Google Cloud: the OAuth client secret (keep it secret)."
       }
     }
   }

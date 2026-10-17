@@ -5,6 +5,7 @@
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["global_fetch_strictly_public"],
   "workers_dev": true,
+  "keep_vars": true,
   "d1_databases": [{ "binding": "DB", "database_name": "study-notebook" }],
   "kv_namespaces": [{ "binding": "OAUTH_KV" }],
   "build": { "command": "node ../scripts/build-web.js", "watch_dir": ["../renderer", "landing"] },

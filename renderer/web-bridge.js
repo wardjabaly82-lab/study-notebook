@@ -14,6 +14,7 @@
   async function req(path, opts = {}) {
     const r = await fetch(path, { credentials: 'same-origin', ...opts, headers: { ...H, ...(opts.headers || {}) } });
     if (r.status === 401) { signedOut(); throw new Error('signed_out'); }
+    if (r.status === 413) { error = 'Your online notebook is full (100 MB). Delete old recordings or courses to make room.'; throw new Error('full'); }
     if (!r.ok) throw new Error('http ' + r.status);
     return r.json();
   }
@@ -56,7 +57,7 @@
         }
         error = ''; lastSync = Date.now(); online = synced.size; tell();
         return { ok: true };
-      } catch (e) { error = 'Can’t reach your online notebook. Changes are kept and sent when the connection is back.'; tell(); return { ok: false }; }
+      } catch (e) { if (e.message !== 'full') error = 'Can’t reach your online notebook. Changes are kept and sent when the connection is back.'; tell(); return { ok: false }; }
     });
     return pushing;
   }

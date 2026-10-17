@@ -47,6 +47,12 @@ export async function upsertUser(env, { sub, email, name }) {
   await env.DB.prepare('INSERT INTO users (id, google_sub, email, name, created, last_seen) VALUES (?1, ?2, ?3, ?4, ?5, ?5)').bind(id, sub, email, name || null, now).run();
   return { id, google_sub: sub, email, name, created: now, last_seen: now, fresh: true };
 }
+// The site's first account is its owner (the person who set it up and signed in first).
+export async function isOwner(env, uid) {
+  await ensureSchema(env);
+  const r = await env.DB.prepare('SELECT id FROM users ORDER BY created, id LIMIT 1').first();
+  return !!r && r.id === uid;
+}
 export async function countUsers(env) {
   await ensureSchema(env);
   const r = await env.DB.prepare('SELECT COUNT(*) AS n FROM users').first();
@@ -103,8 +109,17 @@ export async function docAt(env, uid, path) {
   try { return row && row.data ? JSON.parse(row.data) : null; } catch (e) { return null; }
 }
 
+// Each student may keep up to this much (notes, practice, transcripts); far more than a degree needs.
+export const QUOTA_BYTES = 100 * 1024 * 1024, QUOTA_DOCS = 50000;
+export async function usage(env, uid) {
+  const r = await env.DB.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(LENGTH(data)), 0) AS bytes FROM notes WHERE uid = ?1 AND data IS NOT NULL').bind(uid).first();
+  return { docs: r ? r.n : 0, bytes: r ? r.bytes : 0 };
+}
 // Applies changes sent by the app or the website; keeps the online copy where it is newer.
 export async function applyPush(env, uid, incoming) {
+  const adding = incoming.reduce((n, ch) => n + (ch && ch.data ? JSON.stringify(ch.data).length : 0), 0);
+  const u = await usage(env, uid);
+  if (u.bytes + adding > QUOTA_BYTES || u.docs + incoming.length > QUOTA_DOCS) throw Object.assign(new Error('full'), { code: 'full' });
   const writes = [], kept = [];
   for (const ch of incoming) {
     if (!ch || typeof ch.path !== 'string' || !DOC_PATH.test(ch.path)) throw Object.assign(new Error('bad_path'), { code: 'bad_path', path: ch && ch.path });

@@ -55,7 +55,7 @@ async function push(request, env, uid) {
   const incoming = Array.isArray(body && body.changes) ? body.changes : null;
   if (!incoming || incoming.length > 5000) return json({ error: 'bad_changes' }, 400);
   try { return json({ ok: true, ...(await store.applyPush(env, uid, incoming)) }); }
-  catch (e) { if (e.code) return json({ error: e.code, path: e.path }, 400); throw e; }
+  catch (e) { if (e.code === 'full') return json({ error: 'full', message: 'Your notebook is full (100 MB). Delete old recordings or courses to make room.' }, 413); if (e.code) return json({ error: e.code, path: e.path }, 400); throw e; }
 }
 
 /* ---------------- the desktop app's sync (signed in with a token) ---------------- */
@@ -141,7 +141,8 @@ async function computers(env, uid) {
 async function account(request, env, url, user) {
   const u = { ...user, mcp: `${url.origin}/mcp` };
   if (request.method === 'GET' && url.pathname === '/account') {
-    const [notes, grants, pcs, legacy] = await Promise.all([store.countDocs(env, user.id), accountGrants(env, user.id), computers(env, user.id), store.legacyInfo(env)]);
+    const [notes, grants, pcs, owner] = await Promise.all([store.countDocs(env, user.id), accountGrants(env, user.id), computers(env, user.id), store.isOwner(env, user.id)]);
+    const legacy = owner ? await store.legacyInfo(env) : null;   // only the site's owner can claim the old password notebook
     return P.html(P.accountPage({ user: u, token: await formToken(request), notes, grants, computers: pcs, legacy, msg: url.searchParams.get('done') || '' }));
   }
   if (request.method !== 'POST') return redirect('/account');
@@ -157,7 +158,7 @@ async function account(request, env, url, user) {
     return redirect('/account?done=' + encodeURIComponent('That computer is unlinked.'));
   }
   if (url.pathname === '/account/claim') {
-    const legacy = await store.legacyInfo(env);
+    const legacy = (await store.isOwner(env, user.id)) ? await store.legacyInfo(env) : null;
     if (!legacy) return redirect('/account');
     if (!(await store.legacyPasswordOk(env, String(form.get('password') || ''), legacy.password))) {
       await new Promise(r => setTimeout(r, 800));

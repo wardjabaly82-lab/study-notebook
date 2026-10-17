@@ -1,7 +1,7 @@
 /* What Claude talks to: the notebook tools, for the student who connected Claude. */
 import Ops from './notebook-ops.js';
 import { INSTRUCTIONS } from './instructions.js';
-import { loadDocs, writeDocs, userById } from './store.js';
+import { loadDocs, writeDocs, userById, usage, QUOTA_BYTES } from './store.js';
 
 export const VERSION = '2.0.0';
 
@@ -36,7 +36,11 @@ async function callTool(env, uid, name, args) {
   try {
     const docs = await loadDocs(env, uid);
     const { result, writes } = Ops.run(docs, name, args || {});
-    if (writes && writes.length) await writeDocs(env, uid, writes);
+    if (writes && writes.length) {
+      const adding = writes.reduce((n, w) => n + (w.data ? JSON.stringify(w.data).length : 0), 0);
+      if ((await usage(env, uid)).bytes + adding > QUOTA_BYTES) return { content: [{ type: 'text', text: 'The student’s notebook is full (100 MB). Nothing was saved; ask them to delete old recordings or courses.' }], isError: true };
+      await writeDocs(env, uid, writes);
+    }
     const text = JSON.stringify(result, null, 2) + (READ_ONLY.has(name) ? '' : '\n\n' + ONLINE_NOTE);
     return { content: [{ type: 'text', text }] };
   } catch (e) {

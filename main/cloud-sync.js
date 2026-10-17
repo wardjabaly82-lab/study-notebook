@@ -38,6 +38,7 @@ function create({ dataDir, loadData, applyChanges, log, onStatus, fetchImpl }) {
       });
     } catch (e) { throw new SyncError('offline', 'Can’t reach your online notebook. Check the internet connection.'); }
     if (res.status === 401) throw new SyncError('signed_out', 'This computer was signed out of your account. Sign in with Google again.');
+    if (res.status === 413) throw new SyncError('full', 'Your online notebook is full (100 MB). Delete old recordings or courses to make room.');
     if (!res.ok) throw new SyncError('server', `Your online notebook answered with an error (${res.status}).`);
     try { return await res.json(); } catch (e) { throw new SyncError('server', 'That address doesn’t look like a Study Notebook online server.'); }
   }
