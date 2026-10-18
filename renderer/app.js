@@ -352,7 +352,7 @@
       const say = c.lang === 'he' ? `“תשמור את מה שלמדנו ב-Study Notebook, בקורס ${num || c.name}”` : `“Save what we covered in Study Notebook, course ${num || c.name}”`;
       sheet.setAttribute('dir', UIDIR);
       sheet.innerHTML = `<div class="empty"><h2>${t('This notebook is empty')}</h2>
-        <p>${esc(t('Open the Claude app and study a topic from {course}: ask questions until it makes sense. Then say:', { course: c.name }))}</p>
+        <p>${esc(t('Open the Claude desktop app and study a topic from {course}: ask questions until it makes sense. Then say:', { course: c.name }))}</p>
         <p class="say" dir="auto">${esc(say)}</p>
         <p class="small">${esc(t('Claude saves the final explanation here, under the right topic.'))}</p>
         ${lastClaude() ? `<button class="btn primary" type="button" data-act="auto-save">${t('Set up auto-saving for this course')}</button>` : `<button class="btn primary" type="button" data-act="settings">${t('Connect to Claude')}</button>`}</div>`;
@@ -992,7 +992,7 @@
     if (!dlg.open) dlg.showModal();
     if (onOpen) onOpen(dlg);
   }
-  const head = (title, sub) => `<div class="dlg-head"><div style="flex:1"><h2>${title}</h2>${sub ? `<p>${sub}</p>` : ''}</div><button type="button" class="sn-x" data-close aria-label="${esc(t('Close'))}">×</button></div>`;
+  const head = (title, sub) => `<div class="dlg-head"><div style="flex:1"><h2>${title}</h2>${sub ? `<p>${sub}</p>` : ''}</div><button type="button" class="sn-x" data-close aria-label="${esc(t('Close'))}"><svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true" style="display:block;margin:auto"><path d="M5 5l14 14M19 5 5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button></div>`;
   const langSelect = (id, v) => `<select id="${id}"><option value="he"${v === 'he' ? ' selected' : ''}>${t('Hebrew')}</option><option value="en"${v === 'en' ? ' selected' : ''}>${t('English')}</option><option value="auto"${!v || v === 'auto' ? ' selected' : ''}>${t('Same as the course material')}</option></select>`;
 
   // The course form (new course and course details): name, number, language, exam, book colour, photo, page.
@@ -1059,7 +1059,7 @@
         <li><div><b>${esc(t('Create a project in the Claude app'))}</b><span>${esc(t('In the Claude desktop app, open Projects and create a new project. Name it “{course}”.', { course: c.name }))}</span></div></li>
         <li><div><b>${esc(t('Paste these instructions into the project'))}</b><span>${esc(t('Open the project’s instructions and paste this text. You only do this once.'))}</span></div></li>
         <li><div><b>${esc(t('Study in that project'))}</b><span>${esc(t('Start your chats inside the project. Claude saves the explanations here as you go, adds practice questions, and when you ask about one part, it deepens just that part. Say “don’t save this” to keep something out.'))}</span></div></li>
-        <li><div><b>${esc(t('Use the Claude app on this computer'))}</b><span>${esc(t('Start the chats from the Claude desktop app on this computer, with this computer linked to the chat. A chat that isn’t linked (for example one started on your phone) can’t reach Study Notebook.'))}</span></div></li>
+        <li><div><b>${esc(t('Use the Claude desktop app on this computer'))}</b><span>${esc(t('Start the chats in the Claude desktop app on this computer. Chats started on your phone or on the web can’t save to Study Notebook.'))}</span></div></li>
       </ol>
       <pre class="auto-text" dir="ltr">${esc(text)}</pre>
       <div class="row"><button class="btn primary" type="button" id="copyAuto">${t('Copy instructions')}</button><button class="btn ghost" type="button" data-close>${t('Done')}</button></div>
