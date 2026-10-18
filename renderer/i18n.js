@@ -268,7 +268,7 @@
     'Saved to {path}': 'נשמר ב-{path}',
     'Show in folder': 'הצגה בתיקייה',
     // Highlighter and drawing tools
-    'Draw': 'ציור', 'Draw, mark up and highlight on this topic': 'לצייר, לסמן ולהדגיש על הנושא הזה',
+    'Draw': 'ציור', 'Draw, mark up and highlight on your notes': 'לצייר, לסמן ולהדגיש על הסיכומים',
     'Highlight {color}': 'הדגשה ב{color}', 'Change to {color}': 'שינוי ל{color}', 'Remove highlight': 'הסרת ההדגשה',
     'Yellow': 'צהוב', 'Green': 'ירוק', 'Blue': 'כחול', 'Pink': 'ורוד', 'Orange': 'כתום', 'Black': 'שחור', 'Red': 'אדום', 'Purple': 'סגול',
     'Drawing tools': 'כלי ציור', 'Pen': 'עט', 'Marker': 'מרקר', 'Line': 'קו', 'Arrow': 'חץ', 'Box': 'מלבן', 'Circle': 'עיגול', 'Eraser': 'מחק',

@@ -27,7 +27,7 @@
     SNMarks.clearHighlights(note);
     SNMarks.applyHighlights(note, s.marks);
     SNMarks.drawInk(note, s.ink);
-    if (drawing && drawing.id === note.dataset.note) attachOverlay(note);
+    if (drawing) attachOverlay(note);
   }
   function refreshNote(id) { const n = noteFor(id), s = api && api.section(id); if (n && s) apply(n, s); }
 
@@ -108,7 +108,7 @@
     tools.querySelectorAll('[data-size]').forEach(b => b.onclick = () => { opt.size = +b.dataset.size; if (opt.tool === 'eraser') opt.tool = 'pen'; remember(); drawTools(); });
     tools.querySelector('[data-undo]').onclick = undo;
     tools.querySelector('[data-done]').onclick = stopDrawing;
-    if (drawing && drawing.overlay) drawing.overlay.dataset.tool = opt.tool;
+    document.querySelectorAll('.ink-input').forEach(o => { o.dataset.tool = opt.tool; });
     placeTools();
   }
   // The toolbar sits at the top, just under the course header, centered over the notes.
@@ -119,32 +119,42 @@
     tools.style.top = Math.max(8, (h ? h.bottom : 0) + 6) + 'px';
     if (w && w.width) tools.style.left = (w.left + w.width / 2) + 'px';
   }
+  // Drawing is switched on for the whole page: every topic gets a drawing surface, and each stroke
+  // belongs to the topic it was started on.
+  const allNotes = () => [...document.querySelectorAll('.note[data-note]')].filter(n => api.section(n.dataset.note));
   function attachOverlay(note) {
-    if (!drawing) return;
+    if (!drawing || !note) return;
     note.querySelectorAll(':scope > .ink-input').forEach(o => o.remove());
     const ov = document.createElement('div'); ov.className = 'ink-input'; ov.dataset.tool = opt.tool;
     ov.innerHTML = '<svg class="ink-preview" aria-hidden="true"></svg>';
-    note.appendChild(ov); drawing.note = note; drawing.overlay = ov;
-    ov.addEventListener('pointerdown', down);
-    note.closest('.sec') && note.closest('.sec').classList.add('drawing');
+    note.appendChild(ov);
+    ov.addEventListener('pointerdown', e => down(e, note, ov));
+    const sec = note.closest('.sec'); if (sec) sec.classList.add('drawing');
   }
-  function startDrawing(id) {
+  function startDrawing() {
     stopDrawing();
-    const note = noteFor(id); if (!note || !api.section(id)) return;
+    const notes = allNotes(); if (!notes.length) return;
     hideBar(); getSelection().removeAllRanges();
-    drawing = { id, note: null, overlay: null, undo: [] };
-    attachOverlay(note); drawTools(); tools.hidden = false; placeTools();
+    drawing = { undo: [] };
+    notes.forEach(attachOverlay);
+    drawTools(); tools.hidden = false; placeTools();
     if (api.onDrawingChange) api.onDrawingChange();
   }
   function stopDrawing() {
     if (!drawing) return;
-    const { note } = drawing;
-    if (note) { note.querySelectorAll(':scope > .ink-input').forEach(o => o.remove()); const sec = note.closest('.sec'); if (sec) sec.classList.remove('drawing'); }
-    drawing = null; if (tools) tools.hidden = true;
+    document.querySelectorAll('.ink-input').forEach(o => o.remove());
+    document.querySelectorAll('.sec.drawing').forEach(x => x.classList.remove('drawing'));
+    drawing = null; live = null; if (tools) tools.hidden = true;
     if (api && api.onDrawingChange) api.onDrawingChange();
   }
-  const toggleDrawing = id => (drawing && drawing.id === id ? stopDrawing() : startDrawing(id));
-  function refresh() { if (drawing && !document.body.contains(drawing.note)) { const n = noteFor(drawing.id); if (n) attachOverlay(n); else stopDrawing(); } }
+  const toggleDrawing = () => (drawing ? stopDrawing() : startDrawing());
+  // After the page is redrawn: new topics get a drawing surface; no notes on the page ends drawing.
+  function refresh() {
+    if (!drawing) return;
+    const notes = allNotes(); if (!notes.length) return stopDrawing();
+    notes.forEach(n => { if (!n.querySelector(':scope > .ink-input')) attachOverlay(n); });
+    placeTools();
+  }
 
   // Which paragraph a point on the screen belongs to, and the point in that paragraph's units.
   function blockAt(note, y) {
@@ -163,16 +173,14 @@
     }
     return max > eps ? simplify(pts.slice(0, idx + 1), eps).slice(0, -1).concat(simplify(pts.slice(idx), eps)) : [a, b];
   }
-  let live = null;   // the stroke being drawn
-  function down(e) {
+  let live = null;   // the stroke being drawn: { note, ov, id, ... }
+  function down(e, note, ov) {
     if (!drawing || e.button > 0) return;
     e.preventDefault();
-    const ov = drawing.overlay; ov.setPointerCapture(e.pointerId);
-    if (opt.tool === 'eraser') { live = { erase: true, hit: new Set() }; erase(e); }
-    else {
-      const { b, el } = blockAt(drawing.note, e.clientY);
-      live = { b, el, pts: [[e.clientX, e.clientY]] };
-    }
+    ov.setPointerCapture(e.pointerId);
+    const base = { note, ov, id: note.dataset.note };
+    if (opt.tool === 'eraser') { live = { ...base, erase: true, hit: new Set() }; erase(e); }
+    else { const { b, el } = blockAt(note, e.clientY); live = { ...base, b, el, pts: [[e.clientX, e.clientY]] }; }
     ov.onpointermove = move; ov.onpointerup = ov.onpointercancel = up;
   }
   function move(e) {
@@ -184,21 +192,19 @@
     preview();
   }
   function preview() {
-    const svg = drawing.overlay.querySelector('.ink-preview'), r = svg.getBoundingClientRect();
+    const svg = live.ov.querySelector('.ink-preview'), r = svg.getBoundingClientRect();
     const k = 1000 / Math.max(1, r.width);
     svg.setAttribute('viewBox', `0 0 1000 ${Math.max(1, r.height * k)}`);
     const pts = live.pts.map(([x, y]) => [(x - r.left) * k, (y - r.top) * k]);
     svg.innerHTML = SNMarks.strokeSvg({ t: opt.tool, c: opt.color, s: opt.size, p: pts });
   }
   function up() {
-    const ov = drawing && drawing.overlay; if (!ov) return;
-    ov.onpointermove = ov.onpointerup = ov.onpointercancel = null;
-    const L = live; live = null;
-    ov.querySelector('.ink-preview').innerHTML = '';
-    if (!L) return;
-    const s = api.section(drawing.id); if (!s) return;
+    const L = live; live = null; if (!L) return;
+    L.ov.onpointermove = L.ov.onpointerup = L.ov.onpointercancel = null;
+    const pv = L.ov.querySelector('.ink-preview'); if (pv) pv.innerHTML = '';
+    const s = api.section(L.id); if (!s || !drawing) return;
     if (L.erase) {
-      if (L.hit.size) { const removed = (s.ink || []).filter(st => L.hit.has(st.id)); drawing.undo.push({ add: removed }); save(drawing.id, { ink: (s.ink || []).filter(st => !L.hit.has(st.id)) }); }
+      if (L.hit.size) { const removed = (s.ink || []).filter(st => L.hit.has(st.id)); drawing.undo.push({ id: L.id, add: removed }); save(L.id, { ink: (s.ink || []).filter(st => !L.hit.has(st.id)) }); }
       return;
     }
     let pts = L.pts.map(([x, y]) => toUnits(L.el, x, y));
@@ -206,12 +212,12 @@
     if (shape) { if (pts.length < 2 || Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]) < 6) return; pts = [pts[0], pts[1]]; }
     else pts = simplify(pts, 1.2);
     const st = { id: rid('k'), t: opt.tool, c: opt.color, s: opt.size, b: L.b, p: pts };
-    drawing.undo.push({ remove: st.id });
-    save(drawing.id, { ink: (s.ink || []).concat(st) });
+    drawing.undo.push({ id: L.id, remove: st.id });
+    save(L.id, { ink: (s.ink || []).concat(st) });
   }
   function erase(e) {
-    const s = api.section(drawing.id); if (!s || !s.ink) return;
-    const bl = SNMarks.blocks(drawing.note);
+    const s = api.section(live.id); if (!s || !s.ink) return;
+    const bl = SNMarks.blocks(live.note);
     for (const st of s.ink) {
       if (live.hit.has(st.id)) continue;
       const el = bl[Math.min(bl.length - 1, Math.max(0, st.b | 0))]; if (!el) continue;
@@ -221,17 +227,17 @@
       for (let i = 0; i < pts.length; i++) {
         const a = pts[i], b = pts[i + 1] || a, dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
         const t = L2 ? Math.max(0, Math.min(1, ((e.clientX - a[0]) * dx + (e.clientY - a[1]) * dy) / L2)) : 0;
-        if (Math.hypot(e.clientX - (a[0] + t * dx), e.clientY - (a[1] + t * dy)) < 10) { live.hit.add(st.id); const n = drawing.note.querySelector(`[data-ink="${st.id}"]`); if (n) n.style.opacity = '.15'; break; }
+        if (Math.hypot(e.clientX - (a[0] + t * dx), e.clientY - (a[1] + t * dy)) < 10) { live.hit.add(st.id); const n = live.note.querySelector(`[data-ink="${st.id}"]`); if (n) n.style.opacity = '.15'; break; }
       }
     }
   }
+  // Undo goes back through this drawing session, across topics, in the order things were drawn.
   function undo() {
     if (!drawing) return;
-    const s = api.section(drawing.id); if (!s) return;
-    const step = drawing.undo.pop();
-    if (step && step.remove) save(drawing.id, { ink: (s.ink || []).filter(st => st.id !== step.remove) });
-    else if (step && step.add) save(drawing.id, { ink: (s.ink || []).concat(step.add) });
-    else if (s.ink && s.ink.length) save(drawing.id, { ink: s.ink.slice(0, -1) });   // strokes from before this session
+    const step = drawing.undo.pop(); if (!step) return;
+    const s = api.section(step.id); if (!s) return;
+    if (step.remove) save(step.id, { ink: (s.ink || []).filter(st => st.id !== step.remove) });
+    else if (step.add) save(step.id, { ink: (s.ink || []).concat(step.add) });
   }
 
   /* ---------- start ---------- */
@@ -247,5 +253,5 @@
     addEventListener('resize', placeTools);
   }
 
-  window.SNMarkup = { init, apply, toggleDrawing, startDrawing, stopDrawing, refresh, drawingId: () => (drawing ? drawing.id : null) };
+  window.SNMarkup = { init, apply, toggleDrawing, startDrawing, stopDrawing, refresh, isDrawing: () => !!drawing };
 })();

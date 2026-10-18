@@ -247,6 +247,7 @@
         ${window.StudyTimer ? window.StudyTimer.button() : ''}
         <button class="btn toc-btn" id="tocBtn" type="button" aria-controls="contents" ${has ? '' : 'disabled'}><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${t('Topics')}</button>
         <button class="btn${S.view === 'practice' ? ' on' : ''}" id="pracBtn" type="button"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="13" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7.5 3.5h10a3 3 0 0 1 3 3v10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>${t('Practice')}${due ? `<span class="count">${due}</span>` : nCards ? '' : ''}</button>
+        <button class="btn${window.SNMarkup && SNMarkup.isDrawing() ? ' on' : ''}" id="drawBtn" type="button" data-act="draw" aria-pressed="${!!(window.SNMarkup && SNMarkup.isDrawing())}" title="${esc(t('Draw, mark up and highlight on your notes'))}" ${has ? '' : 'disabled'}><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4-1 11-11-3-3L5 16z M14 6l3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>${t('Draw')}</button>
         ${recButton()}
         ${WEB ? '' : `<button class="btn" id="printBtn" type="button" ${has ? '' : 'disabled'}><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>${t('Print / PDF')}</button>`}
         <div class="menu-wrap">
@@ -330,7 +331,6 @@
       <div class="sec-head"><${tag} dir="auto"><span class="title-mark">${esc(s.title)}</span></${tag}>${badge}
         <span class="sec-tools" dir="${UIDIR}">
           <button type="button" data-act="edit" data-id="${esc(s.id)}">${t('Edit')}</button>
-          ${S.editing === s.id ? '' : `<button type="button" data-act="draw" data-id="${esc(s.id)}" aria-pressed="${!!(window.SNMarkup && SNMarkup.drawingId() === s.id)}" title="${esc(t('Draw, mark up and highlight on this topic'))}">${t('Draw')}</button>`}
           ${s.prevContent != null ? `<button type="button" data-act="undo" data-id="${esc(s.id)}" title="${esc(t('Go back to the version before the last change'))}">${t('Undo last change')}</button>` : ''}
           ${d === 0 ? `<button type="button" data-act="add-sub" data-id="${esc(s.id)}">${t('Add sub-topic')}</button>` : ''}
           <button type="button" class="danger" data-act="delete" data-id="${esc(s.id)}">${t('Delete')}</button>
@@ -790,7 +790,7 @@
       case 'settings': openSettings(); break;
       case 'clear-search': S.search = ''; render(); break;
       case 'edit': if (window.SNMarkup) SNMarkup.stopDrawing(); S.editing = id; S.confirmDel = null; renderSheet(); setTimeout(() => { const ta = document.querySelector('form.edit textarea'); if (ta) ta.focus(); }, 30); break;
-      case 'draw': if (window.SNMarkup) SNMarkup.toggleDrawing(id); break;
+      case 'draw': if (!window.SNMarkup) break; if (S.view !== 'notes' || S.search || S.editing) { S.search = ''; S.editing = null; showView('notes'); } SNMarkup.toggleDrawing(); break;
       case 'cancel-edit': S.editing = null; renderSheet(); break;
       case 'delete': S.confirmDel = id; S.editing = null; renderSheet(); break;
       case 'cancel-delete': S.confirmDel = null; renderSheet(); break;
@@ -1524,7 +1524,7 @@
     section: id => { const c = course(); const d = c && docs[secPath(c.id, id)]; return d ? { id, ...d } : null; },
     // Highlights and drawings are saved with the topic; they don't count as editing its text.
     save: (id, patch) => { const c = course(); const p = c && secPath(c.id, id); if (!p || !docs[p]) return null; docs[p] = { ...docs[p], ...patch }; save(); return { id, ...docs[p] }; },
-    onDrawingChange: () => document.querySelectorAll('[data-act="draw"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.id === SNMarkup.drawingId())))
+    onDrawingChange: () => { const b = $('drawBtn'); if (b) { const on = SNMarkup.isDrawing(); b.setAttribute('aria-pressed', String(on)); b.classList.toggle('on', on); } }
   });
 
   /* ================= print hook ================= */
