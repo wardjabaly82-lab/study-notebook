@@ -11,10 +11,11 @@
 <link rel="stylesheet" href="vendor/fonts/rubik/index.css">
 <link rel="stylesheet" href="vendor/fonts/frank-ruhl-libre/index.css">
 <link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="figures.css">
 <script src="i18n.js"></script>
 <script>
   // Apply the saved theme before anything draws, so there is no flash.
-  (function () { var t = 'system', w = 'paper'; try { t = localStorage.getItem('sn-theme') || 'system'; w = localStorage.getItem('sn-warmth') || 'paper'; } catch (e) {} document.documentElement.setAttribute('data-theme', t); document.documentElement.setAttribute('data-warmth', w); try { if (localStorage.getItem('sn-shelf') === 'folded') document.documentElement.setAttribute('data-shelf', 'folded'); } catch (e) {} if (window.desktop && window.desktop.isDesktop && window.desktop.platform !== 'darwin') document.documentElement.classList.add('frameless'); })();
+  (function () { var t = 'system', w = 'paper'; try { t = localStorage.getItem('sn-theme') || 'system'; w = localStorage.getItem('sn-warmth') || 'paper'; } catch (e) {} document.documentElement.setAttribute('data-theme', t); document.documentElement.setAttribute('data-warmth', w); try { if (localStorage.getItem('sn-shelf') === 'folded') document.documentElement.setAttribute('data-shelf', 'folded'); } catch (e) {} try { var nf = localStorage.getItem('sn-notefont'); if (nf) document.documentElement.setAttribute('data-notefont', nf); } catch (e) {} if (window.desktop && window.desktop.isDesktop && window.desktop.platform !== 'darwin') document.documentElement.classList.add('frameless'); })();
 </script>
 </head>
 <body>
@@ -65,6 +66,9 @@ window.MathJax = {
 <script src="notebook-ops.js"></script>
 <script src="practice-gen.js"></script>
 <script src="study-timer.js"></script>
+<script src="figures.js"></script>
+<script src="marks.js"></script>
+<script src="markup-ui.js"></script>
 <script src="app.js"></script>
 <script src="print-ui.js"></script>
 <script src="recorder.js"></script>

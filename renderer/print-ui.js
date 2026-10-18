@@ -14,7 +14,7 @@
   ];
   const SIZES = [[9.5, 'Very small'], [10.5, 'Small'], [11.5, 'Normal'], [13, 'Large'], [14.5, 'Very large']];
   const STYLES = [['plain', 'Plain'], ['grid', 'Grid'], ['lined', 'Lined'], ['dotted', 'Dotted']];
-  const DEFAULTS = { what: '', pages: '', paper: 'A4', width: 210, height: 297, orientation: 'portrait', margins: 'normal', fontSize: 11.5, style: 'plain', titlePage: true, contents: true, topicBreaks: true, pageNumbers: true, ink: false };
+  const DEFAULTS = { what: '', pages: '', paper: 'A4', width: 210, height: 297, orientation: 'portrait', margins: 'normal', fontSize: 11.5, style: 'plain', titlePage: true, contents: true, topicBreaks: true, pageNumbers: true, ink: false, marks: true };
 
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   let opts = { ...DEFAULTS };
@@ -75,7 +75,7 @@
   }
   function sendOpts() {
     const o = { paper: opts.paper, width: Number(opts.width), height: Number(opts.height), orientation: opts.orientation, margins: opts.margins,
-      fontSize: Number(opts.fontSize), style: opts.style, titlePage: opts.titlePage, contents: opts.contents, topicBreaks: opts.topicBreaks, pageNumbers: opts.pageNumbers, ink: opts.ink, pages: String(opts.pages || '') };
+      fontSize: Number(opts.fontSize), style: opts.style, titlePage: opts.titlePage, contents: opts.contents, topicBreaks: opts.topicBreaks, pageNumbers: opts.pageNumbers, ink: opts.ink, marks: opts.marks !== false, pages: String(opts.pages || '') };
     // A formula sheet is meant to be short: no title page, no contents, topics run on, smaller text.
     if (opts.what === '__formulas') Object.assign(o, { titlePage: false, contents: false, topicBreaks: false, fontSize: Math.min(o.fontSize, 9.5), margins: opts.margins === 'wide' ? 'normal' : opts.margins });
     return o;
@@ -120,6 +120,7 @@
             <label class="pr-chk"><input type="checkbox" data-k="contents"${opts.contents ? ' checked' : ''}>${T('Contents page')}</label>
             <label class="pr-chk"><input type="checkbox" data-k="topicBreaks"${opts.topicBreaks ? ' checked' : ''}>${T('Start each topic on a new page')}</label>
             <label class="pr-chk"><input type="checkbox" data-k="pageNumbers"${opts.pageNumbers ? ' checked' : ''}>${T('Page numbers')}</label>
+            <label class="pr-chk"><input type="checkbox" data-k="marks"${opts.marks !== false ? ' checked' : ''}>${T('My highlights and drawings')}</label>
             <label class="pr-chk"><input type="checkbox" data-k="ink"${opts.ink ? ' checked' : ''}>${T('Ink saver (black and white)')}</label>
           </div>
           <p class="pr-note">${T('Printing on special paper, like card, photo or colored paper? Click <b>Print…</b> and choose the paper type, copies and double-sided printing in your printer’s window.')}</p>

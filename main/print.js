@@ -46,9 +46,19 @@ function cleanOpts(o) {
     fontSize: FONT_SIZES.includes(Number(o.fontSize)) ? Number(o.fontSize) : 11.5,
     style: STYLES.includes(o.style) ? o.style : 'plain',
     contents: !!o.contents, topicBreaks: !!o.topicBreaks, ink: !!o.ink, titlePage: !!o.titlePage, pageNumbers: o.pageNumbers !== false,
+    marks: o.marks !== false,
     pageRanges: parsePages(o.pages)
   };
 }
+
+// The student's highlights and drawings on a section (see renderer/marks.js), kept to known fields.
+const str = (v, n) => String(v ?? '').slice(0, n);
+const cleanMarks = list => (Array.isArray(list) ? list : []).slice(0, 1000).filter(isObj)
+  .map(m => ({ q: str(m.q, 3000), pre: str(m.pre, 64), suf: str(m.suf, 64), c: str(m.c, 12) })).filter(m => m.q);
+const cleanInk = list => (Array.isArray(list) ? list : []).slice(0, 3000).filter(isObj).map(s => ({
+  t: str(s.t, 10), c: str(s.c, 12), s: Math.max(1, Math.min(3, parseInt(s.s, 10) || 2)), b: Math.max(0, Math.min(5000, parseInt(s.b, 10) || 0)),
+  p: (Array.isArray(s.p) ? s.p : []).slice(0, 5000).filter(q => Array.isArray(q)).map(q => [Number(q[0]) || 0, Number(q[1]) || 0])
+}));
 
 function cleanPayload(p) {
   if (!isObj(p) || !Array.isArray(p.sections) || !p.sections.length || p.sections.length > 5000) throw new Error('Nothing to print.');
@@ -56,7 +66,7 @@ function cleanPayload(p) {
   const sections = p.sections.map(s => {
     if (!isObj(s)) throw new Error('bad section');
     const html = String(s.html || ''); total += html.length;
-    return { title: String(s.title || '').slice(0, 300), depth: Math.max(0, Math.min(10, parseInt(s.depth, 10) || 0)), html };
+    return { title: String(s.title || '').slice(0, 300), depth: Math.max(0, Math.min(10, parseInt(s.depth, 10) || 0)), html, marks: cleanMarks(s.marks), ink: cleanInk(s.ink) };
   });
   if (total > 60 * 1024 * 1024) throw new Error('These notes are too large to print in one go. Print one topic at a time.');
   return {

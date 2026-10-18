@@ -140,13 +140,17 @@
   /* ================= markdown + math ================= */
   function mdToHtml(md) {
     const math = [];
-    const s = String(md || '').replace(/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)/g, m => { math.push(m); return 'MATHPH' + (math.length - 1) + 'X'; });
+    let s = String(md || '').replace(/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)/g, m => { math.push(m); return 'MATHPH' + (math.length - 1) + 'X'; });
+    // ==highlighted== and =={green}highlighted== (not inside code or a graph description)
+    s = s.split(/(```[\s\S]*?```|`[^`\n]*`)/g).map((part, i) => i % 2 ? part
+      : part.replace(/==(?:\{(yellow|green|blue|pink|orange)\})?(?=\S)([^=\n]+?)==/g, (_, c, txt) => `<mark class="hl${c ? ' ' + c : ''}">${txt}</mark>`)).join('');
     let html;
     if (window.marked && window.DOMPurify) html = DOMPurify.sanitize(marked.parse(s, { gfm: true, breaks: false }));
     else html = '<p>' + esc(s).replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
     return html.replace(/MATHPH(\d+)X/g, (_, i) => esc(math[+i]));
   }
   function decorate(el) {
+    if (window.SNFig) SNFig.upgrade(el);   // graphs, diagrams, callout boxes
     decorateShape(el); wireLinks(el);
   }
   function decorateShape(el) {
@@ -176,7 +180,7 @@
   const setMd = (el, md) => { el.innerHTML = mdToHtml(md); decorate(el); typeset(el); };
   function highlight(el, q) {
     if (!q) return;
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentElement.closest('mjx-container,code,pre') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentElement.closest('mjx-container,code,pre,.fig,svg') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
     const hits = []; let n;
     while ((n = walker.nextNode())) if (n.nodeValue.toLowerCase().includes(q)) hits.push(n);
     for (const node of hits) {
@@ -187,7 +191,7 @@
   }
 
   /* ================= rendering ================= */
-  function render() { renderSide(); renderTop(); renderContents(); renderSheet(); requestAnimationFrame(markReading); }
+  function render() { renderSide(); renderTop(); renderContents(); renderSheet(); if (window.SNMarkup) SNMarkup.refresh(); requestAnimationFrame(markReading); }
 
   function renderSide() {
     const list = courses();
@@ -326,6 +330,7 @@
       <div class="sec-head"><${tag} dir="auto"><span class="title-mark">${esc(s.title)}</span></${tag}>${badge}
         <span class="sec-tools" dir="${UIDIR}">
           <button type="button" data-act="edit" data-id="${esc(s.id)}">${t('Edit')}</button>
+          ${S.editing === s.id ? '' : `<button type="button" data-act="draw" data-id="${esc(s.id)}" aria-pressed="${!!(window.SNMarkup && SNMarkup.drawingId() === s.id)}" title="${esc(t('Draw, mark up and highlight on this topic'))}">${t('Draw')}</button>`}
           ${s.prevContent != null ? `<button type="button" data-act="undo" data-id="${esc(s.id)}" title="${esc(t('Go back to the version before the last change'))}">${t('Undo last change')}</button>` : ''}
           ${d === 0 ? `<button type="button" data-act="add-sub" data-id="${esc(s.id)}">${t('Add sub-topic')}</button>` : ''}
           <button type="button" class="danger" data-act="delete" data-id="${esc(s.id)}">${t('Delete')}</button>
@@ -372,15 +377,19 @@
   // Fills in the notes inside root, reusing what's already drawn and drawing only new math.
   function fillNotes(root, secs, q) {
     const fresh = [];
+    // The student's own highlights and drawings go on top last, and are never kept in the cache.
+    const marks = el => { if (window.SNMarkup) SNMarkup.apply(el, secs[el.dataset.note]); };
     root.querySelectorAll('[data-note]').forEach(el => {
       const s = secs[el.dataset.note], key = drawnKey(s);
-      if (!q && drawn.has(key)) { el.innerHTML = drawn.get(key); wireLinks(el); return; }
+      if (!q && drawn.has(key)) { el.innerHTML = drawn.get(key); wireLinks(el); if (window.SNFig) SNFig.upgrade(el); marks(el); return; }
       el.innerHTML = mdToHtml(s.content); decorate(el); highlight(el, q);
-      if (hasMath(el)) fresh.push([el, key]); else if (!q) drawn.set(key, el.innerHTML);
+      if (hasMath(el)) fresh.push([el, key]); else { if (!q) drawn.set(key, el.innerHTML); marks(el); }
     });
     const heads = [...root.querySelectorAll('.sec-head')].filter(hasMath);
     const pending = fresh.map(x => x[0]).concat(heads);
-    S.drawing = pending.length ? typeset(pending).then(() => { if (!q) for (const [el, key] of fresh) if (el.isConnected && !hasMath(el)) drawn.set(key, el.innerHTML); }) : Promise.resolve();
+    S.drawing = pending.length ? typeset(pending).then(() => {
+      for (const [el, key] of fresh) { if (!q && el.isConnected && !hasMath(el)) drawn.set(key, el.innerHTML); if (el.isConnected) marks(el); }
+    }) : Promise.resolve();
     if (drawn.size > 3000) drawn.clear();
   }
 
@@ -780,7 +789,8 @@
       case 'new-course': openNewCourse(); break;
       case 'settings': openSettings(); break;
       case 'clear-search': S.search = ''; render(); break;
-      case 'edit': S.editing = id; S.confirmDel = null; renderSheet(); setTimeout(() => { const ta = document.querySelector('form.edit textarea'); if (ta) ta.focus(); }, 30); break;
+      case 'edit': if (window.SNMarkup) SNMarkup.stopDrawing(); S.editing = id; S.confirmDel = null; renderSheet(); setTimeout(() => { const ta = document.querySelector('form.edit textarea'); if (ta) ta.focus(); }, 30); break;
+      case 'draw': if (window.SNMarkup) SNMarkup.toggleDrawing(id); break;
       case 'cancel-edit': S.editing = null; renderSheet(); break;
       case 'delete': S.confirmDel = id; S.editing = null; renderSheet(); break;
       case 'cancel-delete': S.confirmDel = null; renderSheet(); break;
@@ -974,6 +984,10 @@
   const WARMTH = { neutral: ['Neutral', '#f1f1ef'], paper: ['Paper', '#f4efe5'], warm: ['Warm', '#f1e4cc'], sepia: ['Sepia', '#e9d5ad'] };
   const warmth = () => document.documentElement.getAttribute('data-warmth') || 'paper';
   function setWarmth(w) { document.documentElement.setAttribute('data-warmth', w); store('sn-warmth', w); syncTitleBar(); if (dlg && dlg.open && dlgKind === 'settings') renderSettings(); }
+  // The typeface the notes are written in; each student picks their own.
+  const NOTEFONT = { book: 'Book', clean: 'Clean', plain: 'Plain' };
+  const noteFont = () => document.documentElement.getAttribute('data-notefont') || 'book';
+  function setNoteFont(f) { document.documentElement.setAttribute('data-notefont', f); store('sn-notefont', f); if (dlg && dlg.open && dlgKind === 'settings') renderSettings(); }
   // The window buttons Windows draws at the top right take the colour of the page behind them.
   function syncTitleBar() {
     if (!D.setTitleBar) return;
@@ -1052,6 +1066,7 @@
       `- When I ask a follow-up question about something already saved (e.g. what the letters in a formula mean), add your answer to the notebook right where it belongs (edit_part), not at the end and not as a separate section.`,
       `- When I ask to go deeper into one part, or say I didn't understand it, replace only that part with a deeper, clearer explanation (edit_part), not the whole section.`,
       `- Keep every topic tidy, with no loose ends: it should read as one clean explanation, with every symbol explained where it first appears and nothing repeated.`,
+      `- When a graph or diagram would make something clearer (supply and demand, a function, a distribution, a flowchart), put it in the notes; the app draws it.`,
       `- Save notes from a PDF, slides or a lecture in one go (save_sections). The app makes the practice questions itself; write them only when I ask.`,
       `- Don't save anything I say not to save.`,
       `- After each save, tell me in one short line what was saved and where.`,
@@ -1376,6 +1391,8 @@
         <p class="small">${t('Automatic follows your computer’s light or dark setting.')}</p>
         <div class="seg" role="group" aria-label="${esc(t('Paper warmth'))}">${Object.entries(WARMTH).map(([k, [name, sw]]) => `<button type="button" data-warmth-pick="${k}" aria-pressed="${warmth() === k}"><i class="swatch" style="background:${sw}" aria-hidden="true"></i>${t(name)}</button>`).join('')}</div>
         <p class="small">${t('Paper warmth: how warm the pages and the shelf look, in light and in dark.')}</p>
+        <div class="seg" role="group" aria-label="${esc(t('Notes font'))}">${Object.entries(NOTEFONT).map(([k, name]) => `<button type="button" data-notefont-pick="${k}" aria-pressed="${noteFont() === k}"><span class="nf-${k}" aria-hidden="true">Aa אב</span>${t(name)}</button>`).join('')}</div>
+        <p class="small">${t('Notes font: the typeface your notes are written in.')}</p>
         ${WEB ? '' : `<p class="small">${t('Text size: Ctrl + and Ctrl − (Ctrl 0 for normal).')}`} <button type="button" class="sn-link" id="keysLink">${t('All keyboard shortcuts')}</button>${WEB ? '' : '</p>'}</section>
       <section class="group"><h3>${t('Language')}</h3>
         <div class="seg" role="group" aria-label="${esc(t('Language'))}"><button type="button" data-ui-lang="en" aria-pressed="${uiLang === 'en'}">English</button><button type="button" data-ui-lang="he" aria-pressed="${uiLang === 'he'}">עברית</button></div>
@@ -1390,6 +1407,7 @@
       const kl = d.querySelector('#keysLink'); if (kl) kl.onclick = () => openShortcuts();
       d.querySelectorAll('[data-theme-pick]').forEach(b => b.onclick = () => setTheme(b.dataset.themePick));
       d.querySelectorAll('[data-warmth-pick]').forEach(b => b.onclick = () => setWarmth(b.dataset.warmthPick));
+      d.querySelectorAll('[data-notefont-pick]').forEach(b => b.onclick = () => setNoteFont(b.dataset.notefontPick));
       d.querySelectorAll('[data-ui-lang]').forEach(b => b.onclick = async () => { if (b.dataset.uiLang === uiLang) return; window.I18N.set(b.dataset.uiLang); await saveNow(); location.reload(); });
       if (d.querySelector('#folder')) d.querySelector('#folder').onclick = () => D.openDataFolder();
       d.querySelector('#backup').onclick = async () => { await saveNow(); const r = await D.exportBackup(JSON.stringify({ version: 1, app: 'Study Notebook', exportedAt: new Date().toISOString(), docs }, null, 1)); if (r.ok) toast(t('Backup saved')); else if (!r.cancelled) toast(r.message || t('Couldn’t save the backup')); };
@@ -1495,6 +1513,15 @@
     openLecture(cid, lid) { if (S.courseId !== cid) selectCourse(cid); S.lecture = lid; showView('lecture'); }
   };
 
+  /* ================= the student's highlighter and drawing tools ================= */
+  if (window.SNMarkup) SNMarkup.init({
+    t: (k, v) => t(k, v),
+    section: id => { const c = course(); const d = c && docs[secPath(c.id, id)]; return d ? { id, ...d } : null; },
+    // Highlights and drawings are saved with the topic; they don't count as editing its text.
+    save: (id, patch) => { const c = course(); const p = c && secPath(c.id, id); if (!p || !docs[p]) return null; docs[p] = { ...docs[p], ...patch }; save(); return { id, ...docs[p] }; },
+    onDrawingChange: () => document.querySelectorAll('[data-act="draw"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.id === SNMarkup.drawingId())))
+  });
+
   /* ================= print hook ================= */
   window.snPrintSource = (topicId, pickedIds) => {
     const c = course(); if (!c) return null;
@@ -1503,7 +1530,7 @@
       const base = window.snPrintSource(null);
       return { ...base, subtitle: t('Formula sheet'), sections: formulaItems(c, secs).map(x => ({ id: x.id, title: x.title, depth: x.depth, html: x.md ? mdToHtml(x.md) : '' })) };
     }
-    const add = (s, d) => out.push({ id: s.id, title: s.title, depth: d, html: mdToHtml(s.content) });
+    const add = (s, d) => out.push({ id: s.id, title: s.title, depth: d, html: mdToHtml(s.content), marks: s.marks || [], ink: s.ink || [] });
     if (Array.isArray(pickedIds)) walk(secs, (s, d) => { if (pickedIds.includes(s.id)) add(s, d); });
     else if (topicId && secs[topicId]) { add(secs[topicId], 0); walk(secs, (s, d) => add(s, d + 1), topicId); }
     else walk(secs, add);

@@ -17,6 +17,7 @@ fs.mkdirSync(out, { recursive: true });
 const files = [
   ['marked/marked.min.js', 'marked.min.js'],
   ['dompurify/dist/purify.min.js', 'purify.min.js'],
+  ['mermaid/dist/mermaid.min.js', 'mermaid.min.js'],   // diagrams in notes (loaded only when a note has one)
   ['pdfjs-dist/build/pdf.min.js', 'pdf.min.js'],
   ['pdfjs-dist/build/pdf.worker.min.js', 'pdf.worker.min.js']
 ];

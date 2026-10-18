@@ -1,0 +1,104 @@
+/* Graphs, diagrams, colors, callouts, highlights and drawings inside notes.
+   Shared by the notes page (desktop app and website) and the printout. */
+:root {
+  --fig-blue: #2f6bd8; --fig-red: #d0453b; --fig-green: #2b9452; --fig-orange: #df8419; --fig-purple: #8a4fd0;
+  --fig-teal: #17918f; --fig-pink: #cf4b8c; --fig-brown: #8a5a33; --fig-gray: #7b7b7b; --fig-black: #222222; --fig-yellow: #e2b31d;
+  --fig-ink: var(--ink, #111); --fig-muted: var(--muted, #555); --fig-grid: rgba(0, 0, 0, .08); --fig-page: var(--page, #fff);
+  /* highlighter colors: see-through, like a real marker */
+  --hl-yellow: rgba(255, 212, 0, .42); --hl-green: rgba(60, 200, 105, .32); --hl-blue: rgba(70, 150, 255, .28);
+  --hl-pink: rgba(255, 85, 155, .28); --hl-orange: rgba(255, 145, 30, .36);
+  --mk-blend: multiply;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    --fig-blue: #7aa8ff; --fig-red: #ff7a6e; --fig-green: #5fd38a; --fig-orange: #ffad4d; --fig-purple: #c193ff;
+    --fig-teal: #4fd1cc; --fig-pink: #ff8ac0; --fig-brown: #d0a07a; --fig-gray: #a8a8a8; --fig-black: #ece8e1; --fig-yellow: #ffd54d;
+    --fig-grid: rgba(255, 255, 255, .09);
+    --hl-yellow: rgba(255, 212, 0, .28); --hl-green: rgba(60, 220, 110, .24); --hl-blue: rgba(90, 160, 255, .26);
+    --hl-pink: rgba(255, 95, 165, .26); --hl-orange: rgba(255, 150, 40, .28);
+    --mk-blend: normal;
+  }
+  :root[data-theme="system"] .fig-dia svg { filter: invert(.9) hue-rotate(180deg); }
+}
+:root[data-theme="dark"] {
+  --fig-blue: #7aa8ff; --fig-red: #ff7a6e; --fig-green: #5fd38a; --fig-orange: #ffad4d; --fig-purple: #c193ff;
+  --fig-teal: #4fd1cc; --fig-pink: #ff8ac0; --fig-brown: #d0a07a; --fig-gray: #a8a8a8; --fig-black: #ece8e1; --fig-yellow: #ffd54d;
+  --fig-grid: rgba(255, 255, 255, .09);
+  --hl-yellow: rgba(255, 212, 0, .28); --hl-green: rgba(60, 220, 110, .24); --hl-blue: rgba(90, 160, 255, .26);
+  --hl-pink: rgba(255, 95, 165, .26); --hl-orange: rgba(255, 150, 40, .28);
+  --mk-blend: normal;
+}
+:root[data-theme="dark"] .fig-dia svg { filter: invert(.9) hue-rotate(180deg); }
+
+/* ---------- graphs and diagrams ---------- */
+.fig { margin: 1.1em 0; text-align: center; break-inside: avoid; page-break-inside: avoid; direction: ltr; }
+.fig svg { max-width: 100%; height: auto; }
+.fig svg.plot { width: 100%; max-width: 640px; overflow: visible; font-family: "Rubik Variable", Rubik, "Segoe UI", Arial, sans-serif; }
+.fig figcaption { font-size: .82em; color: var(--fig-muted); margin-top: .35em; font-family: "Rubik Variable", Rubik, "Segoe UI", Arial, sans-serif; }
+.fig-wait { color: var(--fig-muted); font-size: .9em; padding: 1.2em 0; }
+.fig-error { text-align: start; font-family: "Rubik Variable", Rubik, "Segoe UI", Arial, sans-serif; font-size: .86em; color: var(--fig-muted);
+  border: 1px dashed color-mix(in srgb, var(--fig-red) 55%, transparent); border-radius: 8px; padding: .6em .8em; }
+.fig-error p { margin: 0; color: var(--fig-red); }
+.fig-error pre { font-size: .85em; white-space: pre-wrap; max-height: 14em; overflow: auto; }
+.plot line, .plot path { stroke-linecap: round; stroke-linejoin: round; }
+.plot .pf-grid { stroke: var(--fig-grid); stroke-width: 1; }
+.plot .pf-axis { stroke: var(--fig-ink); stroke-width: 1.4; }
+.plot .pf-axis-tip { fill: var(--fig-ink); }
+.plot .pf-tick { fill: var(--fig-muted); font-size: 12px; }
+.plot .pf-name { fill: var(--fig-ink); font-size: 13px; font-weight: 600; }
+.plot .pf-label { fill: var(--fig-ink); font-size: 14px; font-weight: 600; }
+.plot .pf-title { fill: var(--fig-ink); font-size: 15px; font-weight: 600; }
+.plot .pf-series { font-size: 14px; font-weight: 600; paint-order: stroke; stroke: var(--fig-page); stroke-width: 3px; stroke-linejoin: round; }
+.plot .pf-area { opacity: .22; stroke: none; }
+.plot .pf-area-label { font-size: 13px; }
+.plot .pf-guide { opacity: .75; }
+
+/* one class per color, for lines (s-) and fills (f-) */
+.s-blue { stroke: var(--fig-blue); } .f-blue { fill: var(--fig-blue); }
+.s-red { stroke: var(--fig-red); } .f-red { fill: var(--fig-red); }
+.s-green { stroke: var(--fig-green); } .f-green { fill: var(--fig-green); }
+.s-orange { stroke: var(--fig-orange); } .f-orange { fill: var(--fig-orange); }
+.s-purple { stroke: var(--fig-purple); } .f-purple { fill: var(--fig-purple); }
+.s-teal { stroke: var(--fig-teal); } .f-teal { fill: var(--fig-teal); }
+.s-pink { stroke: var(--fig-pink); } .f-pink { fill: var(--fig-pink); }
+.s-brown { stroke: var(--fig-brown); } .f-brown { fill: var(--fig-brown); }
+.s-gray { stroke: var(--fig-gray); } .f-gray { fill: var(--fig-gray); }
+.s-black { stroke: var(--fig-black); } .f-black { fill: var(--fig-black); }
+.s-yellow { stroke: var(--fig-yellow); } .f-yellow { fill: var(--fig-yellow); }
+.f-page { fill: var(--fig-page); } .f-ink { fill: var(--fig-ink); }
+
+/* ---------- colored text and highlights Claude writes into notes ---------- */
+.c-blue { color: var(--fig-blue); } .c-red { color: var(--fig-red); } .c-green { color: var(--fig-green); }
+.c-orange { color: var(--fig-orange); } .c-purple { color: var(--fig-purple); } .c-teal { color: var(--fig-teal); }
+.c-pink { color: var(--fig-pink); } .c-brown { color: var(--fig-brown); } .c-gray { color: var(--fig-gray); }
+mark.hl, mark.uh { color: inherit; border-radius: 3px; padding: 0 .08em; box-decoration-break: clone; -webkit-box-decoration-break: clone; background: var(--hl-yellow); }
+mark.hl.green, mark.uh-green { background: var(--hl-green); }
+mark.hl.blue, mark.uh-blue { background: var(--hl-blue); }
+mark.hl.pink, mark.uh-pink { background: var(--hl-pink); }
+mark.hl.orange, mark.uh-orange { background: var(--hl-orange); }
+mark.uh { cursor: pointer; }
+
+/* ---------- callout boxes:  > [!tip] Title ---------- */
+blockquote.callout, .callout { --co: var(--fig-blue); margin: 1em 0; padding: .65em .95em; border: 0; border-inline-start: 4px solid var(--co);
+  border-radius: 8px; background: color-mix(in srgb, var(--co) 9%, transparent); color: inherit; break-inside: avoid; }
+.callout > :first-child { margin-top: 0; } .callout > :last-child { margin-bottom: 0; }
+.callout .co-title { display: flex; align-items: center; gap: .45em; font-weight: 700; color: var(--co); margin: 0 0 .25em;
+  font-family: "Rubik Variable", Rubik, "Segoe UI", Arial, sans-serif; font-size: .92em; }
+.callout .co-title svg { flex: none; }
+.callout.co-tip { --co: var(--fig-green); }
+.callout.co-important, .callout.co-key { --co: var(--fig-purple); }
+.callout.co-warning, .callout.co-caution, .callout.co-mistake { --co: var(--fig-orange); }
+.callout.co-danger { --co: var(--fig-red); }
+.callout.co-example { --co: var(--fig-teal); }
+.callout.co-definition, .callout.co-formula { --co: var(--fig-blue); }
+.callout.co-summary { --co: var(--fig-gray); }
+
+/* ---------- the student's own drawings (pen, marker, shapes) ---------- */
+.ink-anchor { position: relative; }
+svg.ink { position: absolute; left: 0; top: 0; width: 100%; aspect-ratio: 1 / 1; height: auto; overflow: visible; pointer-events: none; z-index: 1; }
+svg.ink path, svg.ink line, svg.ink rect, svg.ink ellipse { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+svg.ink .mk { opacity: .4; mix-blend-mode: var(--mk-blend); }
+
+/* Ink saver printouts: everything in shades of grey */
+body.ink { --fig-blue: #333; --fig-red: #333; --fig-green: #333; --fig-orange: #333; --fig-purple: #333; --fig-teal: #333; --fig-pink: #333; --fig-brown: #333; --fig-gray: #777; --fig-black: #111; --fig-yellow: #777;
+  --hl-yellow: #e6e6e6; --hl-green: #e6e6e6; --hl-blue: #e6e6e6; --hl-pink: #e6e6e6; --hl-orange: #e6e6e6; }

@@ -266,7 +266,16 @@
     'Keep at least one page selected.': 'צריך להשאיר לפחות עמוד אחד.',
     'Page numbers look wrong. Try something like 1-3, 5.': 'מספרי העמודים לא תקינים. נסו למשל 1-3, 5.',
     'Saved to {path}': 'נשמר ב-{path}',
-    'Show in folder': 'הצגה בתיקייה'
+    'Show in folder': 'הצגה בתיקייה',
+    // Highlighter and drawing tools
+    'Draw': 'ציור', 'Draw, mark up and highlight on this topic': 'לצייר, לסמן ולהדגיש על הנושא הזה',
+    'Highlight {color}': 'הדגשה ב{color}', 'Change to {color}': 'שינוי ל{color}', 'Remove highlight': 'הסרת ההדגשה',
+    'Yellow': 'צהוב', 'Green': 'ירוק', 'Blue': 'כחול', 'Pink': 'ורוד', 'Orange': 'כתום', 'Black': 'שחור', 'Red': 'אדום', 'Purple': 'סגול',
+    'Drawing tools': 'כלי ציור', 'Pen': 'עט', 'Marker': 'מרקר', 'Line': 'קו', 'Arrow': 'חץ', 'Box': 'מלבן', 'Circle': 'עיגול', 'Eraser': 'מחק',
+    'Drag over a drawing to erase it': 'גררו מעל ציור כדי למחוק אותו', 'Thin': 'דק', 'Medium': 'בינוני', 'Thick': 'עבה', 'Undo (Ctrl+Z)': 'ביטול (Ctrl+Z)',
+    'My highlights and drawings': 'ההדגשות והציורים שלי',
+    // Notes font
+    'Notes font': 'גופן הסיכומים', 'Book': 'ספר', 'Clean': 'נקי', 'Notes font: the typeface your notes are written in.': 'גופן הסיכומים: האות שבה כתובים הסיכומים שלכם.'
   };
 
   function fill(s, v) { return v ? s.replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined ? v[k] : m)) : s; }

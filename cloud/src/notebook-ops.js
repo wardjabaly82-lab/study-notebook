@@ -309,6 +309,9 @@
         const s = secs[section_id];
         if (!s) throw new OpError(`No section "${section_id}" in "${c.name}". Use get_outline to find the right id, or leave section_id out to add a new section.`);
         const updated = { title: t, content: body, parentId: s.parentId || null, order: s.order || 1, rev: (s.rev || 1) + 1, createdAt: s.createdAt || now, updatedAt: now, prevTitle: s.title, prevContent: s.content, source: 'claude' };
+        // The student's own highlights and drawings stay (a highlight whose words are gone just doesn't show).
+        if (Array.isArray(s.marks) && s.marks.length) updated.marks = s.marks;
+        if (Array.isArray(s.ink) && s.ink.length) updated.ink = s.ink;
         return { result: { action: 'updated', course: c.name, section_id: s.id, title: t, path: pathOf({ ...secs, [s.id]: { ...s, title: t } }, s.id), revision: updated.rev }, writes: [{ path: base + s.id, data: updated }] };
       }
 

@@ -60,7 +60,10 @@ mjx-container{direction:ltr;unicode-bidi:isolate;font-size:88%}
 mjx-container[display="true"]{break-inside:avoid;margin:.6em 0!important;overflow:visible;max-width:100%}
 /* A formula wider than the page shrinks to fit instead of being cut off */
 mjx-container[display="true"] svg{max-width:100%;height:auto}
+.body .fig svg.plot{max-width:150mm}
 </style>
+<!-- graphs, diagrams, colors, callouts, highlights and drawings: the same styles as on screen -->
+<link rel="stylesheet" href="figures.css">
 </head>
 <body>
 <main id="doc"></main>
@@ -74,6 +77,8 @@ window.MathJax = {
 </script>
 <script src="vendor/purify.min.js"></script>
 <script src="vendor/mathjax/tex-svg.js"></script>
+<script src="figures.js"></script>
+<script src="marks.js"></script>
 <script>
 (() => {
   'use strict';
@@ -121,12 +126,19 @@ window.MathJax = {
       if (s.depth === 0) first = false;
     }
     doc.innerHTML = html;
+    // Graphs, diagrams and callout boxes, drawn the same way as on screen.
+    if (window.SNFig) { try { await SNFig.upgrade(doc); } catch (e) {} }
     doc.querySelectorAll('p,li,td,th,blockquote').forEach(n => n.setAttribute('dir', 'auto'));
     doc.querySelectorAll('pre').forEach(n => n.setAttribute('dir', 'ltr'));
 
     await whenMath();
     if (window.MathJax && MathJax.typesetPromise) { try { await MathJax.typesetPromise([doc]); } catch (e) {} }
     if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
+    // The student's own highlights and drawings, last (they sit on the finished text).
+    if (opts.marks !== false && window.SNMarks) {
+      const bodies = doc.querySelectorAll('section.sec > .body');
+      numbered.forEach((s, i) => { const b = bodies[i]; if (!b) return; try { SNMarks.applyHighlights(b, s.marks); SNMarks.drawInk(b, s.ink); } catch (e) {} });
+    }
     return { ok: true, sections: numbered.length };
   };
 })();

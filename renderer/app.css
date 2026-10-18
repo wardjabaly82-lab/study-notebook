@@ -820,3 +820,52 @@ kbd { font-family: var(--f-ui); font-size: 12px; font-weight: 500; background: v
 .sheet[data-width="narrow"] { max-width: 640px; }
 .sheet[data-width="wide"] { max-width: 1060px; }
 .sheet[data-width="wide"] .note { max-width: 92ch; }
+
+/* ---------- notes font (Settings → Appearance) ---------- */
+:root[data-notefont="clean"] { --f-read: "Rubik Variable", Rubik, "Segoe UI", Arial, sans-serif; }
+:root[data-notefont="plain"] { --f-read: system-ui, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+.nf-book { font-family: "Frank Ruhl Libre Variable", "Frank Ruhl Libre", Georgia, serif; font-size: 15px; }
+.nf-clean { font-family: "Rubik Variable", Rubik, "Segoe UI", Arial, sans-serif; font-size: 14px; }
+.nf-plain { font-family: system-ui, "Segoe UI", Arial, sans-serif; font-size: 14px; }
+
+/* ---------- highlighter and drawing tools ---------- */
+.note { position: relative; }
+.mark-bar { position: fixed; z-index: 60; display: flex; align-items: center; gap: 4px; padding: 5px; border-radius: 999px;
+  background: color-mix(in srgb, var(--raised) 96%, transparent); -webkit-backdrop-filter: saturate(180%) blur(24px); backdrop-filter: saturate(180%) blur(24px);
+  box-shadow: var(--shadow-pop); font-family: var(--f-ui); animation: pop var(--fast) var(--ease); }
+.mark-bar[hidden] { display: none; }
+.mark-bar .mb-c { width: 24px; height: 24px; border-radius: 50%; border: 0; padding: 0; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14); cursor: pointer; }
+.mark-bar .mb-c:hover { transform: scale(1.12); }
+.mark-bar .mb-c.uh-yellow { background: #ffd60a; } .mark-bar .mb-c.uh-green { background: #4cd27a; } .mark-bar .mb-c.uh-blue { background: #64a8ff; }
+.mark-bar .mb-c.uh-pink { background: #ff6fae; } .mark-bar .mb-c.uh-orange { background: #ffa23d; }
+.mark-bar .mb-sep { width: 1px; height: 18px; background: var(--line-strong); margin: 0 3px; }
+.mark-bar .mb-x { border: 0; background: none; color: var(--ink); font: inherit; font-size: 12.5px; padding: 4px 9px; border-radius: 999px; cursor: pointer; }
+.mark-bar .mb-x:hover { background: var(--fill); }
+
+.draw-bar { position: fixed; z-index: 55; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center;
+  width: max-content; max-width: calc(100vw - 32px); padding: 6px 8px; border-radius: 16px; font-family: var(--f-ui);
+  background: color-mix(in srgb, var(--raised) 96%, transparent); -webkit-backdrop-filter: saturate(180%) blur(24px); backdrop-filter: saturate(180%) blur(24px);
+  box-shadow: var(--shadow-pop); animation: rise var(--med) var(--ease); }
+.draw-bar[hidden] { display: none; }
+.draw-bar .db-group { display: flex; align-items: center; gap: 2px; padding: 0 4px; }
+.draw-bar .db-group + .db-group { border-inline-start: .5px solid var(--line-strong); padding-inline-start: 8px; }
+.draw-bar button { display: inline-grid; place-items: center; min-width: 32px; height: 32px; border: 0; border-radius: 9px; background: transparent; color: var(--ink); cursor: pointer; padding: 0 6px; font: inherit; font-size: 13px; }
+.draw-bar button:hover { background: var(--fill); }
+.draw-bar button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
+.draw-bar .db-c i { width: 18px; height: 18px; border-radius: 50%; display: block; }
+.draw-bar .db-c i[class^="f-"] { background: currentColor; }
+.draw-bar .db-c.s-black { color: var(--fig-black); } .draw-bar .db-c.s-blue { color: var(--fig-blue); } .draw-bar .db-c.s-red { color: var(--fig-red); }
+.draw-bar .db-c.s-green { color: var(--fig-green); } .draw-bar .db-c.s-orange { color: var(--fig-orange); } .draw-bar .db-c.s-purple { color: var(--fig-purple); }
+.draw-bar .db-c.s-yellow { color: #ffd60a; } .draw-bar .db-c.s-pink { color: var(--fig-pink); }
+.draw-bar .db-c[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); background: transparent; }
+.draw-bar .db-dot { display: block; border-radius: 50%; background: currentColor; }
+.draw-bar .db-hint { font-size: 12.5px; color: var(--muted); padding: 0 6px; }
+.draw-bar .db-done { background: var(--accent); color: var(--accent-ink); font-weight: 600; padding: 0 14px; }
+.draw-bar .db-done:hover { background: color-mix(in srgb, var(--accent) 88%, #000); }
+.ink-input { position: absolute; inset: -6px -10px; z-index: 3; cursor: crosshair; touch-action: none; border-radius: 10px;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 3%, transparent); }
+.ink-input[data-tool="eraser"] { cursor: cell; }
+.ink-input .ink-preview { position: absolute; left: 10px; top: 6px; width: calc(100% - 20px); height: calc(100% - 12px); overflow: visible; pointer-events: none; }
+.sec.drawing .sec-tools { opacity: 1; }
+.sec-tools button[aria-pressed="true"] { background: var(--accent-soft); }
+@media print { .mark-bar, .draw-bar, .ink-input { display: none !important; } }

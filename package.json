@@ -1,7 +1,7 @@
 {
   "name": "study-notebook",
   "productName": "Study Notebook",
-  "version": "1.11.12",
+  "version": "1.12.0",
   "description": "Turns course PDFs and questions into complete, organized study notes, using the AI you choose.",
   "author": "Study Notebook",
   "license": "MIT",
@@ -26,6 +26,7 @@
     "esbuild": "^0.28.2",
     "marked": "^12.0.2",
     "mathjax": "3.2.2",
+    "mermaid": "11.17.2",
     "pdfjs-dist": "3.11.174",
     "zod": "^4.6.7"
   },
