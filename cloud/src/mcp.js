@@ -34,7 +34,9 @@ const ONLINE_NOTE = 'Saved in the student’s Study Notebook. It shows on the we
 async function callTool(env, uid, name, args) {
   if (!TOOLS.some(t => t.name === name)) return { content: [{ type: 'text', text: `Unknown tool "${name}".` }], isError: true };
   try {
-    const docs = await loadDocs(env, uid);
+    // Lectures are loaded only when this request is about one (they can be large).
+    const aboutLecture = name === 'list_lectures' || name === 'read_lecture' || /"lecture_id"\s*:\s*"[^"]/.test(JSON.stringify(args || {}));
+    const docs = await loadDocs(env, uid, { skipLarge: !aboutLecture });
     const { result, writes } = Ops.run(docs, name, args || {});
     if (writes && writes.length) {
       const adding = writes.reduce((n, w) => n + (w.data ? JSON.stringify(w.data).length : 0), 0);

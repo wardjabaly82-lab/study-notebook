@@ -83,6 +83,26 @@ const call = async (c, name, args) => { const x = await c.callTool({ name, argum
 ok((await call(ca, 'list_courses', {})).courses?.some?.(x => x.name === 'Linear algebra') || JSON.stringify(await call(ca, 'list_courses', {})).includes('Linear algebra'), 'Claude sees Alice’s course');
 const saved = await call(ca, 'save_sections', { course: 'Linear algebra', sections: [{ title: 'Span', content: 'Saved by Claude for Alice' }, { title: 'Basis', under: 1, content: 'x' }] });
 ok(saved.saved.length === 2, 'Claude saves 2 topics in one call');
+
+// Recorded lectures are big. They must not slow down Claude's other requests, and the lecture tools must still see them.
+const transcript = ('[12:30] the rank of a matrix is the dimension of its column space. ').repeat(18000);   // ~1.2 MB each
+for (let i = 1; i <= 6; i++) {
+  const lp = await api(alice, 'push', { changes: [{ path: `${BASE}/c1/lectures/L${i}`, data: { title: `Lecture ${i}`, startedAt: i, durationSec: 5400, lang: 'en', status: 'done', text: transcript } }] });
+  if (!lp.ok) ok(false, `lecture ${i} pushed`);
+}
+ok(true, 'six long lecture transcripts (~7 MB) are in Alice’s notebook');
+const time = async f => { const t0 = Date.now(); await f(); return Date.now() - t0; };
+const tOutline = await time(() => call(ca, 'get_outline', { course: 'Linear algebra' }));
+const tSave = await time(() => call(ca, 'save_section', { course: 'Linear algebra', title: 'Dimension', content: 'x' }));
+const lects = await call(ca, 'list_lectures', { course: 'Linear algebra' });
+ok(lects.lectures.length === 6 && lects.lectures[0].lecture_id === 'L6', 'Claude still sees the lectures (list_lectures)');
+const tLecture = await time(() => call(ca, 'read_lecture', { course: 'Linear algebra', lecture_id: 'L2', part: 1 }));
+const fromLec = await call(ca, 'save_section', { course: 'Linear algebra', title: 'Rank (lecture 2)', content: 'From the lecture.', lecture_id: 'L2' });
+ok(fromLec.action === 'added', 'Claude saves notes linked to a lecture');
+const lectsAfter = await call(ca, 'list_lectures', { course: 'Linear algebra' });
+ok(lectsAfter.lectures.find(l => l.lecture_id === 'L2').notes_made === true, 'that lecture is marked as having notes; the others are untouched');
+ok(lectsAfter.lectures.filter(l => l.notes_made).length === 1, 'no other lecture was changed');
+console.log(`    timing: get_outline ${tOutline} ms, save_section ${tSave} ms (lectures skipped) vs read_lecture ${tLecture} ms (lectures loaded)`);
 const cb = await connectClaude(bob, 'bob@example.com');
 ok(!JSON.stringify(await call(cb, 'list_courses', {})).includes('Linear algebra'), 'Bob’s Claude can’t see Alice’s course');
 const s = await cb.callTool({ name: 'search_notes', arguments: { query: 'Alice' } }); console.log('    search reply:', s.content[0].text.slice(0, 120).replace(/\n/g, ' ')); ok(!/private note|Saved by Claude/.test(s.content[0].text), 'Bob’s Claude finds nothing of Alice’s by searching');
@@ -101,20 +121,20 @@ const app = await (await fetch(O + '/auth/app/token', { method: 'POST', headers:
 ok(app.token && app.email === 'alice@example.com', 'the app gets its own sign-in for Alice');
 r = await fetch(O + '/auth/app/token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code2, verifier }) }); ok(r.status === 400, 'a code works only once');
 const H = { Authorization: 'Bearer ' + app.token };
-const ping = await (await fetch(O + '/sync/ping', { headers: H })).json(); ok(ping.email === 'alice@example.com' && ping.docs === 4, `app sync sees Alice’s ${ping.docs} items`);
+const ping = await (await fetch(O + '/sync/ping', { headers: H })).json(); ok(ping.email === 'alice@example.com' && ping.docs === 12, `app sync sees Alice’s ${ping.docs} items (course, 5 topics, 6 lectures)`);
 const pull = await (await fetch(O + '/sync/pull?since=0', { headers: H })).json(); ok(pull.changes.some(c => c.data && c.data.content === 'Saved by Claude for Alice'), 'app pulls what Claude saved');
 ok((await fetch(O + '/sync/ping', { headers: { Authorization: 'Bearer nonsense-token-nonsense-token' } })).status === 401, 'made-up app token refused');
 
 console.log('Account page');
 r = await alice.go('/account'); html = await r.text();
 ok(/Your account/.test(html) && /Claude/.test(html) && /Jeff’s laptop/.test(html), 'lists Claude and the linked computer');
-r = await alice.go('/api/export'); const exp = await r.json(); ok(exp.version === 1 && Object.keys(exp.docs).length === 4 && /attachment/.test(r.headers.get('content-disposition')), 'download my notes works');
+r = await alice.go('/api/export'); const exp = await r.json(); ok(exp.version === 1 && Object.keys(exp.docs).length === 12 && /attachment/.test(r.headers.get('content-disposition')), 'download my notes works');
 const tb = (await (await bob.go('/account')).text()).match(/name="t" value="([^"]+)"/)[1];
 r = await bob.go('/account/delete', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ t: 'forged', sure: '1' }) }); ok(r.status === 302 && (await api(bob, 'me')).email, 'delete with a forged form token does nothing');
 r = await bob.go('/account/delete', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ t: tb, sure: '1' }) });
 ok(/account is deleted/.test(await r.text()), 'Bob deletes his account');
 ok((await bob.go('/api/me')).status === 401, 'Bob’s browser is signed out');
 const dead = await cb.callTool({ name: 'list_courses', arguments: {} }).then(() => 'worked', e => 'refused'); ok(dead === 'refused', 'Bob’s Claude connection stops working');
-ok(Object.keys((await api(alice, 'docs')).docs).length === 4, 'Alice’s notes untouched');
+ok(Object.keys((await api(alice, 'docs')).docs).length === 12, 'Alice’s notes untouched');
 await ca.close();
 console.log('\nSHARED SERVER TEST PASSED');

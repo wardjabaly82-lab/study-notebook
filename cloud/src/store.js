@@ -70,9 +70,14 @@ export async function deleteUser(env, uid) {
 
 /* ---------- notes ---------- */
 
-export async function loadDocs(env, uid) {
+// skipLarge leaves out lecture transcripts and source files, the biggest items: most of Claude's
+// requests never read them, and loading them on every request made each one slower as notes grew.
+export async function loadDocs(env, uid, { skipLarge = false } = {}) {
   await ensureSchema(env);
-  const { results } = await env.DB.prepare('SELECT path, data FROM notes WHERE uid = ?1 AND data IS NOT NULL').bind(uid).all();
+  const sql = skipLarge
+    ? "SELECT path, data FROM notes WHERE uid = ?1 AND data IS NOT NULL AND path NOT LIKE '%/lectures/%' AND path NOT LIKE '%/sources/%'"
+    : 'SELECT path, data FROM notes WHERE uid = ?1 AND data IS NOT NULL';
+  const { results } = await env.DB.prepare(sql).bind(uid).all();
   const docs = {};
   for (const r of results) { try { docs[r.path] = JSON.parse(r.data); } catch (e) {} }
   return docs;
