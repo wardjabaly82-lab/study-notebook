@@ -218,13 +218,13 @@ tool('save_sections', {
 });
 
 tool('edit_part', {
-  title: 'Replace one part of a section',
-  description: 'Replace one passage inside a saved section, leaving the rest of the section exactly as it is. Use it when the student asks to go deeper into, or didn’t understand, one part of an explanation. Copy the passage from read_section exactly (it must appear once). The previous version is kept for undo in the app.',
+  title: 'Change or extend one part of a section',
+  description: 'Change one passage inside a saved section, leaving the rest of the section exactly as it is. Use it when the student asks about one part of an explanation. To add the answer to a follow-up question the notes don’t cover yet (e.g. what the letters in a formula mean), use that passage as find and the same passage followed by the new explanation as replace. To go deeper or make it clearer, or to fix a mistake, replace the passage with the better version. Copy the passage from read_section exactly (it must appear once). The previous version is kept for undo in the app.',
   inputSchema: {
     course: courseArg,
     section_id: z.string().max(64).describe('The section that contains the passage.'),
-    find: z.string().min(1).max(20000).describe('The exact passage to replace, copied from read_section (a sentence, paragraph, step or formula).'),
-    replace: z.string().min(1).max(60000).describe('The new, deeper or clearer version of that passage, in Markdown with \\( \\) and $$ $$ math.')
+    find: z.string().min(1).max(20000).describe('The exact passage to change, copied from read_section (a sentence, paragraph, step or formula).'),
+    replace: z.string().min(1).max(60000).describe('The new text for that passage: the passage plus an added explanation, or a deeper, clearer or corrected version. Markdown with \\( \\) and $$ $$ math.')
   },
   annotations: WRITE
 });
