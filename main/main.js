@@ -216,7 +216,7 @@ ipcMain.handle('print:preview', (ev, req) => onePrintAtATime(async () => {
 
 ipcMain.handle('print:savePdf', (ev, req) => onePrintAtATime(async () => {
   const { data, payload } = await printer.makePdf(req && req.payload, req && req.opts, DEV);
-  const name = safeFilename((payload.subtitle ? `${payload.course} - ${payload.subtitle}` : payload.course) + '.pdf').replace(/(\.pdf)?$/i, '.pdf');
+  const name = safeFilename((payload.subtitle ? `${payload.course} - ${payload.subtitle}` : `${payload.course} - Study notes`) + '.pdf').replace(/(\.pdf)?$/i, '.pdf');
   const r = await dialog.showSaveDialog(win, {
     title: 'Save notes as PDF',
     defaultPath: path.join(app.getPath('documents'), name),
@@ -237,6 +237,7 @@ ipcMain.handle('print:paper', (ev, req) => onePrintAtATime(async () => {
 }));
 
 ipcMain.handle('app:openPath', (ev, p) => { if (p && p === lastSavedPdf && fs.existsSync(p)) shell.openPath(p); });
+ipcMain.handle('app:showInFolder', (ev, p) => { if (p && p === lastSavedPdf && fs.existsSync(p)) shell.showItemInFolder(p); });
 
 /* ---------- Claude connector ---------- */
 

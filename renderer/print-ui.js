@@ -54,9 +54,16 @@
   .pr-view{overflow:auto;background:color-mix(in srgb,var(--desk) 70%,#8e8e93 30%);padding:20px;display:flex;flex-direction:column;align-items:center;gap:16px;position:relative}
   .pr-page{background:#fff;border-radius:2px;box-shadow:0 0 0 .5px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.16);display:block;max-width:100%}
   .pr-pn{font-size:11.5px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4);margin-top:-10px}
+  .pr-pg{position:relative;display:block;max-width:100%;cursor:pointer;border-radius:2px;outline:none;transition:opacity var(--fast) ease}
+  .pr-pg canvas{transition:opacity var(--fast) ease}
+  .pr-pg.off canvas{opacity:.38}
+  .pr-pg:focus-visible{box-shadow:0 0 0 3px var(--accent)}
+  .pr-tick{position:absolute;top:8px;inset-inline-end:8px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.28);border:2px solid #fff;color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.3);pointer-events:none}
+  .pr-pg.on .pr-tick{background:var(--accent);border-color:var(--accent)}
+  .pr-pg.off .pr-tick{background:transparent;color:transparent}
   .pr-busy{position:sticky;top:0;align-self:center;background:var(--ink);color:var(--paper);font-size:12.5px;border-radius:99px;padding:5px 12px;z-index:2}
   .pr-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 18px;border-top:.5px solid var(--line-strong)}
-  .pr-info{flex:1;font-size:13px;color:var(--muted);min-width:160px}
+  .pr-info{flex:1;font-size:13px;color:var(--muted);min-width:160px;overflow-wrap:anywhere}
   .pr-info.bad{color:var(--danger)}`;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 
@@ -177,10 +184,12 @@
       const r = await D.printSavePdf(payloadOf(s), sendOpts());
       setBusy(false);
       if (r.ok) {
-        info(T('Saved.') + ' ');
+        info(T('Saved to {path}', { path: r.path }) + ' ');
         const el = dlg.querySelector('#prInfo');
         const b = document.createElement('button'); b.type = 'button'; b.className = 'sn-link'; b.textContent = T('Open the PDF');
         b.onclick = () => D.openPdf(r.path); el.appendChild(b);
+        const f = document.createElement('button'); f.type = 'button'; f.className = 'sn-link'; f.textContent = T('Show in folder');
+        f.onclick = () => D.showPdfInFolder(r.path); el.appendChild(f);
       } else if (!r.cancelled) info(T(r.message || 'Couldn’t save the PDF.'), true);
       else info('');
     };
@@ -195,6 +204,53 @@
 
   function schedule() { clearTimeout(timer); timer = setTimeout(preview, 350); }
 
+  // Page picking: the preview always shows the whole notebook, and each page can be ticked or dropped.
+  let previewTotal = 0;
+  // The ticked pages from the Pages text ("1-3, 5"). Empty or unreadable text means every page.
+  function parsePageText(text, total) {
+    const s = String(text || '').replace(/\s+/g, '');
+    if (!s || !/^\d+(-\d+)?(,\d+(-\d+)?)*$/.test(s)) return null;
+    const set = new Set();
+    for (const part of s.split(',')) {
+      const [a, b = a] = part.split('-').map(Number);
+      for (let n = Math.max(1, a); n <= Math.min(b, total); n++) set.add(n);
+    }
+    return set;
+  }
+  function includedSet(total) {
+    return parsePageText(opts.pages, total) || new Set(Array.from({ length: total }, (_, i) => i + 1));
+  }
+  // Writes the ticked pages back as text, e.g. "1-3,5". All pages means empty text.
+  function pagesText(set, total) {
+    if (set.size === total) return '';
+    const nums = [...set].sort((x, y) => x - y), out = [];
+    for (let i = 0; i < nums.length;) {
+      let j = i;
+      while (j + 1 < nums.length && nums[j + 1] === nums[j] + 1) j++;
+      out.push(nums[i] === nums[j] ? `${nums[i]}` : `${nums[i]}-${nums[j]}`);
+      i = j + 1;
+    }
+    return out.join(',');
+  }
+  function paperInfo(total, sel) {
+    if (sel < total) return T('{n} of {total} pages selected', { n: sel, total });
+    const paperName = opts.paper === 'custom' ? `${opts.width} × ${opts.height} mm` : opts.paper;
+    return window.I18N.tn(total, '1 page on {paper}, {orientation}', '{n} pages on {paper}, {orientation}', { paper: paperName === 'custom' ? T('Custom size…') : paperName, orientation: T(opts.orientation === 'landscape' ? 'landscape' : 'portrait') });
+  }
+  function togglePage(n) {
+    if (!previewTotal) return;
+    const set = includedSet(previewTotal);
+    if (set.has(n)) {
+      if (set.size === 1) { info(T('Keep at least one page selected.'), true); return; }
+      set.delete(n);
+    } else set.add(n);
+    opts.pages = pagesText(set, previewTotal); remember();
+    const input = dlg.querySelector('input[data-k="pages"]'); if (input) input.value = opts.pages;
+    const el = dlg.querySelector(`.pr-pg[data-n="${n}"]`);
+    if (el) { const on = set.has(n); el.classList.toggle('on', on); el.classList.toggle('off', !on); el.setAttribute('aria-checked', String(on)); }
+    info(paperInfo(previewTotal, set.size));
+  }
+
   // Builds the real PDF and draws its pages, so what you see is exactly what prints.
   async function preview() {
     const view = dlg && dlg.querySelector('#prView'); if (!view) return;
@@ -205,7 +261,7 @@
     let badge = view.querySelector('.pr-busy');
     if (!badge) { badge = document.createElement('div'); badge.className = 'pr-busy'; view.prepend(badge); }
     badge.textContent = T('Updating preview…');
-    const r = await D.printPreview(payloadOf(s), sendOpts());
+    const r = await D.printPreview(payloadOf(s), { ...sendOpts(), pages: '' });
     if (id !== reqId || !dlg.open) return;
     if (!r.ok) { badge.remove(); if (/Already preparing/.test(r.message || '')) { schedule(); return; } info(T(r.message || 'Couldn’t make the preview.'), true); return; }
     try {
@@ -217,6 +273,8 @@
       const frag = document.createDocumentFragment();
       const maxW = Math.min(view.clientWidth - 40, 640);
       const show = Math.min(pdf.numPages, 60);
+      previewTotal = pdf.numPages;
+      const ticked = includedSet(previewTotal);
       for (let n = 1; n <= show; n++) {
         const page = await pdf.getPage(n);
         if (id !== reqId) return;
@@ -228,13 +286,21 @@
         c.style.width = (vp.width / (window.devicePixelRatio || 1)) + 'px';
         c.setAttribute('aria-label', `Page ${n}`);
         await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
-        frag.appendChild(c);
+        const on = ticked.has(n);
+        const wrap = document.createElement('div');
+        wrap.className = 'pr-pg ' + (on ? 'on' : 'off');
+        wrap.dataset.n = n; wrap.tabIndex = 0; wrap.setAttribute('role', 'checkbox'); wrap.setAttribute('aria-checked', String(on));
+        wrap.setAttribute('aria-label', T('Page {n}', { n }));
+        const tick = document.createElement('span'); tick.className = 'pr-tick'; tick.textContent = '✓';
+        wrap.append(c, tick);
+        frag.appendChild(wrap);
         const pn = document.createElement('div'); pn.className = 'pr-pn'; pn.textContent = T('Page {n} of {total}', { n, total: pdf.numPages }); frag.appendChild(pn);
       }
       if (pdf.numPages > show) { const more = document.createElement('div'); more.className = 'pr-pn'; more.textContent = T('…and {n} more pages', { n: pdf.numPages - show }); frag.appendChild(more); }
       view.replaceChildren(frag);
-      const paperName = opts.paper === 'custom' ? `${opts.width} × ${opts.height} mm` : opts.paper;
-      info(window.I18N.tn(pdf.numPages, '1 page on {paper}, {orientation}', '{n} pages on {paper}, {orientation}', { paper: paperName === 'custom' ? T('Custom size…') : paperName, orientation: T(opts.orientation === 'landscape' ? 'landscape' : 'portrait') }));
+      view.onclick = e => { const pg = e.target.closest && e.target.closest('.pr-pg'); if (pg) togglePage(Number(pg.dataset.n)); };
+      view.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('pr-pg')) { e.preventDefault(); togglePage(Number(e.target.dataset.n)); } };
+      info(paperInfo(previewTotal, ticked.size));
     } catch (e) { badge.remove(); info(T('Couldn’t show the preview, but saving and printing still work.'), true); }
   }
 

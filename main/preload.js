@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('desktop', {
   printSavePdf: (payload, opts) => ipcRenderer.invoke('print:savePdf', { payload, opts }),
   printPaper: (payload, opts) => ipcRenderer.invoke('print:paper', { payload, opts }),
   openPdf: p => ipcRenderer.invoke('app:openPath', p),
+  showPdfInFolder: p => ipcRenderer.invoke('app:showInFolder', p),
 
   copyText: text => ipcRenderer.invoke('clipboard:write', String(text)),
   updateStatus: () => ipcRenderer.invoke('update:status'),
