@@ -205,7 +205,7 @@ async function onePrintAtATime(fn) {
   if (printing) return { ok: false, message: 'Already preparing a printout. Wait a moment.' };
   printing = true;
   try { return await fn(); }
-  catch (e) { log.warn('print.failed', { error: e && e.message }); return { ok: false, message: /^(Custom paper|These notes|Nothing to print)/.test(e && e.message) ? e.message : 'Couldn’t prepare the printout. Try again.' }; }
+  catch (e) { log.warn('print.failed', { error: e && e.message }); return { ok: false, message: /^(Custom paper|These notes|Nothing to print|Page numbers look wrong)/.test(e && e.message) ? e.message : 'Couldn’t prepare the printout. Try again.' }; }
   finally { printing = false; }
 }
 

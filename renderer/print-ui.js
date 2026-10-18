@@ -14,7 +14,7 @@
   ];
   const SIZES = [[9.5, 'Very small'], [10.5, 'Small'], [11.5, 'Normal'], [13, 'Large'], [14.5, 'Very large']];
   const STYLES = [['plain', 'Plain'], ['grid', 'Grid'], ['lined', 'Lined'], ['dotted', 'Dotted']];
-  const DEFAULTS = { what: '', paper: 'A4', width: 210, height: 297, orientation: 'portrait', margins: 'normal', fontSize: 11.5, style: 'plain', titlePage: true, contents: true, topicBreaks: true, pageNumbers: true, ink: false };
+  const DEFAULTS = { what: '', pages: '', paper: 'A4', width: 210, height: 297, orientation: 'portrait', margins: 'normal', fontSize: 11.5, style: 'plain', titlePage: true, contents: true, topicBreaks: true, pageNumbers: true, ink: false };
 
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   let opts = { ...DEFAULTS };
@@ -35,7 +35,7 @@
   .pr-side{overflow:auto;padding:14px 16px;border-inline-end:.5px solid var(--line-strong);display:grid;background:color-mix(in srgb,var(--fill) 35%,var(--raised));gap:14px;align-content:start}
   .pr-f{display:grid;gap:6px;font-size:12.5px;color:var(--muted)}
   .pr-f > span{font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:11.5px}
-  .pr-f select,.pr-f input[type=number]{border:0;box-shadow:inset 0 0 0 .5px var(--line-strong);border-radius:8px;padding:7px 9px;background:var(--page);color:var(--ink);font:inherit;font-size:13.5px;width:100%}
+  .pr-f select,.pr-f input[type=number],.pr-f input[type=text]{border:0;box-shadow:inset 0 0 0 .5px var(--line-strong);border-radius:8px;padding:7px 9px;background:var(--page);color:var(--ink);font:inherit;font-size:13.5px;width:100%}
   .pr-seg{display:flex;border:0;border-radius:9px;padding:2px;gap:2px;background:var(--fill)}
   .pr-seg button{flex:1;border:0;background:transparent;border-radius:7px;padding:5px 6px;font:inherit;font-size:13px;font-weight:500;color:var(--ink);transition:background-color var(--fast) ease}
   
@@ -68,7 +68,7 @@
   }
   function sendOpts() {
     const o = { paper: opts.paper, width: Number(opts.width), height: Number(opts.height), orientation: opts.orientation, margins: opts.margins,
-      fontSize: Number(opts.fontSize), style: opts.style, titlePage: opts.titlePage, contents: opts.contents, topicBreaks: opts.topicBreaks, pageNumbers: opts.pageNumbers, ink: opts.ink };
+      fontSize: Number(opts.fontSize), style: opts.style, titlePage: opts.titlePage, contents: opts.contents, topicBreaks: opts.topicBreaks, pageNumbers: opts.pageNumbers, ink: opts.ink, pages: String(opts.pages || '') };
     // A formula sheet is meant to be short: no title page, no contents, topics run on, smaller text.
     if (opts.what === '__formulas') Object.assign(o, { titlePage: false, contents: false, topicBreaks: false, fontSize: Math.min(o.fontSize, 9.5), margins: opts.margins === 'wide' ? 'normal' : opts.margins });
     return o;
@@ -91,6 +91,9 @@
             <select data-k="what"><option value="">${T('Whole course')}${s ? ' · ' + esc(s.course) : ''}</option><option value="__formulas"${opts.what === '__formulas' ? ' selected' : ''}>${T('Formula sheet')}</option><option value="__pick"${opts.what === '__pick' ? ' selected' : ''}>${T('Choose sections…')}</option>${topics.map(t => `<option value="${esc(t.id)}"${t.id === opts.what ? ' selected' : ''}>${esc(T('Only: {title}', { title: t.title }))}</option>`).join('')}</select>
           </label>
           ${opts.what === '__pick' ? pickList(s) : ''}
+          <label class="pr-f"><span>${T('Pages')}</span>
+            <input type="text" data-k="pages" value="${esc(opts.pages)}" placeholder="${esc(T('All pages'))}" inputmode="numeric" autocomplete="off" spellcheck="false">
+          </label>
           <label class="pr-f"><span>${T('Paper size')}</span>
             <select data-k="paper">${PAPERS.map(([v, l, tr]) => `<option value="${v}"${v === opts.paper ? ' selected' : ''}>${esc(tr ? T(l) : l)}</option>`).join('')}</select>
           </label>

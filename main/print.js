@@ -15,6 +15,19 @@ const STYLES = ['plain', 'grid', 'lined', 'dotted'];
 
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 
+// "1-3, 5" → [{from:0,to:2},{from:4,to:4}] (0-based, as the print engine wants). Empty means every page.
+function parsePages(text) {
+  const s = String(text || '').replace(/\s+/g, '');
+  if (!s) return null;
+  const bad = () => new Error('Page numbers look wrong. Try something like 1-3, 5.');
+  if (!/^\d+(-\d+)?(,\d+(-\d+)?)*$/.test(s)) throw bad();
+  return s.split(',').map(part => {
+    const [a, b = a] = part.split('-').map(Number);
+    if (a < 1 || b < a || b > 9999) throw bad();
+    return { from: a - 1, to: b - 1 };
+  });
+}
+
 // Accepts only known values; anything unexpected falls back to a safe default.
 function cleanOpts(o) {
   o = isObj(o) ? o : {};
@@ -32,7 +45,8 @@ function cleanOpts(o) {
     widthMm: w, heightMm: h, margin,
     fontSize: FONT_SIZES.includes(Number(o.fontSize)) ? Number(o.fontSize) : 11.5,
     style: STYLES.includes(o.style) ? o.style : 'plain',
-    contents: !!o.contents, topicBreaks: !!o.topicBreaks, ink: !!o.ink, titlePage: !!o.titlePage, pageNumbers: o.pageNumbers !== false
+    contents: !!o.contents, topicBreaks: !!o.topicBreaks, ink: !!o.ink, titlePage: !!o.titlePage, pageNumbers: o.pageNumbers !== false,
+    pageRanges: parsePages(o.pages)
   };
 }
 
@@ -91,7 +105,9 @@ async function makePdf(rawPayload, rawOpts, dev) {
       displayHeaderFooter: opts.pageNumbers,
       headerTemplate: '<span></span>',
       footerTemplate: footer(payload, opts),
-      generateDocumentOutline: true
+      generateDocumentOutline: true,
+      // Chromium's own page-range text, e.g. "1-3,5" (1-based).
+      ...(opts.pageRanges ? { pageRanges: opts.pageRanges.map(r => (r.from === r.to ? `${r.from + 1}` : `${r.from + 1}-${r.to + 1}`)).join(',') } : {})
     });
     return { data, payload, opts };
   } finally { w.destroy(); }
@@ -110,7 +126,8 @@ async function printPaper(rawPayload, rawOpts, dev) {
       pageSize: { width: Math.round(opts.widthMm * 1000), height: Math.round(opts.heightMm * 1000) },
       landscape: false,
       margins: { marginType: 'custom', top: px(opts.margin), bottom: px(opts.margin), left: px(opts.margin), right: px(opts.margin) },
-      footer: opts.pageNumbers ? payload.course : undefined
+      footer: opts.pageNumbers ? payload.course : undefined,
+      ...(opts.pageRanges ? { pageRanges: opts.pageRanges } : {})
     }, (ok, reason) => { w.destroy(); resolve({ ok, reason: ok ? '' : String(reason || '') }); });
   });
 }
