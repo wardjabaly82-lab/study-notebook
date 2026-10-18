@@ -20,6 +20,9 @@
   let opts = { ...DEFAULTS };
   try { opts = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('sn-print') || '{}') }; } catch (e) {}
   const remember = () => { try { const { what, ...keep } = opts; localStorage.setItem('sn-print', JSON.stringify(keep)); } catch (e) {} };
+  // Section ids ticked in "Choose sections" (kept only while the app runs). null = the whole course.
+  let picked = null;
+  const pickIsEmpty = () => opts.what === '__pick' && !!picked && picked.length === 0;
 
   const css = `
   .pr-dlg{border:0;border-radius:16px;padding:0;background:var(--raised);color:var(--ink);width:min(1120px,calc(100vw - 32px));height:min(800px,calc(100vh - 40px));box-shadow:var(--shadow-pop);font-family:var(--f-ui);overflow:hidden}
@@ -60,7 +63,7 @@
   let dlg = null, src = null, reqId = 0, timer = null, busy = false, lastInfo = '';
 
   function source() {
-    src = window.snPrintSource ? window.snPrintSource(opts.what || null) : null;
+    src = window.snPrintSource ? window.snPrintSource(opts.what === '__pick' ? null : (opts.what || null), opts.what === '__pick' ? picked : null) : null;
     return src;
   }
   function sendOpts() {
@@ -79,13 +82,15 @@
   function render() {
     const s = src || source();
     const topics = (s && s.topics) || [];
+    const pickEmpty = pickIsEmpty();
     dlg.innerHTML = `
       <div class="pr-top"><h2>${T('Print or save as PDF')}</h2><button type="button" class="sn-x" data-close aria-label="${esc(T('Close'))}">×</button></div>
       <div class="pr-main">
         <div class="pr-side">
           <label class="pr-f"><span>${T('What to print')}</span>
-            <select data-k="what"><option value="">${T('Whole course')}${s ? ' · ' + esc(s.course) : ''}</option><option value="__formulas"${opts.what === '__formulas' ? ' selected' : ''}>${T('Formula sheet')}</option>${topics.map(t => `<option value="${esc(t.id)}"${t.id === opts.what ? ' selected' : ''}>${esc(T('Only: {title}', { title: t.title }))}</option>`).join('')}</select>
+            <select data-k="what"><option value="">${T('Whole course')}${s ? ' · ' + esc(s.course) : ''}</option><option value="__formulas"${opts.what === '__formulas' ? ' selected' : ''}>${T('Formula sheet')}</option><option value="__pick"${opts.what === '__pick' ? ' selected' : ''}>${T('Choose sections…')}</option>${topics.map(t => `<option value="${esc(t.id)}"${t.id === opts.what ? ' selected' : ''}>${esc(T('Only: {title}', { title: t.title }))}</option>`).join('')}</select>
           </label>
+          ${opts.what === '__pick' ? pickList(s) : ''}
           <label class="pr-f"><span>${T('Paper size')}</span>
             <select data-k="paper">${PAPERS.map(([v, l, tr]) => `<option value="${v}"${v === opts.paper ? ' selected' : ''}>${esc(tr ? T(l) : l)}</option>`).join('')}</select>
           </label>
@@ -114,14 +119,26 @@
       <div class="pr-bar">
         <span class="pr-info" id="prInfo" role="status">${esc(lastInfo)}</span>
         <button type="button" class="btn" data-close>${T('Cancel')}</button>
-        <button type="button" class="btn" id="prPdf">${T('Save as PDF')}</button>
-        <button type="button" class="btn primary" id="prPrint">${T('Print…')}</button>
+        <button type="button" class="btn" id="prPdf"${pickEmpty ? ' disabled' : ''}>${T('Save as PDF')}</button>
+        <button type="button" class="btn primary" id="prPrint"${pickEmpty ? ' disabled' : ''}>${T('Print…')}</button>
       </div>`;
     wire();
   }
 
+  // Every section with a checkbox, indented by depth, plus All / None.
+  function pickList(s) {
+    const tree = (s && s.tree) || [];
+    const on = new Set(picked || tree.map(x => x.id));
+    const rows = tree.map(x => `<label style="display:flex;align-items:center;gap:6px;padding-inline-start:${Math.min(x.depth, 4) * 14}px;font-size:13px;cursor:pointer"><input type="checkbox" data-pick="${esc(x.id)}"${on.has(x.id) ? ' checked' : ''}><span dir="auto">${esc(x.title)}</span></label>`).join('');
+    return `<div class="pr-f" style="gap:6px">
+      <div style="display:flex;align-items:center;gap:8px"><span style="flex:1">${esc(T('Choose which sections to print'))}</span><button type="button" class="btn" data-pick-all="all">${esc(T('All'))}</button><button type="button" class="btn" data-pick-all="none">${esc(T('None'))}</button></div>
+      <div style="display:grid;gap:4px;max-height:220px;overflow:auto;border:1px solid var(--rule);border-radius:8px;padding:8px">${rows || `<span class="pr-note">${esc(T('No sections yet.'))}</span>`}</div>
+      ${pickIsEmpty() ? `<p class="pr-note">${esc(T('Choose at least one section.'))}</p>` : ''}
+    </div>`;
+  }
+
   function info(text, bad) { lastInfo = text; const el = dlg.querySelector('#prInfo'); if (el) { el.textContent = text; el.className = 'pr-info' + (bad ? ' bad' : ''); } }
-  function setBusy(b) { busy = b; dlg.querySelectorAll('#prPdf,#prPrint').forEach(x => x.disabled = b); }
+  function setBusy(b) { busy = b; dlg.querySelectorAll('#prPdf,#prPrint').forEach(x => x.disabled = b || pickIsEmpty()); }
 
   function wire() {
     dlg.querySelectorAll('[data-close]').forEach(b => b.onclick = () => dlg.close());
@@ -140,6 +157,16 @@
       opts[name] = b.dataset.v; remember();
       b.closest('[data-name]').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
       schedule();
+    });
+    dlg.querySelectorAll('[data-pick]').forEach(cb => cb.onchange = () => {
+      const id = cb.dataset.pick;
+      picked = cb.checked ? [...new Set([...(picked || []), id])] : (picked || []).filter(x => x !== id);
+      src = null; render(); schedule();
+    });
+    dlg.querySelectorAll('[data-pick-all]').forEach(b => b.onclick = () => {
+      const s = source();
+      picked = b.dataset.pickAll === 'all' ? ((s && s.tree) || []).map(x => x.id) : [];
+      src = null; render(); schedule();
     });
     dlg.querySelector('#prPdf').onclick = async () => {
       const s = src || source(); if (!s) return;
@@ -212,7 +239,7 @@
     if (typeof what === 'string') opts.what = what;
     if (!dlg) { dlg = document.createElement('dialog'); dlg.className = 'pr-dlg'; document.body.appendChild(dlg); dlg.addEventListener('close', () => { reqId++; }); }
     src = null; lastInfo = '';
-    if (opts.what && opts.what !== '__formulas' && !(source() || { topics: [] }).topics.some(t => t.id === opts.what)) opts.what = '';
+    if (opts.what && opts.what !== '__formulas' && opts.what !== '__pick' && !(source() || { topics: [] }).topics.some(t => t.id === opts.what)) opts.what = '';
     src = null; source();
     render();
     if (!dlg.open) dlg.showModal();

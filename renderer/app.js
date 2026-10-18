@@ -1479,7 +1479,7 @@
   };
 
   /* ================= print hook ================= */
-  window.snPrintSource = topicId => {
+  window.snPrintSource = (topicId, pickedIds) => {
     const c = course(); if (!c) return null;
     const secs = sections(c.id); const out = [];
     if (topicId === '__formulas') {
@@ -1487,9 +1487,11 @@
       return { ...base, subtitle: t('Formula sheet'), sections: formulaItems(c, secs).map(x => ({ id: x.id, title: x.title, depth: x.depth, html: x.md ? mdToHtml(x.md) : '' })) };
     }
     const add = (s, d) => out.push({ id: s.id, title: s.title, depth: d, html: mdToHtml(s.content) });
-    if (topicId && secs[topicId]) { add(secs[topicId], 0); walk(secs, (s, d) => add(s, d + 1), topicId); }
+    if (Array.isArray(pickedIds)) walk(secs, (s, d) => { if (pickedIds.includes(s.id)) add(s, d); });
+    else if (topicId && secs[topicId]) { add(secs[topicId], 0); walk(secs, (s, d) => add(s, d + 1), topicId); }
     else walk(secs, add);
-    return { course: c.name, lang: c.lang === 'he' || c.lang === 'en' ? c.lang : (dirOf(c) === 'rtl' ? 'he' : 'auto'), sections: out, topics: kids(secs, null).map(s => ({ id: s.id, title: s.title })), subtitle: topicId && secs[topicId] ? secs[topicId].title : '' };
+    const tree = []; walk(secs, (s, d) => tree.push({ id: s.id, title: s.title, depth: d }));
+    return { tree, course: c.name, lang: c.lang === 'he' || c.lang === 'en' ? c.lang : (dirOf(c) === 'rtl' ? 'he' : 'auto'), sections: out, topics: kids(secs, null).map(s => ({ id: s.id, title: s.title })), subtitle: topicId && secs[topicId] ? secs[topicId].title : '' };
   };
 
   /* ================= start ================= */
