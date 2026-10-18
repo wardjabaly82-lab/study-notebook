@@ -10,6 +10,7 @@ import * as store from './store.js';
 import { currentUser, startGoogle, finishGoogle, signInResponse, signOutResponse, formToken, formOk, readCookie, safeNext, googleReady, devGoogle, SESSION_COOKIE } from './auth.js';
 import * as P from './pages.js';
 import { landingPage } from './landing.js';
+import { over, address, tooMany } from './limits.js';
 
 const FAVICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 26"><rect x="4" y="2.5" width="18" height="21" rx="3" fill="#0071e3"/><rect x="7" y="2.5" width="2" height="21" fill="#005bb8"/><path d="M12 9h7M12 13h7M12 17h4.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>`;
 const json = (data, status = 200, headers = {}) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
@@ -27,6 +28,7 @@ const ERRORS = {
 
 async function api(request, env, url, user) {
   const route = url.pathname.slice('/api/'.length);
+  if (await over(env.RL_USER, 'u:' + user.id)) return tooMany();
   // Reading and changing data needs this header, which other sites can't send with the cookie.
   if (request.method !== 'GET' && request.headers.get('X-Study-Notebook') !== '1') return json({ error: 'forbidden' }, 403);
   if (route === 'me' && request.method === 'GET') {
@@ -64,6 +66,7 @@ async function sync(request, env, url) {
   const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
   const user = await store.sessionUser(env, token, 'app');
   if (!user) return json({ error: 'signed_out' }, 401);
+  if (await over(env.RL_USER, 'u:' + user.id)) return tooMany();
   const route = url.pathname.replace(/^\/sync\/?/, '');
   if (route === 'ping' && request.method === 'GET') {
     return json({ ok: true, version: VERSION, rev: await store.currentRev(env, user.id), docs: await store.countDocs(env, user.id), email: user.email, name: user.name || '', mcp: `${url.origin}/mcp` });
@@ -275,9 +278,16 @@ function providerFor(origin) {
   return providers.get(origin);
 }
 
+// Requests that only fetch the site's own files (pages, scripts, fonts) aren't counted.
+const isFile = (request, p) => request.method === 'GET' && (/^\/(app|landing)\/.+\.[a-z0-9]{1,8}$/i.test(p) || p === '/favicon.ico' || p === '/favicon.svg');
+const SIGN_IN = p => p.startsWith('/auth/') || p === '/link' || p === '/register';
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const p = url.pathname, ip = address(request);
+    if (SIGN_IN(p) && await over(env.RL_AUTH, p === '/register' ? 'r:' + ip : 'a:' + ip)) return tooMany();
+    if (p !== '/mcp' && p !== '/token' && p !== '/register' && !isFile(request, p) && await over(env.RL_IP, ip)) return tooMany();
     if (url.pathname.startsWith('/sync/')) return sync(request, env, url);
     if (url.pathname === '/auth/app/token' && request.method === 'POST') return appToken(request, env);
     return providerFor(url.origin).fetch(request, env, ctx);

@@ -136,5 +136,13 @@ ok(/account is deleted/.test(await r.text()), 'Bob deletes his account');
 ok((await bob.go('/api/me')).status === 401, 'Bob’s browser is signed out');
 const dead = await cb.callTool({ name: 'list_courses', arguments: {} }).then(() => 'worked', e => 'refused'); ok(dead === 'refused', 'Bob’s Claude connection stops working');
 ok(Object.keys((await api(alice, 'docs')).docs).length === 12, 'Alice’s notes untouched');
+
+console.log('Rate limits');
+let codes = []; for (let i = 0; i < 33; i++) codes.push(...await Promise.all(Array.from({ length: 10 }, () => fetch(O + '/sync/ping', { headers: H }).then(r => r.status))));
+ok(codes.filter(c => c === 200).length >= 250 && codes.includes(429), `one account flooding the server is slowed down (${codes.filter(c => c === 429).length} of 330 refused)`);
+const ra = await fetch(O + '/sync/ping', { headers: H }); ok(ra.status === 429 && ra.headers.get('retry-after') === '60' && /Wait a minute/.test((await ra.json()).message), 'it gets a clear “wait a minute” answer');
+const dave = await signIn('dave@example.com'); ok((await api(dave, 'me')).email === 'dave@example.com', 'other students are not affected');
+codes = []; for (let i = 0; i < 7; i++) codes.push(...await Promise.all(Array.from({ length: 10 }, () => fetch(O + '/auth/google', { redirect: 'manual' }).then(r => r.status))));
+ok(codes.includes(429), `repeated sign-in attempts from one address are stopped (${codes.filter(c => c === 429).length} of 70 refused)`);
 await ca.close();
 console.log('\nSHARED SERVER TEST PASSED');
