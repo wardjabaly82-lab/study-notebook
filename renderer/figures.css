@@ -96,8 +96,10 @@ blockquote.callout, .callout { --co: var(--fig-blue); margin: 1em 0; padding: .6
 /* ---------- the student's own drawings (pen, marker, shapes) ---------- */
 .ink-anchor { position: relative; }
 svg.ink { position: absolute; left: 0; top: 0; width: 100%; aspect-ratio: 1 / 1; height: auto; overflow: visible; pointer-events: none; z-index: 1; }
-svg.ink path, svg.ink line, svg.ink rect, svg.ink ellipse { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-svg.ink .mk { opacity: .4; mix-blend-mode: var(--mk-blend); }
+/* (also the live preview while a stroke is being drawn: shapes are outlines, never filled) */
+svg.ink path, svg.ink line, svg.ink rect, svg.ink ellipse,
+svg.ink-preview path, svg.ink-preview line, svg.ink-preview rect, svg.ink-preview ellipse { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+svg.ink .mk, svg.ink-preview .mk { opacity: .4; mix-blend-mode: var(--mk-blend); }
 
 /* Ink saver printouts: everything in shades of grey */
 body.ink { --fig-blue: #333; --fig-red: #333; --fig-green: #333; --fig-orange: #333; --fig-purple: #333; --fig-teal: #333; --fig-pink: #333; --fig-brown: #333; --fig-gray: #777; --fig-black: #111; --fig-yellow: #777;

@@ -10,7 +10,7 @@
 (() => {
   'use strict';
   let api = null, bar = null, tools = null, drawing = null;   // drawing = { id, note, overlay, undo: [] }
-  const opt = { tool: 'pen', color: 'blue', size: 2, mcolor: 'yellow' };
+  const opt = { tool: 'pen', color: 'blue', size: 2 };
   try { Object.assign(opt, JSON.parse(localStorage.getItem('sn-draw') || '{}')); } catch (e) {}
   const remember = () => { try { localStorage.setItem('sn-draw', JSON.stringify(opt)); } catch (e) {} };
   const T = (k, v) => (api ? api.t(k, v) : k);
@@ -92,23 +92,32 @@
     ['ellipse', 'Circle', '<ellipse cx="12" cy="12" rx="8.5" ry="6.5"/>'],
     ['eraser', 'Eraser', '<path d="M16 4l4 4-10 10H6l-2-2z"/><path d="M11 9l4 4M14 20h6"/>']
   ];
-  const PEN_COLORS = ['black', 'blue', 'red', 'green', 'orange', 'purple'], MARK_COLORS = ['yellow', 'green', 'pink', 'blue', 'orange'];
+  const COLORS = ['black', 'blue', 'red', 'green', 'orange', 'purple', 'yellow', 'pink'];   // the same colors for every tool
   const icon = d => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   function drawTools() {
     if (!tools) { tools = document.createElement('div'); tools.className = 'draw-bar'; tools.setAttribute('role', 'toolbar'); document.body.appendChild(tools); }
-    const colors = opt.tool === 'marker' ? MARK_COLORS : PEN_COLORS, cur = opt.tool === 'marker' ? opt.mcolor : opt.color;
+    const cur = opt.color;
     tools.setAttribute('aria-label', T('Drawing tools'));
-    tools.innerHTML = `<div class="db-group">${TOOLS.map(([k, name, d]) => `<button type="button" data-tool="${k}" aria-pressed="${opt.tool === k}" title="${esc(T(name))}" aria-label="${esc(T(name))}">${icon(d)}</button>`).join('')}</div>
-      <div class="db-group">${opt.tool === 'eraser' ? `<span class="db-hint">${esc(T('Drag over a drawing to erase it'))}</span>` : colors.map(c => `<button type="button" class="db-c s-${c}" data-color="${c}" aria-pressed="${cur === c}" title="${esc(T(INKNAME[c]))}" aria-label="${esc(T(INKNAME[c]))}"><i class="f-${c}"></i></button>`).join('')}</div>
-      ${opt.tool === 'eraser' ? '' : `<div class="db-group">${[1, 2, 3].map(z => `<button type="button" data-size="${z}" aria-pressed="${opt.size === z}" title="${esc(T(['Thin', 'Medium', 'Thick'][z - 1]))}" aria-label="${esc(T(['Thin', 'Medium', 'Thick'][z - 1]))}"><i class="db-dot" style="width:${3 + z * 3}px;height:${3 + z * 3}px"></i></button>`).join('')}</div>`}
+    tools.innerHTML = `<div class="db-group">${TOOLS.map(([k, name, d]) => `<button type="button" data-tool="${k}" aria-pressed="${opt.tool === k}" title="${esc(k === 'eraser' ? T(name) + ': ' + T('Drag over a drawing to erase it') : T(name))}" aria-label="${esc(T(name))}">${icon(d)}</button>`).join('')}</div>
+      <div class="db-group">${COLORS.map(c => `<button type="button" class="db-c s-${c}" data-color="${c}" aria-pressed="${cur === c}" title="${esc(T(INKNAME[c]))}" aria-label="${esc(T(INKNAME[c]))}"><i class="f-${c}"></i></button>`).join('')}</div>
+      <div class="db-group">${[1, 2, 3].map(z => `<button type="button" data-size="${z}" aria-pressed="${opt.size === z}" title="${esc(T(['Thin', 'Medium', 'Thick'][z - 1]))}" aria-label="${esc(T(['Thin', 'Medium', 'Thick'][z - 1]))}"><i class="db-dot" style="width:${3 + z * 3}px;height:${3 + z * 3}px"></i></button>`).join('')}</div>
       <div class="db-group"><button type="button" data-undo title="${esc(T('Undo (Ctrl+Z)'))}" aria-label="${esc(T('Undo'))}">${icon('<path d="M9 7H4V2"/><path d="M4.5 7A8 8 0 1 1 6 17"/>')}</button>
       <button type="button" class="db-done" data-done>${esc(T('Done'))}</button></div>`;
     tools.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => { opt.tool = b.dataset.tool; remember(); drawTools(); });
-    tools.querySelectorAll('[data-color]').forEach(b => b.onclick = () => { if (opt.tool === 'marker') opt.mcolor = b.dataset.color; else opt.color = b.dataset.color; remember(); drawTools(); });
-    tools.querySelectorAll('[data-size]').forEach(b => b.onclick = () => { opt.size = +b.dataset.size; remember(); drawTools(); });
+    tools.querySelectorAll('[data-color]').forEach(b => b.onclick = () => { opt.color = b.dataset.color; if (opt.tool === 'eraser') opt.tool = 'pen'; remember(); drawTools(); });
+    tools.querySelectorAll('[data-size]').forEach(b => b.onclick = () => { opt.size = +b.dataset.size; if (opt.tool === 'eraser') opt.tool = 'pen'; remember(); drawTools(); });
     tools.querySelector('[data-undo]').onclick = undo;
     tools.querySelector('[data-done]').onclick = stopDrawing;
     if (drawing && drawing.overlay) drawing.overlay.dataset.tool = opt.tool;
+    placeTools();
+  }
+  // The toolbar sits at the top, just under the course header, centered over the notes.
+  function placeTools() {
+    if (!tools || tools.hidden) return;
+    const head = document.getElementById('top'), wrap = document.getElementById('sheetWrap');
+    const h = head ? head.getBoundingClientRect() : null, w = wrap ? wrap.getBoundingClientRect() : null;
+    tools.style.top = Math.max(8, (h ? h.bottom : 0) + 6) + 'px';
+    if (w && w.width) tools.style.left = (w.left + w.width / 2) + 'px';
   }
   function attachOverlay(note) {
     if (!drawing) return;
@@ -124,7 +133,7 @@
     const note = noteFor(id); if (!note || !api.section(id)) return;
     hideBar(); getSelection().removeAllRanges();
     drawing = { id, note: null, overlay: null, undo: [] };
-    attachOverlay(note); drawTools(); tools.hidden = false;
+    attachOverlay(note); drawTools(); tools.hidden = false; placeTools();
     if (api.onDrawingChange) api.onDrawingChange();
   }
   function stopDrawing() {
@@ -179,7 +188,7 @@
     const k = 1000 / Math.max(1, r.width);
     svg.setAttribute('viewBox', `0 0 1000 ${Math.max(1, r.height * k)}`);
     const pts = live.pts.map(([x, y]) => [(x - r.left) * k, (y - r.top) * k]);
-    svg.innerHTML = SNMarks.strokeSvg({ t: opt.tool, c: opt.tool === 'marker' ? opt.mcolor : opt.color, s: opt.size, p: pts });
+    svg.innerHTML = SNMarks.strokeSvg({ t: opt.tool, c: opt.color, s: opt.size, p: pts });
   }
   function up() {
     const ov = drawing && drawing.overlay; if (!ov) return;
@@ -196,7 +205,7 @@
     const shape = !(opt.tool === 'pen' || opt.tool === 'marker');
     if (shape) { if (pts.length < 2 || Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]) < 6) return; pts = [pts[0], pts[1]]; }
     else pts = simplify(pts, 1.2);
-    const st = { id: rid('k'), t: opt.tool, c: opt.tool === 'marker' ? opt.mcolor : opt.color, s: opt.size, b: L.b, p: pts };
+    const st = { id: rid('k'), t: opt.tool, c: opt.color, s: opt.size, b: L.b, p: pts };
     drawing.undo.push({ remove: st.id });
     save(drawing.id, { ink: (s.ink || []).concat(st) });
   }
@@ -235,6 +244,7 @@
       if (drawing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.target.closest('input, textarea')) { e.preventDefault(); undo(); }
     });
     const sw = document.getElementById('sheetWrap'); if (sw) sw.addEventListener('scroll', hideBar, { passive: true });
+    addEventListener('resize', placeTools);
   }
 
   window.SNMarkup = { init, apply, toggleDrawing, startDrawing, stopDrawing, refresh, drawingId: () => (drawing ? drawing.id : null) };

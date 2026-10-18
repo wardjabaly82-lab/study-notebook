@@ -235,8 +235,8 @@ button { cursor: default; -webkit-tap-highlight-color: transparent; }
 /* Where a note came from: said once, quietly, like a line under a book title */
 .tag { font-family: var(--f-ui); font-size: 12.5px; font-weight: 500; padding: 0; background: none; color: var(--accent); white-space: nowrap; letter-spacing: 0; }
 .tag.plain { color: var(--muted); }
-.sec-tools { margin-inline-start: auto; display: flex; gap: 2px; opacity: 0; transition: opacity var(--med) ease; font-family: var(--f-ui); }
-.sec:hover > .sec-head .sec-tools, .sec:focus-within > .sec-head .sec-tools { opacity: 1; }
+/* Always visible: Edit, Draw, Undo, Add sub-topic, Delete (nothing hides until you hover). */
+.sec-tools { margin-inline-start: auto; display: flex; flex-wrap: wrap; gap: 2px; font-family: var(--f-ui); }
 .sec-tools button { border: 0; background: none; color: var(--accent); font-size: 12.5px; padding: 3px 8px; border-radius: 6px; }
 .sec-tools button:hover { background: var(--accent-soft); }
 .sec-tools button.danger { color: var(--danger); }
@@ -842,7 +842,8 @@ kbd { font-family: var(--f-ui); font-size: 12px; font-weight: 500; background: v
 .mark-bar .mb-x { border: 0; background: none; color: var(--ink); font: inherit; font-size: 12.5px; padding: 4px 9px; border-radius: 999px; cursor: pointer; }
 .mark-bar .mb-x:hover { background: var(--fill); }
 
-.draw-bar { position: fixed; z-index: 55; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center;
+/* At the top, just under the course header (markup-ui.js places it), centered over the notes. */
+.draw-bar { position: fixed; z-index: 55; left: 50%; top: 12px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center;
   width: max-content; max-width: calc(100vw - 32px); padding: 6px 8px; border-radius: 16px; font-family: var(--f-ui);
   background: color-mix(in srgb, var(--raised) 96%, transparent); -webkit-backdrop-filter: saturate(180%) blur(24px); backdrop-filter: saturate(180%) blur(24px);
   box-shadow: var(--shadow-pop); animation: rise var(--med) var(--ease); }
@@ -866,6 +867,5 @@ kbd { font-family: var(--f-ui); font-size: 12px; font-weight: 500; background: v
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 3%, transparent); }
 .ink-input[data-tool="eraser"] { cursor: cell; }
 .ink-input .ink-preview { position: absolute; left: 10px; top: 6px; width: calc(100% - 20px); height: calc(100% - 12px); overflow: visible; pointer-events: none; }
-.sec.drawing .sec-tools { opacity: 1; }
 .sec-tools button[aria-pressed="true"] { background: var(--accent-soft); }
 @media print { .mark-bar, .draw-bar, .ink-input { display: none !important; } }
