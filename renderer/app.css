@@ -261,7 +261,9 @@ button { cursor: default; -webkit-tap-highlight-color: transparent; }
 .note pre { background: var(--desk); border: 0; box-shadow: inset 0 0 0 .5px var(--line); border-radius: 10px; padding: 12px 14px; overflow-x: auto; direction: ltr; text-align: left; }
 .note pre code { background: none; padding: 0; }
 .note blockquote { margin: .8em 0; padding: .3em 1em; border-inline-start: 2px solid var(--line-strong); color: var(--muted); }
-.note mjx-container { direction: ltr; unicode-bidi: isolate; }
+.note mjx-container { direction: ltr; unicode-bidi: isolate; font-weight: 400; font-style: normal; font-size: .94em; color: inherit; background: none; }
+.note mjx-container svg { overflow: visible; }
+.note mjx-container[display="true"] { font-size: 1em; }
 .note mjx-container[display="true"] { overflow-x: auto; overflow-y: hidden; max-width: 100%; margin: .9em 0 !important; padding: 2px 0; }
 .note mark { background: var(--marker); color: var(--marker-ink); border-radius: 3px; padding: 0 2px; }
 
