@@ -1163,8 +1163,9 @@
         <div class="row">${st.running ? `<button class="btn primary big" type="button" id="csRestart">${t('Restart Claude now')}</button>` : `<button class="btn primary big" type="button" id="csRestart">${t('Open Claude')}</button>`}</div>
         <p class="small">${t('This page turns green as soon as Claude connects. If it doesn’t within a minute, close Claude from the tray icon (right-click → Quit) and open it again.')}</p>`;
     }
+    if (st.configured) html += `<div class="row"><button class="btn ghost danger" type="button" id="csRemove">${t('Disconnect from Claude')}</button></div>`;
     if (claudeMsg) html += `<p class="status ${claudeMsg.kind}">${claudeMsg.html}</p>`;
-    html += `<details class="cs-more"><summary>${t('Other ways to connect')}</summary><p class="small">${t('You can also install Study Notebook as a Claude extension file. Open the file with the Claude app, or drag it into the Claude window.')}</p><button class="btn ghost" type="button" id="showMcpb">${t('Show the extension file')}</button>${st.configured ? ` <button class="btn ghost danger" type="button" id="csRemove">${t('Disconnect from Claude')}</button>` : ''}</details>`;
+    html += `<details class="cs-more"><summary>${t('Other ways to connect')}</summary><p class="small">${t('You can also install Study Notebook as a Claude extension file. Open the file with the Claude app, or drag it into the Claude window.')}</p><button class="btn ghost" type="button" id="showMcpb">${t('Show the extension file')}</button></details>`;
     box.innerHTML = html;
     box.querySelectorAll('[data-url]').forEach(x => x.onclick = () => D.openExternal(x.dataset.url));
     const q = id => box.querySelector(id);
