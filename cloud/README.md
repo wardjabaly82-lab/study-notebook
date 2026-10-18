@@ -21,3 +21,10 @@ Put `DEV_FAKE_GOOGLE=1` in `cloud/.dev.vars` and run `npx wrangler dev`. A stand
 ## Moving from the password version
 
 The first account to sign in is the site's owner. If the site still holds a notebook from the earlier password version, the owner's account page offers to move it into their account with that old password.
+
+## Blocking a network
+
+To block an address or a range, open the Cloudflare dashboard → Workers & Pages → study-notebook →
+Settings → Variables and Secrets, and add a text variable `BLOCKED_IPS`, for example
+`203.0.113.7, 198.51.100.0/24, 2001:db8::/32`. It takes effect right away and survives deploys.
+Addresses that keep going over the rate limit are also banned automatically for an hour.

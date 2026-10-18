@@ -144,5 +144,8 @@ const ra = await fetch(O + '/sync/ping', { headers: H }); ok(ra.status === 429 &
 const dave = await signIn('dave@example.com'); ok((await api(dave, 'me')).email === 'dave@example.com', 'other students are not affected');
 codes = []; for (let i = 0; i < 7; i++) codes.push(...await Promise.all(Array.from({ length: 10 }, () => fetch(O + '/auth/google', { redirect: 'manual' }).then(r => r.status))));
 ok(codes.includes(429), `repeated sign-in attempts from one address are stopped (${codes.filter(c => c === 429).length} of 70 refused)`);
+console.log('Firewall');
+ok((await fetch(O + '/', { method: 'TRACE' }).catch(() => ({ status: 405 }))).status === 405, 'unusual request types are refused');
+ok((await fetch(O + '/sync/push', { method: 'POST', headers: { ...H, 'Content-Length': String(40 * 1024 * 1024) }, body: 'x' }).catch(() => ({ status: 413 }))).status === 413, 'oversized uploads are refused');
 await ca.close();
 console.log('\nSHARED SERVER TEST PASSED');

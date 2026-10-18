@@ -11,6 +11,7 @@ import { currentUser, startGoogle, finishGoogle, signInResponse, signOutResponse
 import * as P from './pages.js';
 import { landingPage } from './landing.js';
 import { over, address, tooMany } from './limits.js';
+import { firewall, strike } from './firewall.js';
 
 const FAVICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 26"><rect x="4" y="2.5" width="18" height="21" rx="3" fill="#0071e3"/><rect x="7" y="2.5" width="2" height="21" fill="#005bb8"/><path d="M12 9h7M12 13h7M12 17h4.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>`;
 const json = (data, status = 200, headers = {}) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
@@ -286,8 +287,10 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const p = url.pathname, ip = address(request);
+    const refused = firewall(request, env, ip);
+    if (refused) return refused;
     if (SIGN_IN(p) && await over(env.RL_AUTH, p === '/register' ? 'r:' + ip : 'a:' + ip)) return tooMany();
-    if (p !== '/mcp' && p !== '/token' && p !== '/register' && !isFile(request, p) && await over(env.RL_IP, ip)) return tooMany();
+    if (p !== '/mcp' && p !== '/token' && p !== '/register' && !isFile(request, p) && await over(env.RL_IP, ip)) { strike(ip); return tooMany(); }
     if (url.pathname.startsWith('/sync/')) return sync(request, env, url);
     if (url.pathname === '/auth/app/token' && request.method === 'POST') return appToken(request, env);
     return providerFor(url.origin).fetch(request, env, ctx);
