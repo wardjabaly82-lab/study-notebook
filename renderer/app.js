@@ -343,7 +343,12 @@
     }
     const secs = sections(c.id);
     if (S.view === 'lecture') { const l = lectures(c.id).find(x => x.id === S.lecture); if (l) { renderLecture(sheet, c, l, secs); return; } S.view = 'notes'; }
-    if (S.view === 'practice') { renderPractice(sheet, c, secs); return; }
+    if (S.view === 'practice') {
+      renderPractice(sheet, c, secs);
+      sheet.querySelectorAll('.prac-bar').forEach(n => n.remove());
+      sheet.insertAdjacentHTML('afterbegin', `<div class="prac-bar"><button type="button" class="sn-x" data-act="back-notes" aria-label="${esc(t('Close'))}"><svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true" style="display:block;margin:auto"><path d="M5 5l14 14M19 5 5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button></div>`);
+      return;
+    }
     if (S.view === 'formulas') { renderFormulas(sheet, c, secs); return; }
     sheet.setAttribute('dir', dirOf(c));
     const list = []; walk(secs, (s, d) => list.push([s, d]));
