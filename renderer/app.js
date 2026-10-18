@@ -1163,7 +1163,7 @@
         <div class="row">${st.running ? `<button class="btn primary big" type="button" id="csRestart">${t('Restart Claude now')}</button>` : `<button class="btn primary big" type="button" id="csRestart">${t('Open Claude')}</button>`}</div>
         <p class="small">${t('This page turns green as soon as Claude connects. If it doesn’t within a minute, close Claude from the tray icon (right-click → Quit) and open it again.')}</p>`;
     }
-    if (st.configured) html += `<div class="row"><button class="btn ghost danger" type="button" id="csRemove">${t('Disconnect from Claude')}</button></div>`;
+    if (st.configured) html += `<div class="row"><button class="btn primary" type="button" id="csRemove">${t('Fix: use the online connector')}</button></div><p class="small">${t('Removes the local Study Notebook connector from the Claude app and restarts Claude. Your notebook stays as it is. Then use the online connector in new chats.')}</p>`;
     if (claudeMsg) html += `<p class="status ${claudeMsg.kind}">${claudeMsg.html}</p>`;
     html += `<details class="cs-more"><summary>${t('Other ways to connect')}</summary><p class="small">${t('You can also install Study Notebook as a Claude extension file. Open the file with the Claude app, or drag it into the Claude window.')}</p><button class="btn ghost" type="button" id="showMcpb">${t('Show the extension file')}</button></details>`;
     box.innerHTML = html;
@@ -1184,7 +1184,15 @@
       let n = 0; const poll = setInterval(async () => { n++; const s2 = await D.claudeStatus(); if (s2.seen > Date.now() - 120000 || n > 30 || !dlg.open) { clearInterval(poll); if (dlg.open) { claudeMsg = null; drawClaude(d); } } }, 2000);
     };
     if (q('#showMcpb')) q('#showMcpb').onclick = () => D.connectorReveal();
-    if (q('#csRemove')) q('#csRemove').onclick = async () => { await D.claudeDisconnect(); claudeMsg = null; drawClaude(d); toast(t('Disconnected. Restart Claude to finish.')); };
+    if (q('#csRemove')) q('#csRemove').onclick = async () => {
+      q('#csRemove').disabled = true;
+      await D.claudeDisconnect();
+      const r = await D.claudeRestart();
+      claudeMsg = r.ok
+        ? { kind: '', html: esc(t('Local connector removed. Claude is restarting; use the online connector in new chats.')) }
+        : { kind: 'bad', html: esc(t('Local connector removed. Close Claude from the tray icon (right-click → Quit) and open it again.')) };
+      drawClaude(d);
+    };
   }
   function claudeSection() { return `<section class="group"><h3>${t('Claude app')}</h3><div class="box">${claudeBox()}</div></section>`; }
   function wireClaude(d) { drawClaude(d); }
