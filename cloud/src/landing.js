@@ -95,7 +95,7 @@ export function landingPage({ ready }) {
     ${[
       ['While you study', [['Notes from any Claude chat', 'automatic', 'Web, phone or desktop; one Google sign-in.'], ['Going deeper on one step', 'only that part', 'The rest of the explanation stays as it was.'], ['A whole PDF or slides', 'one save', 'Every topic and sub-topic in place at once.'], ['Hebrew and English', 'both', 'Right-to-left notes, formulas kept in Latin form.']]],
       ['Before the exam', [['Practice questions', '2–4 per topic', 'Flashcards, multiple choice, fill in the blank.'], ['Spaced repetition', 'included', 'What you get wrong comes back sooner.'], ['Exam-date plan', 'a daily list', 'Set the date; the app spreads the review.'], ['Formula sheet', 'one page', 'Every formula in the course, collected.']]],
-      ['Where it works', [['Phone and laptop browser', 'included', 'Sign in and your notebook is there.'], ['Windows app with lecture recording', 'free download', 'Transcribed on your computer.'], ['Price', 'free', 'No card, no trial, no ads.']]]
+      ['Where it works', [['Phone and laptop browser', 'included', 'Sign in and your notebook is there.'], ['Windows and Mac app', 'free download', 'Lecture recording on Windows, transcribed on your computer.'], ['Price', 'free', 'No card, no trial, no ads.']]]
     ].map(([g, rows]) => `<table class="price"><caption>${g}</caption><tbody>${rows.map(([n, v, d]) => `<tr><th scope="row">${n}</th><td class="lead" aria-hidden="true"></td><td class="val">${v}</td><td class="ds">${d}</td></tr>`).join('')}</tbody></table>`).join('')}
   </div>
 </section>
@@ -134,7 +134,7 @@ export function landingPage({ ready }) {
     </div>
     <div class="pc-right">
       <div class="stamp">${img('phone-dark', '', 800, 1000, 'loading="lazy"')}</div>
-      <ul class="addr"><li><a href="/app/">Open your notebook</a></li><li><a href="${RELEASES}">The Windows app</a></li><li><a href="/privacy">Privacy</a></li><li><a href="${SOURCE}">Source and feedback</a></li></ul>
+      <ul class="addr"><li><a href="/app/">Open your notebook</a></li><li><a href="${RELEASES}">The Windows and Mac app</a></li><li><a href="/privacy">Privacy</a></li><li><a href="${SOURCE}">Source and feedback</a></li></ul>
     </div>
     <p class="imprint">Study Notebook · Free · Not affiliated with the Hebrew University of Jerusalem or Anthropic</p>
   </div>

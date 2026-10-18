@@ -3,23 +3,31 @@
 // installed copy that was built with a "publish" setting; otherwise it stays off.
 const fs = require('fs');
 const path = require('path');
-const { app } = require('electron');
+const { app, shell } = require('electron');
+
+// The Mac app isn't signed with an Apple developer certificate yet, and macOS only lets a signed app
+// replace itself. So on a Mac the app tells the student a new version is out and opens its download.
+const MANUAL = process.platform === 'darwin';
 
 function create({ log, notify, progress }) {
-  const st = { enabled: false, state: 'idle', version: '', current: app.getVersion(), size: 0, done: 0, total: 0, bps: 0, installWhenReady: false };
+  const st = { enabled: false, state: 'idle', version: '', current: app.getVersion(), size: 0, done: 0, total: 0, bps: 0, installWhenReady: false, url: '' };
   let lastSent = 0;
   let updater = null;
   try {
     const cfg = path.join(process.resourcesPath || '', 'app-update.yml');
     if (app.isPackaged && fs.existsSync(cfg)) {
+      const yml = fs.readFileSync(cfg, 'utf8');
+      const owner = (yml.match(/^owner:\s*(\S+)/m) || [])[1], repo = (yml.match(/^repo:\s*(\S+)/m) || [])[1];
+      const dmg = v => (owner && repo ? `https://github.com/${owner}/${repo}/releases/download/v${v}/Study-Notebook-${v}-${process.arch === 'arm64' ? 'arm64' : 'x64'}.dmg` : '');
       updater = require('electron-updater').autoUpdater;
-      updater.autoDownload = true;
-      updater.autoInstallOnAppQuit = true;   // installs the next time the app closes
+      updater.autoDownload = !MANUAL;
+      updater.autoInstallOnAppQuit = !MANUAL;   // installs the next time the app closes
       updater.logger = null;
       // Every change of state goes to the window, so Settings updates by itself.
       const push = () => { if (progress) progress({ ...st }); };
       updater.on('checking-for-update', () => { st.state = 'checking'; push(); });
       updater.on('update-available', i => {
+        if (MANUAL) { st.state = 'manual'; st.version = i.version; st.url = dmg(i.version); log.info('update.available', { version: i.version, manual: true }); push(); return; }
         st.state = 'available'; st.version = i.version; st.done = 0; st.total = 0; st.bps = 0;
         st.size = (i.files && i.files[0] && i.files[0].size) || 0;   // full installer size
         log.info('update.available', { version: i.version, size: st.size });
@@ -49,6 +57,7 @@ function create({ log, notify, progress }) {
     // "Update now": installs at once if the download is done, otherwise as soon as it is.
     install: () => {
       if (!updater) return;
+      if (st.state === 'manual') { if (st.url) shell.openExternal(st.url); return; }   // Mac: open the new version's download
       if (st.state === 'ready') updater.quitAndInstall(true, true);
       else if (st.state === 'available') { st.installWhenReady = true; if (progress) progress({ ...st }); }
     },

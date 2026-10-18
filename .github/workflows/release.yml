@@ -26,8 +26,41 @@ jobs:
           V=$(node -p "require('./package.json').version")
           ls -la dist
           FILES="dist/Study-Notebook-Setup-$V.exe dist/Study-Notebook-Setup-$V.exe.blockmap dist/latest.yml"
+          cat > notes.md <<EOF
+          Study Notebook $V
+
+          **Windows:** download \`Study-Notebook-Setup-$V.exe\`. Installed apps update themselves.
+
+          **Mac:** download \`Study-Notebook-$V-arm64.dmg\` for a Mac with Apple silicon (M1 or newer), or \`Study-Notebook-$V-x64.dmg\` for an Intel Mac. Open it and drag Study Notebook into Applications.
+          The first time you open it, macOS may say it can't check the app for malicious software (it isn't signed with an Apple developer certificate yet). Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**. You only do this once.
+          When a new version is out, the Mac app tells you and opens its download. Lecture recording works on Windows for now.
+          EOF
           if gh release view "v$V" > /dev/null 2>&1; then
             gh release upload "v$V" $FILES --clobber
+            gh release edit "v$V" --notes-file notes.md
           else
-            gh release create "v$V" $FILES --title "Study Notebook $V" --notes "Study Notebook $V. Installed apps update themselves." --target "$GITHUB_SHA"
+            gh release create "v$V" $FILES --title "Study Notebook $V" --notes-file notes.md --target "$GITHUB_SHA"
           fi
+
+  # The Mac app, added to the same release once the Windows job has created it.
+  mac:
+    needs: windows
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Build the Claude connector
+        run: npm run build:connector
+      - name: Build the Mac apps (Apple silicon and Intel)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # no Apple developer certificate yet: signed ad hoc
+        run: npx electron-builder --mac dmg zip --arm64 --x64 --publish never
+      - name: Add them to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V=$(node -p "require('./package.json').version")
+          ls -la dist
+          gh release upload "v$V" dist/Study-Notebook-$V-arm64.dmg dist/Study-Notebook-$V-x64.dmg dist/Study-Notebook-$V-arm64.zip dist/Study-Notebook-$V-x64.zip dist/latest-mac.yml --clobber

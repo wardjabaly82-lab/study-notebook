@@ -275,11 +275,18 @@
     'Drag over a drawing to erase it': 'גררו מעל ציור כדי למחוק אותו', 'Thin': 'דק', 'Medium': 'בינוני', 'Thick': 'עבה', 'Undo (Ctrl+Z)': 'ביטול (Ctrl+Z)',
     'My highlights and drawings': 'ההדגשות והציורים שלי',
     // Notes font
+    // Mac updates are downloaded by hand
+    'Version {v} is out. Download it, open it and drag Study Notebook into Applications to replace this one. Your notes stay as they are.': 'גרסה {v} יצאה. הורידו אותה, פתחו אותה וגררו את Study Notebook לתיקיית היישומים (Applications) במקום הגרסה הזו. הסיכומים נשארים כמו שהם.',
+    'Download it, open it and drag Study Notebook into Applications to replace this one. Your notes stay as they are.': 'הורידו אותה, פתחו אותה וגררו את Study Notebook לתיקיית היישומים (Applications) במקום הגרסה הזו. הסיכומים נשארים כמו שהם.',
+    'Download version {v}': 'הורדת גרסה {v}', 'Download': 'הורדה',
     'Notes font': 'גופן הסיכומים', 'Book': 'ספר', 'Clean': 'נקי', 'Notes font: the typeface your notes are written in.': 'גופן הסיכומים: האות שבה כתובים הסיכומים שלכם.'
   };
 
   function fill(s, v) { return v ? s.replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined ? v[k] : m)) : s; }
-  function t(key, vars) { return fill(lang === 'he' && HE[key] !== undefined ? HE[key] : key, vars); }
+  // On a Mac, shortcuts read ⌘ and ⌥ (the keys work with either Ctrl or ⌘ everywhere in the app).
+  const MAC = (window.desktop && window.desktop.platform === 'darwin') || (!(window.desktop && window.desktop.platform) && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || ''));
+  const keys = s => (MAC ? String(s).replace(/Ctrl\+/g, '⌘').replace(/\bCtrl\b/g, '⌘').replace(/Alt\+/g, '⌥').replace(/\bAlt\b/g, '⌥') : s);
+  function t(key, vars) { return keys(fill(lang === 'he' && HE[key] !== undefined ? HE[key] : key, vars)); }
   function tn(n, one, many, vars) { return t(n === 1 ? one : many, Object.assign({ n }, vars || {})); }
   function set(l) { try { localStorage.setItem('sn-ui-lang', l === 'he' ? 'he' : 'en'); } catch (e) {} }
 
@@ -292,5 +299,5 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', applyStatic); else applyStatic();
 
-  window.I18N = { lang, t, tn, set, HE };
+  window.I18N = { lang, t, tn, set, HE, keys, mac: MAC };
 })();
