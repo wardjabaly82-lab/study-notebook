@@ -147,7 +147,7 @@ const RO = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, o
 const WRITE = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
 
 function respond(op, out) {
-  const where = out.live ? 'The Study Notebook app is open and shows this change now.' : 'The Study Notebook app is closed; this will show the next time it opens.';
+  const where = out.live ? 'The Study Notebook app is open and shows this change now.' : 'Saved to the notebook file. If the Study Notebook app is open, it shows the change within a few seconds; otherwise the next time it opens.';
   const text = JSON.stringify(out.result, null, 2) + (READ_ONLY.has(op) ? '' : '\n\n' + where);
   return { content: [{ type: 'text', text }] };
 }

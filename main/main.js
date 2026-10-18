@@ -136,19 +136,62 @@ ipcMain.handle('settings:get', () => publicSettings());
 
 /* ---------- notes data ---------- */
 
-ipcMain.handle('store:load', async () => {
-  // If the Claude connector is in the middle of saving (app was closed), wait for it.
+/* Changes made to the notes file by someone else. The Claude connector writes the file itself when
+   it can't reach this window. The open window must pick those changes up (so they show) and must
+   never save its older copy over them. `known` is each note as this app last read or wrote it. */
+let known = null;
+const snapshot = docs => { const m = new Map(); for (const [p, v] of Object.entries(docs || {})) m.set(p, JSON.stringify(v)); return m; };
+const waitForConnectorSave = async () => {
   const lock = path.join(dataDir(), 'notebook-data.lock');
   for (let i = 0; i < 30 && fs.existsSync(lock); i++) await new Promise(r => setTimeout(r, 100));
-  return loadData();
+};
+// What is in the file now but not in `known`; afterwards `known` matches the file.
+function outsideChanges() {
+  if (!known) return [];
+  const d = readJson(DATA(), null);
+  if (!d || !d.docs) return [];
+  const changes = [];
+  for (const [p, v] of Object.entries(d.docs)) if (known.get(p) !== JSON.stringify(v)) changes.push({ path: p, data: v });
+  for (const p of known.keys()) if (!(p in d.docs)) changes.push({ path: p, data: null });
+  known = snapshot(d.docs);
+  return changes;
+}
+function showOutsideChanges(changes) {
+  if (!changes.length || !win || win.isDestroyed() || !pageReady) return;
+  log.info('notes.outside_change', { count: changes.length });
+  forwardToPage('__file_apply', { changes }).catch(() => {});
+}
+function watchNotesFile() {
+  fs.watchFile(DATA(), { interval: 1500 }, (cur, prev) => {
+    if (cur.mtimeMs === prev.mtimeMs) return;
+    waitForConnectorSave().then(() => showOutsideChanges(outsideChanges()));
+  });
+}
+
+ipcMain.handle('store:load', async () => {
+  // If the Claude connector is in the middle of saving (app was closed), wait for it.
+  await waitForConnectorSave();
+  const d = loadData();
+  known = snapshot(d.docs);
+  return d;
 });
 
-ipcMain.handle('store:save', (ev, text) => {
+ipcMain.handle('store:save', async (ev, text) => {
   try {
     if (typeof text !== 'string' || text.length > MAX_DATA_BYTES) throw new Error('data too large');
-    const bad = validateData(JSON.parse(text));
+    const data = JSON.parse(text);
+    // Keep anything Claude wrote to the file meanwhile, and show it in the window.
+    await waitForConnectorSave();
+    const outside = outsideChanges();
+    if (outside.length && data && data.docs) {
+      for (const c of outside) { if (c.data === null) delete data.docs[c.path]; else data.docs[c.path] = c.data; }
+      text = JSON.stringify(data);
+      showOutsideChanges(outside);
+    }
+    const bad = validateData(data);
     if (bad) throw new Error('invalid data shape');
     writeAtomic(DATA(), text);
+    known = snapshot(data.docs);
     if (cloud) cloud.soon();
     return { ok: true };
   } catch (e) { log.error('store.save.failed', { error: e && e.message }); return { ok: false }; }
@@ -276,6 +319,7 @@ function applyToFile(op, args) {
       for (const w of writes) { if (w.data === null) delete d.docs[w.path]; else d.docs[w.path] = w.data; }
       const bad = validateData(d); if (bad) throw new Error(bad);
       writeAtomic(DATA(), JSON.stringify({ version: 1, savedAt: Date.now(), docs: d.docs }));
+      if (known) known = snapshot(d.docs);
     }
     return { ok: true, result };
   } catch (e) {
@@ -297,6 +341,7 @@ async function applyCloudChanges(changes) {
   for (const c of changes) { if (c.data === null) delete d.docs[c.path]; else d.docs[c.path] = c.data; }
   const bad = validateData(d); if (bad) throw new Error(bad);
   writeAtomic(DATA(), JSON.stringify({ version: 1, savedAt: Date.now(), docs: d.docs }));
+  if (known) known = snapshot(d.docs);
 }
 const seal = pw => safeStorage.isEncryptionAvailable() ? { key: safeStorage.encryptString(pw).toString('base64'), sealed: true } : { key: Buffer.from(pw, 'utf8').toString('base64'), sealed: false };
 const unseal = c => { try { return c.sealed ? safeStorage.decryptString(Buffer.from(c.key, 'base64')) : Buffer.from(c.key, 'base64').toString('utf8'); } catch (e) { return ''; } };
@@ -586,7 +631,8 @@ app.whenReady().then(() => {
   const t = loadSettings().theme; if (['system', 'light', 'dark'].includes(t)) nativeTheme.themeSource = t;
   createWindow();
   const stopLink = link.start(dataDir(), handleConnector, log);
-  app.on('will-quit', () => { stopLink(); engine.stop(); });
+  watchNotesFile();
+  app.on('will-quit', () => { stopLink(); engine.stop(); fs.unwatchFile(DATA()); });
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 });
 

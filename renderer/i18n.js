@@ -247,7 +247,26 @@
     '{s} sec': '{s} שנ׳',
     'This happens once. You can keep using the app. If you cancel, the download continues from the same point next time.': 'זה קורה פעם אחת. אפשר להמשיך להשתמש באפליקציה. אם תבטלו, ההורדה תמשיך מאותה נקודה בפעם הבאה.',
     'Download paused. It continues from the same point next time you record.': 'ההורדה הושהתה. היא תמשיך מאותה נקודה בהקלטה הבאה.',
-    'Courses': 'קורסים', 'Contents': 'תוכן העניינים'
+    'Courses': 'קורסים', 'Contents': 'תוכן העניינים',
+    // Welcome and empty course: Claude in any chat
+    'Only on this computer: connect the Claude desktop app instead': 'רק במחשב הזה: לחבר את אפליקציית Claude למחשב במקום',
+    'Open Claude (any chat: web, phone or the desktop app) and study a topic from {course}: ask questions until it makes sense. Then say:': 'פתחו את Claude (בכל צ׳אט: באתר, בטלפון או באפליקציה למחשב) ולמדו נושא מ{course}: שאלו עד שהכול ברור. ואז אמרו:',
+    'Claude saved 1 change to your notes': 'Claude שמר שינוי אחד בסיכומים',
+    'Claude saved {n} changes to your notes': 'Claude שמר {n} שינויים בסיכומים',
+    // Claude app panel
+    'Fix: use the online connector': 'תיקון: שימוש בחיבור המקוון',
+    'Removes the local Study Notebook connector from the Claude app and restarts Claude. Your notebook stays as it is. Then use the online connector in new chats.': 'מסיר את החיבור המקומי של Study Notebook מאפליקציית Claude ומפעיל את Claude מחדש. המחברת נשארת כמו שהיא. אחר כך משתמשים בחיבור המקוון בצ׳אטים חדשים.',
+    'Local connector removed. Claude is restarting; use the online connector in new chats.': 'החיבור המקומי הוסר. Claude מופעל מחדש; בצ׳אטים חדשים משתמשים בחיבור המקוון.',
+    'Local connector removed. Close Claude from the tray icon (right-click → Quit) and open it again.': 'החיבור המקומי הוסר. סגרו את Claude מהסמל במגש (קליק ימני ← Quit) ופתחו אותו שוב.',
+    // Print: choosing pages, where the PDF went
+    'Pages': 'עמודים',
+    'All pages': 'כל העמודים',
+    'Page {n}': 'עמוד {n}',
+    '{n} of {total} pages selected': '{n} מתוך {total} עמודים נבחרו',
+    'Keep at least one page selected.': 'צריך להשאיר לפחות עמוד אחד.',
+    'Page numbers look wrong. Try something like 1-3, 5.': 'מספרי העמודים לא תקינים. נסו למשל 1-3, 5.',
+    'Saved to {path}': 'נשמר ב-{path}',
+    'Show in folder': 'הצגה בתיקייה'
   };
 
   function fill(s, v) { return v ? s.replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined ? v[k] : m)) : s; }

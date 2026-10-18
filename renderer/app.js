@@ -357,7 +357,7 @@
       const say = c.lang === 'he' ? `“תשמור את מה שלמדנו ב-Study Notebook, בקורס ${num || c.name}”` : `“Save what we covered in Study Notebook, course ${num || c.name}”`;
       sheet.setAttribute('dir', UIDIR);
       sheet.innerHTML = `<div class="empty"><h2>${t('This notebook is empty')}</h2>
-        <p>${esc(t('Open the Claude desktop app and study a topic from {course}: ask questions until it makes sense. Then say:', { course: c.name }))}</p>
+        <p>${esc(t('Open Claude (any chat: web, phone or the desktop app) and study a topic from {course}: ask questions until it makes sense. Then say:', { course: c.name }))}</p>
         <p class="say" dir="auto">${esc(say)}</p>
         <p class="small">${esc(t('Claude saves the final explanation here, under the right topic.'))}</p>
         ${lastClaude() ? `<button class="btn primary" type="button" data-act="auto-save">${t('Set up auto-saving for this course')}</button>` : `<button class="btn primary" type="button" data-act="settings">${t('Connect to Claude')}</button>`}</div>`;
@@ -1302,7 +1302,7 @@
 
   /* ---------- online notebook: use Study Notebook in any Claude chat ---------- */
   const DOC_RX = /^data\/users\/local\/[A-Za-z0-9_-]{1,64}(\/(sections|sources|lectures|cards)\/[A-Za-z0-9_-]{1,64})?$/;
-  async function applyCloud(changes) {
+  async function applyCloud(changes, from) {
     try {
       if (!Array.isArray(changes)) throw new Error('bad');
       let notes = 0; const fresh = {};
@@ -1316,7 +1316,9 @@
       for (const [cid, ids] of Object.entries(fresh)) autoPractice(cid, ids);
       dirty = true; await saveNow();
       if (!S.editing && !(S.view === 'practice' && S.prac)) render(); else { renderSide(); renderContents(); }
-      if (notes) toast(tn(notes, '1 change came in from your online notebook', '{n} changes came in from your online notebook'));
+      if (notes) toast(from === 'claude'
+        ? tn(notes, 'Claude saved 1 change to your notes', 'Claude saved {n} changes to your notes')
+        : tn(notes, '1 change came in from your online notebook', '{n} changes came in from your online notebook'));
       return { ok: true, result: { applied: changes.length } };
     } catch (e) { return { ok: false, error: 'Couldn’t apply the online changes.' }; }
   }
@@ -1410,16 +1412,20 @@
         <div class="row"><button class="btn ghost" type="button" data-close>${t('Later')}</button></div></div>`, d => drawCloud(d));
       store('sn-welcomed', '1'); return;
     }
+    // Sign in with Google first: it works in every Claude chat (web, phone, desktop). The Claude
+    // desktop app's local link is the fallback for this computer only.
     openDlg('welcome', `<div class="dlg-in">${head(t('Welcome to Study Notebook'), t('Your notes, written by Claude while you study.'))}
-      <p class="small" style="font-size:14px;color:var(--ink)">${t('Study with Claude in the Claude app as usual. When you understand something, Claude saves the final explanation here, under the right course and topic. You can also record lectures here and practice for exams.')}</p>
-      ${claudeBox()}
-      <div class="row"><button class="btn ghost" type="button" data-close>${t('Later')}</button></div></div>`, d => drawClaude(d));
+      <p class="small" style="font-size:14px;color:var(--ink)">${t('Study with Claude as usual, in any chat. When you understand something, Claude saves the final explanation here, under the right course and topic, and makes practice questions for it.')}</p>
+      <div class="box" id="cloudBox"><p class="small">${t('Checking…')}</p></div>
+      <details class="cs-more"><summary>${t('Only on this computer: connect the Claude desktop app instead')}</summary>${claudeBox()}</details>
+      <div class="row"><button class="btn ghost" type="button" data-close>${t('Later')}</button></div></div>`, d => { drawCloud(d); drawClaude(d); });
     store('sn-welcomed', '1');
   }
 
   /* ================= Claude, live ================= */
   D.onConnectorOp(async (op, args) => {
     if (op === '__cloud_apply') return applyCloud(args && args.changes);
+    if (op === '__file_apply') return applyCloud(args && args.changes, 'claude');   // Claude wrote the notes file directly
     try {
       const { result, writes } = Ops.run(docs, op, args);
       for (const w of writes) { if (w.data === null) delete docs[w.path]; else docs[w.path] = w.data; }
