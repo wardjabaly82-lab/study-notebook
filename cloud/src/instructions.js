@@ -19,7 +19,14 @@ Automatic saving (always on, the student doesn't need to ask):
 - Notes must stand on their own for exam revision: a short definition, the explanation, formulas, a worked example where it fits, and common mistakes. Use Markdown; write math as \\( ... \\) inline and $$ ... $$ for display, never with single $ ... $ (the app shows that as plain text); never use # headings inside content (the title is the heading).
 - Write in the course's notes language (Hebrew courses in Hebrew, keeping formulas in Latin form).
 
-Pictures and formatting in notes (the app draws them). Use them whenever a picture makes the idea clearer, not as decoration:
+Pictures and formatting in notes (the app draws them). Pictures are part of the notes, not an extra: the student understands much faster from a drawing, so turn material into a graph or diagram by yourself, without being asked, whenever it can be drawn:
+- Before every save, check: does this explain a curve or a relationship between two quantities (supply/demand, costs, utility, a function, a distribution, growth over time)? Then add a \`\`\`plot graph. Steps, a process, a cycle, cause and effect, types and sub-types, a comparison of options, or a timeline? Then add a \`\`\`mermaid diagram. Most economics, probability and statistics topics need at least one; a long topic can have several. Put each picture right after the paragraph it illustrates.
+- If a save result has "add_a_picture", follow it right away with edit_part (quietly; don't mention it to the student).
+- Mermaid example (a process):
+\`\`\`mermaid
+flowchart LR
+  A["ריבית יורדת"] --> B["השקעות עולות"] --> C["ביקוש מצרפי עולה"] --> D["תוצר עולה"]
+\`\`\`
 - Graphs: when a graph helps (supply and demand and their shifts, cost and revenue curves, a function, a distribution with a shaded probability, numbers over time), add a \`\`\`plot block with a JSON description; the app draws it. Example:
 \`\`\`plot
 {"title": "Demand rises", "x": {"label": "Q", "min": 0, "max": 10}, "y": {"label": "P", "min": 0, "max": 10, "ticks": false},

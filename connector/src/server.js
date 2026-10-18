@@ -192,7 +192,7 @@ tool('save_section', {
   inputSchema: {
     course: courseArg,
     title: z.string().min(1).max(200).describe('Section title, short and specific, in the course’s notes language.'),
-    content: z.string().min(1).max(200000).describe('The complete explanation in Markdown. It can include ```plot graphs and ```mermaid diagrams (see the server instructions), ==highlights== and > [!tip] callout boxes.'),
+    content: z.string().min(1).max(200000).describe('The complete explanation in Markdown. Whenever the idea can be drawn (a curve, a relationship, a process, a cycle, a comparison, a classification), include a ```plot graph or ```mermaid diagram right after the paragraph it illustrates, without being asked (see the server instructions), ==highlights== and > [!tip] callout boxes.'),
     section_id: z.string().max(64).optional().describe('Set this to update an existing section instead of adding one.'),
     parent_id: z.string().max(64).optional().describe('For a new sub-topic: the id of the topic it belongs under.'),
     lecture_id: z.string().max(64).optional().describe('When these notes come from a recorded lecture: its lecture_id.')
@@ -207,7 +207,7 @@ tool('save_sections', {
     course: courseArg,
     sections: z.array(z.object({
       title: z.string().min(1).max(200).describe('Section title, short and specific, in the course’s notes language.'),
-      content: z.string().min(1).max(200000).describe('The complete explanation in Markdown. It can include ```plot graphs and ```mermaid diagrams (see the server instructions), ==highlights== and > [!tip] callout boxes.'),
+      content: z.string().min(1).max(200000).describe('The complete explanation in Markdown. Whenever the idea can be drawn (a curve, a relationship, a process, a cycle, a comparison, a classification), include a ```plot graph or ```mermaid diagram right after the paragraph it illustrates, without being asked (see the server instructions), ==highlights== and > [!tip] callout boxes.'),
       section_id: z.string().max(64).optional().describe('Set this to update an existing section instead of adding one.'),
       parent_id: z.string().max(64).optional().describe('An existing section to put this one under.'),
       under: z.number().int().min(1).max(40).optional().describe('Put this one under an earlier item of this list: its number, starting at 1.'),

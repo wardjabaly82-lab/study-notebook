@@ -241,6 +241,8 @@
           out.writes.push({ path: `${BASE}/${c.id}/lectures/${id}`, data: { ...ld, notesAt: now, sections: secs } });
         }
       }
+      const hint = pictureHint(String(args.content || ''));
+      if (hint) out.result.add_a_picture = hint;
       return out;
     },
 
@@ -264,9 +266,11 @@
         catch (e) { throw new OpError(`Item ${i + 1}: ${e.message}`); }
         for (const w of out.writes) { if (w.data === null) delete work[w.path]; else work[w.path] = w.data; writes.set(w.path, w); }
         ids.push(out.result.section_id);
-        saved.push({ item: i + 1, action: out.result.action, section_id: out.result.section_id, path: out.result.path });
+        saved.push({ item: i + 1, action: out.result.action, section_id: out.result.section_id, path: out.result.path, ...(out.result.add_a_picture ? { needs_picture: true } : {}) });
       });
-      return { result: { course: c.name, saved }, writes: [...writes.values()] };
+      const result = { course: c.name, saved };
+      if (saved.some(x => x.needs_picture)) result.add_a_picture = 'The items marked needs_picture have no graph or diagram, but look like they could use one. Where a ```plot graph or ```mermaid diagram would make an item easier to understand, add it now with edit_part. Don\'t mention this to the student.';
+      return { result, writes: [...writes.values()] };
     },
 
     // Replaces one passage of a section (e.g. with a deeper explanation of just that part),
@@ -297,6 +301,18 @@
       return { result: { action: 'updated', part: true, course: c.name, section_id: s.id, title: s.title, path: pathOf(secs, s.id), revision: updated.rev }, writes: [{ path: `${BASE}/${c.id}/sections/${s.id}`, data: updated }] };
     }
   };
+
+  // A nudge for Claude: notes about something that can be drawn, but with no graph or diagram in them.
+  const DRAWABLE = [
+    [/(ביקוש|היצע|demand|supply|עקומ|curve|שיווי.?משקל|equilibri|גרף|graph|פונקצי|function|התפלגות|distribution|צפיפות|density|נגזרת|derivative|שולי|marginal|עלות|cost|הכנס|revenue|תועלת|utility|אדישות|indifference|תקציב|budget|אינפלציה|inflation|תוצר|gdp|מגמה|trend|regression|רגרסיה|שטח|probabilit|הסתברות)/i, 'a ```plot graph'],
+    [/(שלב|step|תהליך|process|מחזור|cycle|זרימ|flow|סוגים|types of|סיווג|classif|היררכ|hierarch|עץ|tree|ציר זמן|timeline|לעומת|versus|\bvs\b|השוואה|compar|גורם|cause|→|=>)/i, 'a ```mermaid diagram']
+  ];
+  function pictureHint(body) {
+    if (/```(plot|mermaid)/.test(body) || body.length < 300) return null;
+    const kinds = DRAWABLE.filter(([re]) => re.test(body)).map(([, k]) => k);
+    if (!kinds.length) return null;
+    return `This section has no picture yet. If ${kinds.join(' or ')} would make it easier to understand, add it now with edit_part (find = the paragraph it illustrates, replace = that paragraph followed by the picture). Don't mention this to the student.`;
+  }
 
   function saveSection(docs, { course, title, content, section_id, parent_id }, now) {
       const c = findCourse(docs, course);
