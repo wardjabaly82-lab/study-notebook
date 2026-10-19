@@ -12,6 +12,7 @@ import * as P from './pages.js';
 import { landingPage } from './landing.js';
 import { over, address, tooMany } from './limits.js';
 import { firewall, strike } from './firewall.js';
+import * as trace from './trace.js';
 
 const FAVICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 26"><rect x="4" y="2.5" width="18" height="21" rx="3" fill="#0071e3"/><rect x="7" y="2.5" width="2" height="21" fill="#005bb8"/><path d="M12 9h7M12 13h7M12 17h4.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>`;
 const json = (data, status = 200, headers = {}) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
@@ -167,7 +168,8 @@ async function account(request, env, url, user) {
   if (request.method === 'GET' && url.pathname === '/account') {
     const [notes, grants, pcs, owner, uses] = await Promise.all([store.countDocs(env, user.id), accountGrants(env, user.id), computers(env, user.id), store.isOwner(env, user.id), store.lastUses(env, user.id)]);
     const legacy = owner ? await store.legacyInfo(env) : null;   // only the site's owner can claim the old password notebook
-    return P.html(P.accountPage({ user: u, token: await formToken(request), notes, grants, computers: pcs, legacy, uses, msg: url.searchParams.get('done') || '' }));
+    const steps = owner && url.searchParams.get('trace') === '1' ? await trace.recent(env) : null;   // owner only: recent connection steps
+    return P.html(P.accountPage({ user: u, token: await formToken(request), notes, grants, computers: pcs, legacy, uses, steps, msg: url.searchParams.get('done') || '' }));
   }
   if (request.method !== 'POST') return redirect('/account');
   const form = await request.formData();
@@ -317,7 +319,15 @@ const SIGN_IN = p => p.startsWith('/auth/') || p === '/link' || p === '/register
 
 export default {
   async fetch(request, env, ctx) {
-    const url = new URL(request.url);
+    const url = new URL(request.url), kind = trace.wants(request, url);
+    const copy = kind && (url.pathname === '/token' || url.pathname === '/register') ? request.clone() : request;   // the body is read again for the trace
+    const res = await handle(request, env, ctx, url);
+    if (kind) ctx.waitUntil(trace.note(env, copy, url, res, kind));
+    return res;
+  }
+};
+async function handle(request, env, ctx, url) {
+  {
     const p = url.pathname, ip = address(request);
     const refused = firewall(request, env, ip);
     if (refused) return refused;
@@ -327,4 +337,4 @@ export default {
     if (url.pathname === '/auth/app/token' && request.method === 'POST') return appToken(request, env);
     return providerFor(url.origin).fetch(request, env, ctx);
   }
-};
+}

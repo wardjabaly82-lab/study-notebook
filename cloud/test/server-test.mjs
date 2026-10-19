@@ -137,6 +137,14 @@ console.log('Gemini connects to the same notebook, next to Claude');
   await g.close();
 }
 
+console.log('Connection trace (owner only)');
+{
+  const tr = await (await alice.go('/account?trace=1')).text();
+  ok(/Connection steps/.test(tr) && /\/token/.test(tr) && /authorization_code/.test(tr) && /gemini\.google\.com/.test(tr) && !/code_verifier|access_token/.test(tr), 'the site owner can see recent connection steps (no codes or tokens shown)');
+  const trb = await (await bob.go('/account?trace=1')).text();
+  ok(!/Connection steps/.test(trb), 'other students can’t see it');
+}
+
 console.log('Desktop app links for Alice');
 const verifier = b64u(crypto.randomBytes(32)), challenge = b64u(crypto.createHash('sha256').update(verifier).digest()), st = b64u(crypto.randomBytes(18));
 r = await alice.go(`/link?port=45678&state=${st}&challenge=${challenge}&device=Jeff%E2%80%99s%20laptop`); let html = await r.text();

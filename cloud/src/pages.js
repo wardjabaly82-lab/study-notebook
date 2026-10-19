@@ -67,6 +67,7 @@ ul.rows .d{color:var(--muted);font-size:14px}
 ul.rows form{margin-inline-start:auto}
 ul.rows .btn{min-height:36px;padding:6px 14px;font-size:14px;border-radius:10px;background:var(--page)}
 .empty{color:var(--muted);font-size:15px;margin:8px 0 0}
+.trace{font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere}.trace div{padding:3px 0;border-bottom:1px solid var(--line,#ddd)}
 .steps{margin:10px 0 0;padding-inline-start:22px;font-size:15px;line-height:1.5}.steps li{margin:6px 0}
 .prose h2{margin-top:32px}.prose ul{padding-inline-start:1.2em;margin:0 0 12px}.prose li{margin:4px 0}
 details{margin-top:12px}
@@ -107,7 +108,7 @@ export function signInPage(next, { title = 'Sign in to Study Notebook', text = '
 
 export function claudeConsentPage({ user, handle, token, clientName, redirectHost, app, isClaude, loopback, here }) {
   const who = app === 'gemini' ? 'Gemini' : app === 'claude' || !clientName || /claude/i.test(clientName) ? 'Claude' : esc(clientName);
-  const known = isClaude || (app === 'gemini' && /(^|\.)google\.com$/.test(String(redirectHost || '')));
+  const known = isClaude || (app === 'gemini' && /(^|\.)(google\.com|googleusercontent\.com)$/.test(String(redirectHost || '')));
   return layout(`Connect ${who}`, `<div class="sheet"><h1>Connect ${who} to your notebook</h1>
   <p>${who} will read your notes and save new ones while you study with it. You can disconnect it any time on your account page.</p>
   ${whoRow(user, here)}
@@ -130,7 +131,7 @@ export function messagePage(title, text, { user = null, action = '' } = {}) {
 }
 
 const when = ms => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-export function accountPage({ user, token, notes, grants, computers, legacy, msg, uses = {} }) {
+export function accountPage({ user, token, notes, grants, computers, legacy, msg, uses = {}, steps = null }) {
   const grantRows = grants.length ? `<ul class="rows">${grants.map(g => `<li><div><div class="t">${esc(g.client || 'Claude')}</div><div class="d">Connected ${when(g.createdAt * 1000)}${uses[g.app === 'gemini' ? 'gemini' : 'claude'] ? ` · last used ${when(uses[g.app === 'gemini' ? 'gemini' : 'claude'])}` : ' · not used yet'}</div></div>
     <form method="post" action="/account/revoke"><input type="hidden" name="t" value="${esc(token)}"><input type="hidden" name="grant" value="${esc(g.id)}"><button class="btn">Disconnect</button></form></li>`).join('')}</ul>`
     : `<p class="empty">Not connected yet. It takes about a minute, once:</p>
@@ -145,6 +146,7 @@ export function accountPage({ user, token, notes, grants, computers, legacy, msg
   return layout('Your account', `<div class="sheet">
   <h1>Your account</h1>
   ${msg ? `<p class="okmsg" role="status">${esc(msg)}</p>` : ''}
+  ${steps ? `<h2>Connection steps (last 2 days)</h2><div class="trace">${steps.length ? steps.map(e => `<div><b>${esc(new Date(e.t).toISOString().slice(5, 19).replace('T', ' '))}</b> ${esc(e.m)} ${esc(e.p)} → ${esc(e.s)}${e.err ? ` <b>${esc(e.err)}</b> ${esc(e.why || '')}` : ''}${e.back ? ` · app: ${esc(e.back)}` : ''}${e.name ? ` · ${esc(e.name)}` : ''}${e.grant ? ` · ${esc(e.grant)}` : ''}${e.auth ? ` · auth ${esc(e.auth)}` : ''}${e.basic ? ' · basic' : ''}${e.scope ? ` · scope ${esc(e.scope)}` : ''}${e.client ? ` · client ${esc(String(e.client).slice(0, 24))}` : ''} · <i>${esc(e.ua)}</i></div>`).join('') : '<p class="empty">Nothing yet.</p>'}</div>` : ''}
   ${whoRow(user, '/account')}
   <p>${notes} ${notes === 1 ? 'item' : 'items'} in your notebook. <a href="/app/">Open notebook</a></p>
   <h2>Claude and Gemini</h2>${grantRows}

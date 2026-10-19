@@ -2,6 +2,9 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.17.2', date: '2026-10-19',
+    en: ['Connecting Gemini: the notebook recognises Gemini’s sign-in, and keeps a short private record of the connection steps so problems can be found.'],
+    he: ['חיבור Gemini: המחברת מזהה את ההתחברות של Gemini, ושומרת רישום קצר ופרטי של שלבי החיבור כדי שאפשר יהיה למצוא תקלות.'] },
   { v: '1.17.1', date: '2026-10-19',
     en: ['Click anywhere outside a window (Settings, a course’s details, printing…) to close it; you don’t need the ×.', 'What’s new opens on top of Settings, and closing it takes you back to Settings.'],
     he: ['לחיצה בכל מקום מחוץ לחלון (הגדרות, פרטי קורס, הדפסה…) סוגרת אותו; לא צריך את ה-×.', '”מה חדש” נפתח מעל ההגדרות, וכשסוגרים אותו חוזרים להגדרות.'] },
