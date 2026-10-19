@@ -31,6 +31,8 @@
   function apply(note, s) {
     if (!note || !s || !window.SNMarks) return;
     SNMarks.clearHighlights(note);
+    // what Claude just changed goes under the student's own highlights, so their colours stay on top
+    const ch = api && api.fresh ? api.fresh(s) : null; if (ch) SNMarks.applyChanges(note, ch);
     SNMarks.applyHighlights(note, s.marks);
     SNMarks.drawInk(note, s.ink);
     if (drawing) attachOverlay(note);
@@ -53,7 +55,7 @@
       bar.addEventListener('mousedown', e => e.preventDefault());   // keep the text selected
     }
     const s = api.section(note.dataset.note); if (!s) return;
-    const over = range ? [...note.querySelectorAll('mark.uh')].filter(m => range.intersectsNode(m)).map(m => m.dataset.hl) : [];
+    const over = range ? [...note.querySelectorAll('mark.uh:not(.uh-fresh)')].filter(m => range.intersectsNode(m)).map(m => m.dataset.hl) : [];
     const ids = hlId ? [hlId] : [...new Set(over)];
     bar.innerHTML = SNMarks.HL.map(c => `<button type="button" class="mb-c uh-${c}" data-c="${c}" title="${esc(T(hlId ? 'Change to {color}' : 'Highlight {color}', { color: T(HLNAME[c]) }))}" aria-label="${esc(T(hlId ? 'Change to {color}' : 'Highlight {color}', { color: T(HLNAME[c]) }))}"></button>`).join('')
       + `<span class="mb-sep"></span><button type="button" class="mb-x mb-note" data-comment title="${esc(T('Add a comment'))}"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-8l-4 3.5V16H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>${esc(T(noteOfMark(s, hlId) ? 'Edit comment' : 'Comment'))}</button>`
@@ -91,7 +93,7 @@
     if (drawing || (e && e.target && e.target.closest && e.target.closest('.mark-bar, .draw-bar, .note-pop, input, textarea, button, a, select'))) return;
     const sel = getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) {
-      const m = e && e.target && e.target.closest && e.target.closest('mark.uh');
+      const m = e && e.target && e.target.closest && e.target.closest('mark.uh:not(.uh-fresh)');
       if (m && noteOf(m) && api.section(noteOf(m).dataset.note)) {
         if (m.classList.contains('uh-note')) { hideBar(); return openComment(noteOf(m), m.dataset.hl, null, m.getBoundingClientRect()); }
         return showBar(m.getBoundingClientRect(), noteOf(m), null, m.dataset.hl);

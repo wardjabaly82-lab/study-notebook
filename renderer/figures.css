@@ -120,3 +120,9 @@ svg.ink .mk, svg.ink-preview .mk { opacity: .4; mix-blend-mode: var(--mk-blend);
 /* Ink saver printouts: everything in shades of grey */
 body.ink { --fig-blue: #333; --fig-red: #333; --fig-green: #333; --fig-orange: #333; --fig-purple: #333; --fig-teal: #333; --fig-pink: #333; --fig-brown: #333; --fig-gray: #777; --fig-black: #111; --fig-yellow: #777;
   --hl-yellow: #e6e6e6; --hl-green: #e6e6e6; --hl-blue: #e6e6e6; --hl-pink: #e6e6e6; --hl-orange: #e6e6e6; }
+
+/* What Claude just changed in a topic (until the student presses Got it) */
+mark.uh-fresh { background: color-mix(in srgb, #23a978 15%, transparent); box-shadow: inset 0 -2px 0 color-mix(in srgb, #23a978 60%, transparent); border-radius: 2px; cursor: text; }
+mark.uh-fresh mark.uh { box-shadow: inset 0 -2px 0 color-mix(in srgb, #23a978 60%, transparent); }
+.fresh-fig { outline: 2px dashed color-mix(in srgb, #23a978 65%, transparent); outline-offset: 6px; border-radius: 6px; }
+@media print { mark.uh-fresh { background: none; box-shadow: none; } .fresh-fig { outline: 0; } }

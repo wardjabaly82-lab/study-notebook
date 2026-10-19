@@ -73,7 +73,7 @@
     return null;
   }
   function wrap(idx, start, end, h) {
-    const color = HL.includes(h.c) || h.c === 'note' ? h.c : 'yellow';
+    const color = HL.includes(h.c) || h.c === 'note' || h.c === 'fresh' ? h.c : 'yellow';
     const note = typeof h.n === 'string' && h.n.trim() ? h.n.trim() : '';
     let last = null;
     for (const seg of idx.nodes) {
@@ -95,6 +95,7 @@
   }
   function clearHighlights(root) {
     root.querySelectorAll('mark.uh').forEach(m => m.replaceWith(...m.childNodes));
+    root.querySelectorAll('.fresh-fig').forEach(f => f.classList.remove('fresh-fig'));
     root.normalize();
   }
   function applyHighlights(root, list) {
@@ -166,5 +167,45 @@
     }
   }
 
-  window.SNMarks = { blocks, textIndex, applyHighlights, clearHighlights, quoteFromRange, drawInk, strokeSvg, HL, INK };
+
+  /* ---------- what Claude changed ---------- */
+  // When Claude (or Gemini) deepens or fixes part of a topic, the sentences and pictures that are new
+  // compared with the version before are found here, so the page can mark them for the student.
+  const FENCE = /^```[^\n]*\n[\s\S]*?^```[ \t]*$/gm;
+  function plain(md) {
+    return String(md || '')
+      .replace(FENCE, '\n')
+      .replace(/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)/g, '')       // formulas aren't part of the text that gets marked
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/==(?:\{\w+\})?([^=\n]+?)==/g, '$1').replace(/\*\*|__|~~|`/g, '').replace(/(^|\s)[*_](?=\S)|(?<=\S)[*_](?=\s|$|[.,;:!?])/g, '$1')
+      .replace(/^[ \t]*(#{1,6}|>|[-*+]|\d+[.)])[ \t]+/gm, '').replace(/^\s*\[!\w+\][^\n]*$/gm, '').replace(/\|/g, ' ').replace(/^[ \t]*:?-{3,}:?[ \t]*$/gm, '');
+  }
+  const sentences = txt => txt.split(/\n+|(?<=[.!?…:;])\s+/).map(x => x.trim()).filter(x => /[\p{L}\p{N}]{2,}/u.test(x));
+  const key = x => x.toLowerCase().replace(/[\s.,;:!?()"'“”׳״\-–—]+/g, ' ').trim();
+  function changes(prev, cur) {
+    if (typeof prev !== 'string' || typeof cur !== 'string' || prev === cur) return null;
+    const before = new Set(sentences(plain(prev)).map(key));
+    const all = plain(cur), parts = [];
+    let from = 0;
+    for (const sn of sentences(all)) {
+      const at = all.indexOf(sn, from); if (at >= 0) from = at + sn.length;
+      if (before.has(key(sn)) || key(sn).length < 3) continue;
+      parts.push({ q: sn, pre: at > 0 ? all.slice(Math.max(0, at - 32), at) : '', suf: at >= 0 ? all.slice(at + sn.length, at + sn.length + 32) : '', c: 'fresh' });
+    }
+    const fences = md => String(md || '').match(FENCE) || [];
+    const old = new Set(fences(prev).map(f => f.replace(/\s+/g, ' ').trim()));
+    const figs = []; fences(cur).forEach((f, i) => { if (!old.has(f.replace(/\s+/g, ' ').trim())) figs.push(i); });
+    return parts.length || figs.length ? { parts: parts.slice(0, 80), figs } : null;
+  }
+  // Marks what changed on a note: the new sentences, and the new pictures (by their order on the page).
+  function applyChanges(root, ch) {
+    if (!root || !ch) return 0;
+    let n = applyHighlights(root, ch.parts);
+    if (ch.figs.length) {
+      const blocksIn = [...root.querySelectorAll('pre, figure.fig')].filter(el => !el.parentElement.closest('pre, figure.fig'));
+      for (const i of ch.figs) if (blocksIn[i]) { blocksIn[i].classList.add('fresh-fig'); n++; }
+    }
+    return n;
+  }
+  window.SNMarks = { changes, applyChanges, blocks, textIndex, applyHighlights, clearHighlights, quoteFromRange, drawInk, strokeSvg, HL, INK };
 })();

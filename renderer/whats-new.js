@@ -2,6 +2,9 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.20.0', date: '2026-10-20',
+    en: ['When Claude or Gemini deepens or fixes part of a topic, the new text (and any new picture) is marked in green on the page, so you see exactly what changed. Press “Got it” next to the topic’s title to clear the marks. Your own highlights stay on top.'],
+    he: ['כש־Claude או Gemini מעמיקים או מתקנים חלק מנושא, הטקסט החדש (וכל תמונה חדשה) מסומן בירוק בדף, כך שרואים בדיוק מה השתנה. לוחצים ”הבנתי” ליד כותרת הנושא כדי להסיר את הסימון. הסימונים שלכם נשארים מעל.'] },
   { v: '1.19.0', date: '2026-10-19',
     en: ['A new home screen, “Today”, for all your courses: tonight’s study plan across every course, a button to continue the topic you were reading, what Claude or Gemini saved today, how ready each course is for its exam, and your study time this week. The app opens on it; click Today at the top of the shelf to come back.', 'Highlighting a word inside a highlighted sentence now colours just that word; the rest of the sentence keeps its highlight.'],
     he: ['מסך בית חדש, ”היום”, לכל הקורסים: התוכנית להערב בכל הקורסים, כפתור להמשיך את הנושא שקראתם, מה ש־Claude או Gemini שמרו היום, כמה כל קורס מוכן למבחן, וזמן הלימוד השבוע. האפליקציה נפתחת בו; לוחצים ”היום” בראש המדף כדי לחזור אליו.', 'סימון מילה בתוך משפט מסומן צובע עכשיו רק את המילה; שאר המשפט נשאר מסומן.'] },

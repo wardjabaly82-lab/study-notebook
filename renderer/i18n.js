@@ -7,6 +7,9 @@
   if (lang !== 'he') lang = 'en';
 
   const HE = {
+    'Hide the marks': 'הסתרת הסימון',
+    'What Claude changed is marked': 'מה ש־Claude שינה מסומן',
+    'What Gemini changed is marked': 'מה ש־Gemini שינה מסומן',
     'Today: all your courses': 'היום: כל הקורסים שלך',
     'Good morning': 'בוקר טוב',
     'Good afternoon': 'צהריים טובים',

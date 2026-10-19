@@ -430,12 +430,24 @@
   }
   { let raf = 0; $('sheetWrap').addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; if (S.view === 'notes') markReading(); }); }, { passive: true }); }
 
+  // What Claude (or Gemini) changed the last time it edited a topic: shown marked on the page until
+  // the student presses Got it (kept on this device), for up to two weeks.
+  const freshCache = new Map();
+  function freshOf(s) {
+    if (!s || s.source !== 'claude' || (s.rev || 1) < 2 || typeof s.prevContent !== 'string' || !window.SNMarks || !SNMarks.changes) return null;
+    if ((s.updatedAt || 0) < Date.now() - 14 * 86400000 || store('sn-fresh-seen:' + s.id) === String(s.updatedAt)) return null;
+    const k = s.id + '|' + s.updatedAt + '|' + String(s.content || '').length;
+    if (!freshCache.has(k)) { if (freshCache.size > 300) freshCache.clear(); freshCache.set(k, SNMarks.changes(s.prevContent, s.content)); }
+    return freshCache.get(k);
+  }
   function sectionHtml(c, s, d, secs) {
     const tag = ['h2', 'h3', 'h4', 'h4', 'h4'][Math.min(d, 4)];
     const recent = (s.updatedAt || 0) > Date.now() - 86400000;
     const gem = s.by === 'gemini';
     const badge = s.source === 'claude' && recent ? `<span class="tag">${esc((s.rev || 1) > 1 ? t(gem ? 'Updated by Gemini {when}' : 'Updated by Claude {when}', { when: ago(s.updatedAt) }) : t(gem ? 'Saved by Gemini {when}' : 'Saved by Claude {when}', { when: ago(s.updatedAt) }))}</span>`
       : (s.rev || 1) > 1 && recent ? `<span class="tag plain">${esc(t('Edited {when}', { when: ago(s.updatedAt) }))}</span>` : '';
+    const fr = freshOf(s);
+    const freshTag = fr ? `<button type="button" class="tag fresh-tag" data-act="fresh-seen" data-id="${esc(s.id)}" title="${esc(t('Hide the marks'))}"><span class="fresh-sw" aria-hidden="true"></span>${esc(t(gem ? 'What Gemini changed is marked' : 'What Claude changed is marked'))}<b>${esc(t('Got it'))}</b></button>` : '';
     const crumb = S.search ? crumbs(secs, s.id) : [];
     let body;
     if (S.editing === s.id) {
@@ -449,7 +461,7 @@
     const confirm = S.confirmDel === s.id ? `<div class="confirm" role="alert" dir="${UIDIR}"><span>${esc(kids(secs, s.id).length ? t('Delete “{title}” and everything under it? This can’t be undone.', { title: s.title }) : t('Delete “{title}”? This can’t be undone.', { title: s.title }))}</span><button class="btn danger solid" type="button" data-act="do-delete" data-id="${esc(s.id)}">${t('Delete')}</button><button class="btn ghost" type="button" data-act="cancel-delete">${t('Keep it')}</button></div>` : '';
     return `<section class="sec d${Math.min(d, 4)}${S.flash.has(s.id) ? ' flash' : ''}" id="sec-${esc(s.id)}">
       ${crumb.length ? `<div class="crumb" dir="auto">${crumb.map(esc).join(' › ')}</div>` : ''}
-      <div class="sec-head"><${tag} dir="auto"><span class="title-mark">${esc(s.title)}</span></${tag}>${badge}
+      <div class="sec-head"><${tag} dir="auto"><span class="title-mark">${esc(s.title)}</span></${tag}>${badge}${freshTag}
         <span class="sec-tools" dir="${UIDIR}">
           <button type="button" data-act="edit" data-id="${esc(s.id)}">${t('Edit')}</button>
           ${s.prevContent != null ? `<button type="button" data-act="undo" data-id="${esc(s.id)}" title="${esc(t('Go back to the version before the last change'))}">${t('Undo last change')}</button>` : ''}
@@ -933,6 +945,7 @@
         render(); flash(id); toast(t('Went back to the previous version. Press “Undo last change” again to switch back.')); break;
       }
       case 'add-sub': addSection(id); break;
+      case 'fresh-seen': { const sec = secs[id]; if (sec) store('sn-fresh-seen:' + id, String(sec.updatedAt)); render(); break; }
       case 'add-topic': S.menu = false; addSection(null); break;
       case 'export-md': S.menu = false; renderTop(); exportMd(); break;
       case 'course-settings': S.menu = false; renderTop(); openCourseSettings(); break;
@@ -1839,6 +1852,7 @@
   if (window.SNMarkup) SNMarkup.init({
     t: (k, v) => t(k, v),
     section: id => { const c = course(); const d = c && docs[secPath(c.id, id)]; return d ? { id, ...d } : null; },
+    fresh: s => freshOf(s),
     // Highlights and drawings are saved with the topic; they don't count as editing its text.
     save: (id, patch) => { const c = course(); const p = c && secPath(c.id, id); if (!p || !docs[p]) return null; docs[p] = { ...docs[p], ...patch, marksAt: Date.now() }; save(); return { id, ...docs[p] }; },
     onDrawingChange: () => { const b = $('drawBtn'); if (b) { const on = SNMarkup.isDrawing(); b.setAttribute('aria-pressed', String(on)); b.classList.toggle('on', on); } }
