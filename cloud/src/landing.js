@@ -107,7 +107,7 @@ export function landingPage({ ready }) {
     <div class="qs" data-reveal>
       ${[
         ['Do I need a paid Claude plan?', 'No. Free Claude accounts can add one custom connector, and that is all Study Notebook needs.'],
-        ['How do I connect Claude?', 'Sign in here, then in the notebook open Settings and copy the address. In Claude: Customize → Connectors → Add custom connector, paste it, press Connect and sign in with Google.'],
+        ['How do I connect Claude?', 'Sign in here, then open Settings in the notebook: it walks you through it in three steps (copy the address, add it in Claude’s connector settings, click Connect) and turns green when Claude is connected.'],
         ['Can other students see my notes?', 'No. Each notebook belongs to one Google account, and every request is checked against it. The <a href="/privacy">privacy page</a> says plainly what is kept and who could see it.'],
         ['Does it work in Hebrew?', 'Yes. Hebrew notes are set right to left with formulas in Latin form, and the app’s buttons come in Hebrew or English.'],
         ['Can I record lectures?', `In the free <a href="${RELEASES}">Windows app</a>. Speech is transcribed on your own computer; the audio never leaves it.`],

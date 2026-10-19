@@ -4,7 +4,7 @@
    - Claude connects as a custom connector at /mcp; the student signs in with Google once.
    - The desktop app links to the account (/link) and syncs with it (/sync/*).
    Every note is stored with its owner's account id, and every read and write is scoped to it. */
-import { OAuthProvider } from '@cloudflare/workers-oauth-provider';
+import { OAuthProvider, getOAuthApi } from '@cloudflare/workers-oauth-provider';
 import { McpHandler, VERSION } from './mcp.js';
 import * as store from './store.js';
 import { currentUser, startGoogle, finishGoogle, signInResponse, signOutResponse, formToken, formOk, readCookie, safeNext, googleReady, devGoogle, SESSION_COOKIE } from './auth.js';
@@ -34,7 +34,7 @@ async function api(request, env, url, user) {
   if (request.method !== 'GET' && request.headers.get('X-Study-Notebook') !== '1') return json({ error: 'forbidden' }, 403);
   if (route === 'me' && request.method === 'GET') {
     let claude = 0; try { claude = (await env.OAUTH_PROVIDER.listUserGrants(user.id)).items.length; } catch (e) {}
-    return json({ email: user.email, name: user.name || '', mcp: `${url.origin}/mcp`, claude, rev: await store.currentRev(env, user.id) });
+    return json({ email: user.email, name: user.name || '', mcp: `${url.origin}/mcp`, claude, claudeLast: await store.claudeLastUse(env, user.id), rev: await store.currentRev(env, user.id) });
   }
   if (route === 'docs' && request.method === 'GET') {
     const rev = await store.currentRev(env, user.id);
@@ -70,7 +70,8 @@ async function sync(request, env, url) {
   if (await over(env.RL_USER, 'u:' + user.id)) return tooMany();
   const route = url.pathname.replace(/^\/sync\/?/, '');
   if (route === 'ping' && request.method === 'GET') {
-    return json({ ok: true, version: VERSION, rev: await store.currentRev(env, user.id), docs: await store.countDocs(env, user.id), email: user.email, name: user.name || '', mcp: `${url.origin}/mcp` });
+    let claude = 0; try { claude = (await (env.OAUTH_PROVIDER || getOAuthApi(providerOptions(url.origin), env)).listUserGrants(user.id)).items.length; } catch (e) {}
+    return json({ ok: true, version: VERSION, rev: await store.currentRev(env, user.id), docs: await store.countDocs(env, user.id), email: user.email, name: user.name || '', mcp: `${url.origin}/mcp`, claude, claudeLast: await store.claudeLastUse(env, user.id) });
   }
   if (route === 'pull' && request.method === 'GET') {
     const since = Math.max(0, Number(url.searchParams.get('since')) || 0);
@@ -145,9 +146,9 @@ async function computers(env, uid) {
 async function account(request, env, url, user) {
   const u = { ...user, mcp: `${url.origin}/mcp` };
   if (request.method === 'GET' && url.pathname === '/account') {
-    const [notes, grants, pcs, owner] = await Promise.all([store.countDocs(env, user.id), accountGrants(env, user.id), computers(env, user.id), store.isOwner(env, user.id)]);
+    const [notes, grants, pcs, owner, claudeLast] = await Promise.all([store.countDocs(env, user.id), accountGrants(env, user.id), computers(env, user.id), store.isOwner(env, user.id), store.claudeLastUse(env, user.id)]);
     const legacy = owner ? await store.legacyInfo(env) : null;   // only the site's owner can claim the old password notebook
-    return P.html(P.accountPage({ user: u, token: await formToken(request), notes, grants, computers: pcs, legacy, msg: url.searchParams.get('done') || '' }));
+    return P.html(P.accountPage({ user: u, token: await formToken(request), notes, grants, computers: pcs, legacy, claudeLast, msg: url.searchParams.get('done') || '' }));
   }
   if (request.method !== 'POST') return redirect('/account');
   const form = await request.formData();
@@ -265,7 +266,11 @@ const Pages = {
 
 const providers = new Map();
 function providerFor(origin) {
-  if (!providers.has(origin)) providers.set(origin, new OAuthProvider({
+  if (!providers.has(origin)) providers.set(origin, new OAuthProvider(providerOptions(origin)));
+  return providers.get(origin);
+}
+function providerOptions(origin) {
+  return ({
     apiRoute: '/mcp',
     apiHandler: McpHandler,
     defaultHandler: Pages,
@@ -281,8 +286,7 @@ function providerFor(origin) {
     // Refused sign-in steps show up in the Cloudflare logs, so connection problems can be traced.
     onError: ({ code, description, internal }) => { console.warn('oauth', code, description, internal ? JSON.stringify(internal) : ''); },
     resourceMetadata: { resource: `${origin}/mcp`, authorization_servers: [origin], resource_name: 'Study Notebook' }
-  }));
-  return providers.get(origin);
+  });
 }
 
 // Requests that only fetch the site's own files (pages, scripts, fonts) aren't counted.

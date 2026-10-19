@@ -18,7 +18,7 @@
     if (!r.ok) throw new Error('http ' + r.status);
     return r.json();
   }
-  const status = () => ({ enabled: true, web: true, email: me && me.email, name: me && me.name, mcp: me && me.mcp, claude: me && me.claude, lastSync, syncing: !!pulling, error, online });
+  const status = () => ({ enabled: true, web: true, email: me && me.email, name: me && me.name, mcp: me && me.mcp, claude: me && me.claude, claudeLast: me && me.claudeLast, lastSync, syncing: !!pulling, error, online });
   const tell = () => { if (onCloud) onCloud(status()); };
 
   async function pull() {
@@ -99,7 +99,7 @@
     openDataFolder() {},
     openExternal(url) { window.open(url, '_blank', 'noopener'); },
     async copyText(text) { try { await navigator.clipboard.writeText(String(text)); return true; } catch (e) { return false; } },
-    async cloudStatus() { return status(); },
+    async cloudStatus() { if (!me || Date.now() - (me._at || 0) > 4000) { try { me = await req('/api/me'); me._at = Date.now(); } catch (e) {} } return status(); },
     async cloudSync() { await pull(); return status(); },
     async cloudDisconnect() { location.href = '/auth/signout'; },
     onCloudStatus(fn) { onCloud = fn; },

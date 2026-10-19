@@ -21,9 +21,26 @@ export async function ensureSchema(env) {
       hash TEXT PRIMARY KEY, uid TEXT NOT NULL, kind TEXT NOT NULL, label TEXT,
       created INTEGER NOT NULL, last_used INTEGER NOT NULL, expires INTEGER NOT NULL)`),
     env.DB.prepare('CREATE INDEX IF NOT EXISTS sessions_uid ON sessions(uid)'),
-    env.DB.prepare('CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)')
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)'),
+    // When the student's Claude last used the notebook (shown in the app, so they can see it works).
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS claude_use (uid TEXT PRIMARY KEY, last INTEGER NOT NULL)')
   ]);
   ready = true;
+}
+
+/* ---------- Claude's use of the notebook ---------- */
+const noted = new Map();   // written at most every 5 minutes per student (per server copy)
+export async function noteClaudeUse(env, uid) {
+  const now = Date.now();
+  if (now - (noted.get(uid) || 0) < 5 * 60 * 1000) return;
+  noted.set(uid, now); if (noted.size > 10000) noted.clear();
+  try {
+    await ensureSchema(env);
+    await env.DB.prepare('INSERT INTO claude_use (uid, last) VALUES (?1, ?2) ON CONFLICT(uid) DO UPDATE SET last = excluded.last').bind(uid, now).run();
+  } catch (e) { console.error('claude_use', e && e.message); }
+}
+export async function claudeLastUse(env, uid) {
+  try { await ensureSchema(env); const r = await env.DB.prepare('SELECT last FROM claude_use WHERE uid = ?1').bind(uid).first(); return r ? r.last : 0; } catch (e) { return 0; }
 }
 
 /* ---------- students ---------- */
@@ -65,6 +82,7 @@ export async function deleteUser(env, uid) {
   await env.DB.batch([
     env.DB.prepare('DELETE FROM notes WHERE uid = ?1').bind(uid),
     env.DB.prepare('DELETE FROM sessions WHERE uid = ?1').bind(uid),
+    env.DB.prepare('DELETE FROM claude_use WHERE uid = ?1').bind(uid),
     env.DB.prepare('DELETE FROM users WHERE id = ?1').bind(uid)
   ]);
 }

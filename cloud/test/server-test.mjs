@@ -125,9 +125,15 @@ const ping = await (await fetch(O + '/sync/ping', { headers: H })).json(); ok(pi
 const pull = await (await fetch(O + '/sync/pull?since=0', { headers: H })).json(); ok(pull.changes.some(c => c.data && c.data.content === 'Saved by Claude for Alice'), 'app pulls what Claude saved');
 ok((await fetch(O + '/sync/ping', { headers: { Authorization: 'Bearer nonsense-token-nonsense-token' } })).status === 401, 'made-up app token refused');
 
+console.log('Claude connection status');
+{
+  const p1 = await (await fetch(O + '/sync/ping', { headers: H })).json();
+  ok(p1.claude >= 1 && p1.claudeLast > Date.now() - 3600e3, `the app can see Claude is connected and when it last used the notebook (${p1.claude} connection)`);
+  const m1 = await api(alice, 'me'); ok(m1.claude >= 1 && m1.claudeLast > 0, 'the website sees it too');
+}
 console.log('Account page');
 r = await alice.go('/account'); html = await r.text();
-ok(/Your account/.test(html) && /Claude/.test(html) && /Jeff’s laptop/.test(html), 'lists Claude and the linked computer');
+ok(/Your account/.test(html) && /Claude/.test(html) && /Jeff’s laptop/.test(html) && /last used/.test(html), 'lists Claude (with when it was last used) and the linked computer');
 r = await alice.go('/api/export'); const exp = await r.json(); ok(exp.version === 1 && Object.keys(exp.docs).length === 12 && /attachment/.test(r.headers.get('content-disposition')), 'download my notes works');
 const tb = (await (await bob.go('/account')).text()).match(/name="t" value="([^"]+)"/)[1];
 r = await bob.go('/account/delete', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ t: 'forged', sure: '1' }) }); ok(r.status === 302 && (await api(bob, 'me')).email, 'delete with a forged form token does nothing');

@@ -1439,11 +1439,26 @@
       const who = s.name ? `${esc(s.name)}<span class="cs-sub">${esc(s.email)}</span>` : esc(s.email);
       const site = (s.mcp || '').replace(/\/mcp$/, '');
       box.innerHTML = `<div class="cs-state ${s.error ? '' : 'ok'}"><span class="cs-ico">${s.error ? '!' : '✓'}</span><div><b>${who}</b><p>${esc(s.error ? t(s.error) : WEB ? t('Your notes are saved online and sync with the app on your computer.') : when)}</p></div></div>
-        ${s.claude ? `<p class="small">${t('Claude is connected: in any chat (web, phone or desktop) it saves to this notebook.')}</p>`
-          : `<p class="small">${t('To use your notebook in any Claude chat (web, phone or desktop): in Claude open Customize → Connectors → Add custom connector, paste this address, press Add, then Connect and sign in with Google.')}</p>`}
-        <div class="row"><code class="path" dir="ltr">${esc(s.mcp || '')}</code><button class="btn" type="button" id="cloudCopy">${t('Copy address')}</button></div>
+        ${s.claude ? `<div class="cs-state ok claude-ok"><span class="cs-ico">✓</span><div><b>${t('Claude is connected')}</b><p>${esc(s.claudeLast ? t('Claude last used your notebook {when}.', { when: ago(s.claudeLast) }) : t('Claude hasn’t used it yet. Open a new chat in Claude and ask it to save something.'))}</p></div></div>
+            <p class="small">${t('In any chat (web, phone or desktop) Claude saves to this notebook. If a chat doesn’t find it: start a new chat, and check that Study Notebook is switched on in the chat’s connectors (the + or tools menu under the message box).')}</p>
+            <div class="row"><code class="path" dir="ltr">${esc(s.mcp || '')}</code><button class="btn" type="button" id="cloudCopy">${t('Copy address')}</button></div>`
+          : `<h4 class="cc-title">${t('Connect Claude (once, about a minute)')}</h4>
+            <ol class="cc-steps">
+              <li><span class="n">1</span><div><b>${t('Copy this address')}</b><div class="row"><code class="path" dir="ltr">${esc(s.mcp || '')}</code><button class="btn" type="button" id="cloudCopy">${t('Copy address')}</button></div></div></li>
+              <li><span class="n">2</span><div><b>${t('Add it in Claude')}</b><p>${t('Open Claude’s connector settings, click “Add custom connector”, name it Study Notebook, paste the address and click Add.')}</p><button class="btn" type="button" id="cloudOpenClaude">${t('Open Claude’s connectors')}</button></div></li>
+              <li><span class="n">3</span><div><b>${t('Click Connect')}</b><p>${t('Next to Study Notebook, click Connect. Choose your Google account ({email}), then click the blue Connect button on the Study Notebook page that opens.', { email: s.email })}</p></div></li>
+            </ol>
+            <p class="cc-wait" role="status"><span class="spin" aria-hidden="true"></span>${t('Waiting for Claude… this turns green by itself when it’s connected.')}</p>`}
         <div class="row">${WEB ? '' : `<button class="btn" type="button" id="cloudNow">${t('Sync now')}</button><button class="btn" type="button" id="cloudWeb">${t('Open on the web')}</button>`}<button class="btn" type="button" id="cloudAcct">${t('Your account')}</button><button class="btn ghost" type="button" id="cloudOff">${t('Sign out')}</button></div>`;
-      box.querySelector('#cloudCopy').onclick = () => copy(s.mcp, t('Address copied. Paste it in Claude → Customize → Connectors.'));
+      box.querySelector('#cloudCopy').onclick = () => copy(s.mcp, t('Address copied. Paste it in Claude’s connector settings.'));
+      const oc = box.querySelector('#cloudOpenClaude'); if (oc) oc.onclick = () => { copy(s.mcp, t('Address copied. Paste it in Claude’s connector settings.')); D.openExternal('https://claude.ai/settings/connectors'); };
+      // While Claude isn't connected yet, check every few seconds so the box turns green by itself.
+      clearTimeout(box._poll);
+      if (!s.claude) box._poll = setTimeout(async () => {
+        if (!box.isConnected) return;
+        const was = cloudState && cloudState.claude; cloudState = await D.cloudStatus();
+        if (box.isConnected && !box.dataset.busy) { paintCloud(box); if (!was && cloudState.claude) { toast(t('Claude is connected')); renderClaudePill(); } }
+      }, 4000);
       if (box.querySelector('#cloudNow')) box.querySelector('#cloudNow').onclick = () => D.cloudSync();
       if (box.querySelector('#cloudWeb')) box.querySelector('#cloudWeb').onclick = () => D.openExternal(site + '/app/');
       box.querySelector('#cloudAcct').onclick = () => D.openExternal(site + '/account');

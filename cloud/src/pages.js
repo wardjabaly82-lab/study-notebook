@@ -67,6 +67,7 @@ ul.rows .d{color:var(--muted);font-size:14px}
 ul.rows form{margin-inline-start:auto}
 ul.rows .btn{min-height:36px;padding:6px 14px;font-size:14px;border-radius:10px;background:var(--page)}
 .empty{color:var(--muted);font-size:15px;margin:8px 0 0}
+.steps{margin:10px 0 0;padding-inline-start:22px;font-size:15px;line-height:1.5}.steps li{margin:6px 0}
 .prose h2{margin-top:32px}.prose ul{padding-inline-start:1.2em;margin:0 0 12px}.prose li{margin:4px 0}
 details{margin-top:12px}
 summary{cursor:pointer;font-weight:600;color:var(--danger);min-height:44px;display:flex;align-items:center}
@@ -128,10 +129,14 @@ export function messagePage(title, text, { user = null, action = '' } = {}) {
 }
 
 const when = ms => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-export function accountPage({ user, token, notes, grants, computers, legacy, msg }) {
-  const grantRows = grants.length ? `<ul class="rows">${grants.map(g => `<li><div><div class="t">${esc(g.client || 'Claude')}</div><div class="d">Connected ${when(g.createdAt * 1000)}</div></div>
+export function accountPage({ user, token, notes, grants, computers, legacy, msg, claudeLast = 0 }) {
+  const grantRows = grants.length ? `<ul class="rows">${grants.map(g => `<li><div><div class="t">${esc(g.client || 'Claude')}</div><div class="d">Connected ${when(g.createdAt * 1000)}${claudeLast ? ` · last used ${when(claudeLast)}` : ' · not used yet'}</div></div>
     <form method="post" action="/account/revoke"><input type="hidden" name="t" value="${esc(token)}"><input type="hidden" name="grant" value="${esc(g.id)}"><button class="btn">Disconnect</button></form></li>`).join('')}</ul>`
-    : `<p class="empty">Not connected yet. In Claude: Customize → Connectors → Add custom connector, and paste <b>${esc(user.mcp)}</b>.</p>`;
+    : `<p class="empty">Not connected yet. It takes about a minute, once:</p>
+    <ol class="steps"><li>Copy this address: <b>${esc(user.mcp)}</b></li>
+      <li>In Claude, open the connector settings (Settings → Connectors, called Customize → Connectors in some versions), click <b>Add custom connector</b>, name it Study Notebook, paste the address and click Add.</li>
+      <li>Click <b>Connect</b> next to it, choose this Google account (${esc(user.email)}), then click the blue <b>Connect</b> on the Study Notebook page that opens.</li></ol>
+    <div class="actions"><a class="btn" href="https://claude.ai/settings/connectors" target="_blank" rel="noopener">Open Claude’s connectors</a></div>`;
   const pcRows = computers.length ? `<ul class="rows">${computers.map(c => `<li><div><div class="t">${esc(c.label || 'A computer')}</div><div class="d">Linked ${when(c.created)} · last synced ${when(c.last_used)}</div></div>
     <form method="post" action="/account/unlink"><input type="hidden" name="t" value="${esc(token)}"><input type="hidden" name="id" value="${esc(c.id)}"><button class="btn">Unlink</button></form></li>`).join('')}</ul>`
     : `<p class="empty">No computer linked. In the Study Notebook app: Settings → Sign in with Google.</p>`;

@@ -2,7 +2,7 @@
 import Ops from './notebook-ops.js';
 import { INSTRUCTIONS } from './instructions.js';
 import { over, MESSAGE } from './limits.js';
-import { loadDocs, writeDocs, userById, usage, QUOTA_BYTES } from './store.js';
+import { loadDocs, writeDocs, userById, usage, QUOTA_BYTES, noteClaudeUse } from './store.js';
 
 export const VERSION = '2.0.0';
 
@@ -77,6 +77,7 @@ export const McpHandler = {
   async fetch(request, env, ctx) {
     const uid = ctx && ctx.props && ctx.props.uid;
     if (!uid || !(await userById(env, uid))) return Response.json({ jsonrpc: '2.0', id: null, error: { code: -32001, message: 'This Study Notebook account no longer exists. Connect again.' } }, { status: 401, headers: { 'WWW-Authenticate': 'Bearer error="invalid_token"' } });
+    try { const job = noteClaudeUse(env, uid); if (ctx && ctx.waitUntil) ctx.waitUntil(job); else await job; } catch (e) {}
     if (await over(env.RL_USER, 'u:' + uid)) return Response.json({ jsonrpc: '2.0', id: null, error: { code: -32029, message: 'Study Notebook: ' + MESSAGE } }, { status: 429, headers: { 'Retry-After': '60' } });
     if (request.method !== 'POST') return new Response('Use POST for MCP requests.', { status: 405, headers: { Allow: 'POST' } });
     let body; try { body = await request.json(); } catch (e) { return Response.json({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }, { status: 400 }); }

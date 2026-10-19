@@ -356,8 +356,10 @@ function startCloud() {
   cloud = CloudSync.create({ dataDir, loadData, applyChanges: applyCloudChanges, log, onStatus: s => { if (win && !win.isDestroyed()) win.webContents.send('cloud:status', s); } });
   cloud.configure(cloudConfig());
 }
-ipcMain.handle('cloud:status', () => {
-  const st = cloud ? cloud.status() : { enabled: false };
+ipcMain.handle('cloud:status', async () => {
+  let st = cloud ? cloud.status() : { enabled: false };
+  // is Claude connected? (asked again at most every few seconds while the account box is open)
+  if (cloud && st.enabled && Date.now() - (st.checkedAt || 0) > 4000) st = await Promise.race([cloud.check(), new Promise(r => setTimeout(() => r(cloud.status()), 6000))]);
   const c = loadSettings().cloud;
   if (!st.enabled && c && c.kind !== 'google' && c.url) st.url = c.url;   // shows "sign in with Google instead"
   return st;
