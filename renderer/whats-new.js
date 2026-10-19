@@ -2,6 +2,9 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.16.1', date: '2026-10-19',
+    en: ['A side panel that popped out from the edge now closes when the mouse leaves the app or you switch to another app; it no longer gets stuck open.'],
+    he: ['פאנל שקפץ מהקצה נסגר עכשיו כשהעכבר יוצא מהאפליקציה או כשעוברים לאפליקציה אחרת, ולא נשאר תקוע פתוח.'] },
   { v: '1.16.0', date: '2026-10-19',
     en: ['After every update, this window shows what’s new. You can open it again any time from Settings → What’s new.'],
     he: ['אחרי כל עדכון החלון הזה מראה מה חדש. אפשר לפתוח אותו שוב מתי שרוצים בהגדרות ← מה חדש.'] },

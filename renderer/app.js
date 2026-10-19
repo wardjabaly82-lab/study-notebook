@@ -293,6 +293,12 @@
   function wirePeek() {
     const body = $('main').querySelector('.body');
     for (const p of ['contents', 'slip']) { const d = document.createElement('div'); d.className = 'edge-peek edge-' + p; d.dataset.panel = p; d.setAttribute('aria-hidden', 'true'); body.appendChild(d); }
+    // The mouse left the app window, or another app came to the front: close any pop-up panel.
+    const away = () => { if (!document.documentElement.hasAttribute('data-peek')) return; clearTimeout(peekTimer); peekTimer = setTimeout(() => peek(null), 200); };
+    document.addEventListener('mouseout', e => { if (!e.relatedTarget) away(); });
+    document.documentElement.addEventListener('mouseleave', away);
+    window.addEventListener('blur', () => peek(null));
+    document.addEventListener('visibilitychange', () => { if (document.hidden) peek(null); });
     document.addEventListener('mouseover', e => {
       const strip = e.target.closest && e.target.closest('.edge-peek');
       if (strip) { if (isHidden(strip.dataset.panel)) peek(strip.dataset.panel); return; }
