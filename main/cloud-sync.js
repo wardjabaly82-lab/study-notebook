@@ -127,7 +127,7 @@ function create({ dataDir, loadData, applyChanges, log, onStatus, fetchImpl }) {
     // Asks the account whether Claude is connected and when it last used the notebook.
     async check() {
       if (!cfg) return { ...status };
-      try { const r = await api('GET', '/sync/ping'); Object.assign(status, { claude: Number(r.claude) || 0, claudeLast: Number(r.claudeLast) || 0, checkedAt: Date.now() }); emit(); } catch (e) {}
+      try { const r = await api('GET', '/sync/ping'); Object.assign(status, { claude: Number(r.claude) || 0, claudeLast: Number(r.claudeLast) || 0, gemini: Number(r.gemini) || 0, geminiLast: Number(r.geminiLast) || 0, checkedAt: Date.now() }); emit(); } catch (e) {}
       return { ...status };
     },
     soon() { if (!cfg) return; clearTimeout(timer); timer = setTimeout(() => run(), 3000); },

@@ -23,25 +23,44 @@ export async function ensureSchema(env) {
     env.DB.prepare('CREATE INDEX IF NOT EXISTS sessions_uid ON sessions(uid)'),
     env.DB.prepare('CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)'),
     // When the student's Claude last used the notebook (shown in the app, so they can see it works).
-    env.DB.prepare('CREATE TABLE IF NOT EXISTS claude_use (uid TEXT PRIMARY KEY, last INTEGER NOT NULL)')
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS claude_use (uid TEXT PRIMARY KEY, last INTEGER NOT NULL)'),
+    // the same for each assistant (claude, gemini, ...)
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS assistant_use (uid TEXT NOT NULL, app TEXT NOT NULL, last INTEGER NOT NULL, PRIMARY KEY (uid, app))')
   ]);
   ready = true;
 }
 
-/* ---------- Claude's use of the notebook ---------- */
-const noted = new Map();   // written at most every 5 minutes per student (per server copy)
-export async function noteClaudeUse(env, uid) {
-  const now = Date.now();
-  if (now - (noted.get(uid) || 0) < 5 * 60 * 1000) return;
-  noted.set(uid, now); if (noted.size > 10000) noted.clear();
+/* ---------- when each assistant (Claude, Gemini) last used the notebook ---------- */
+// Which assistant a connection belongs to, from where its sign-in returns to (or its name).
+export function assistantOf(host, name) {
+  const h = String(host || '').toLowerCase(), n = String(name || '').toLowerCase();
+  if (/(^|\.)claude\.(ai|com)$/.test(h) || /claude|anthropic/.test(n)) return 'claude';
+  if (/(^|\.)(google\.com|googleusercontent\.com|gemini\.google)$/.test(h) || /gemini|google/.test(n)) return 'gemini';
+  return 'other';
+}
+const noted = new Map();   // written at most every 5 minutes per student and assistant (per server copy)
+export async function noteUse(env, uid, app = 'claude') {
+  const now = Date.now(), key = uid + ':' + app;
+  if (now - (noted.get(key) || 0) < 5 * 60 * 1000) return;
+  noted.set(key, now); if (noted.size > 10000) noted.clear();
   try {
     await ensureSchema(env);
-    await env.DB.prepare('INSERT INTO claude_use (uid, last) VALUES (?1, ?2) ON CONFLICT(uid) DO UPDATE SET last = excluded.last').bind(uid, now).run();
-  } catch (e) { console.error('claude_use', e && e.message); }
+    await env.DB.prepare('INSERT INTO assistant_use (uid, app, last) VALUES (?1, ?2, ?3) ON CONFLICT(uid, app) DO UPDATE SET last = excluded.last').bind(uid, app, now).run();
+  } catch (e) { console.error('assistant_use', e && e.message); }
 }
-export async function claudeLastUse(env, uid) {
-  try { await ensureSchema(env); const r = await env.DB.prepare('SELECT last FROM claude_use WHERE uid = ?1').bind(uid).first(); return r ? r.last : 0; } catch (e) { return 0; }
+export const noteClaudeUse = (env, uid) => noteUse(env, uid, 'claude');
+export async function lastUses(env, uid) {
+  const out = { claude: 0, gemini: 0 };
+  try {
+    await ensureSchema(env);
+    const { results } = await env.DB.prepare('SELECT app, last FROM assistant_use WHERE uid = ?1').bind(uid).all();
+    for (const r of results) out[r.app === 'gemini' ? 'gemini' : 'claude'] = Math.max(out[r.app === 'gemini' ? 'gemini' : 'claude'], r.last);
+    const old = await env.DB.prepare('SELECT last FROM claude_use WHERE uid = ?1').bind(uid).first();   // kept before assistants were told apart
+    if (old) out.claude = Math.max(out.claude, old.last);
+  } catch (e) {}
+  return out;
 }
+export async function claudeLastUse(env, uid) { return (await lastUses(env, uid)).claude; }
 
 /* ---------- students ---------- */
 
@@ -83,6 +102,7 @@ export async function deleteUser(env, uid) {
     env.DB.prepare('DELETE FROM notes WHERE uid = ?1').bind(uid),
     env.DB.prepare('DELETE FROM sessions WHERE uid = ?1').bind(uid),
     env.DB.prepare('DELETE FROM claude_use WHERE uid = ?1').bind(uid),
+    env.DB.prepare('DELETE FROM assistant_use WHERE uid = ?1').bind(uid),
     env.DB.prepare('DELETE FROM users WHERE id = ?1').bind(uid)
   ]);
 }

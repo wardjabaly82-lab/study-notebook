@@ -105,12 +105,13 @@ export function signInPage(next, { title = 'Sign in to Study Notebook', text = '
   <p class="muted small" style="margin-top:16px">Only your name and email address come from Google. <a href="/privacy">Privacy</a></p></div>`);
 }
 
-export function claudeConsentPage({ user, handle, token, clientName, redirectHost, isClaude, loopback, here }) {
-  const who = clientName && !/claude/i.test(clientName) ? esc(clientName) : 'Claude';
+export function claudeConsentPage({ user, handle, token, clientName, redirectHost, app, isClaude, loopback, here }) {
+  const who = app === 'gemini' ? 'Gemini' : app === 'claude' || !clientName || /claude/i.test(clientName) ? 'Claude' : esc(clientName);
+  const known = isClaude || (app === 'gemini' && /(^|\.)google\.com$/.test(String(redirectHost || '')));
   return layout(`Connect ${who}`, `<div class="sheet"><h1>Connect ${who} to your notebook</h1>
   <p>${who} will read your notes and save new ones while you study with it. You can disconnect it any time on your account page.</p>
   ${whoRow(user, here)}
-  ${isClaude ? '' : `<p class="small"><b>Access goes to ${esc(redirectHost)}.</b> ${loopback ? 'That is an app on your computer; continue only if you just started connecting from it.' : 'Continue only if you trust it.'}</p>`}
+  ${known ? '' : `<p class="small"><b>Access goes to ${esc(redirectHost)}.</b> ${loopback ? 'That is an app on your computer; continue only if you just started connecting from it.' : 'Continue only if you trust it.'}</p>`}
   <form method="post"><input type="hidden" name="handle" value="${esc(handle)}"><input type="hidden" name="t" value="${esc(token)}">
   <div class="actions"><button class="btn primary" name="decision" value="approve" autofocus>Connect</button><button class="btn" name="decision" value="deny">Cancel</button></div></form></div>`, { user });
 }
@@ -129,14 +130,15 @@ export function messagePage(title, text, { user = null, action = '' } = {}) {
 }
 
 const when = ms => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-export function accountPage({ user, token, notes, grants, computers, legacy, msg, claudeLast = 0 }) {
-  const grantRows = grants.length ? `<ul class="rows">${grants.map(g => `<li><div><div class="t">${esc(g.client || 'Claude')}</div><div class="d">Connected ${when(g.createdAt * 1000)}${claudeLast ? ` · last used ${when(claudeLast)}` : ' · not used yet'}</div></div>
+export function accountPage({ user, token, notes, grants, computers, legacy, msg, uses = {} }) {
+  const grantRows = grants.length ? `<ul class="rows">${grants.map(g => `<li><div><div class="t">${esc(g.client || 'Claude')}</div><div class="d">Connected ${when(g.createdAt * 1000)}${uses[g.app === 'gemini' ? 'gemini' : 'claude'] ? ` · last used ${when(uses[g.app === 'gemini' ? 'gemini' : 'claude'])}` : ' · not used yet'}</div></div>
     <form method="post" action="/account/revoke"><input type="hidden" name="t" value="${esc(token)}"><input type="hidden" name="grant" value="${esc(g.id)}"><button class="btn">Disconnect</button></form></li>`).join('')}</ul>`
     : `<p class="empty">Not connected yet. It takes about a minute, once:</p>
     <ol class="steps"><li>Copy this address: <b>${esc(user.mcp)}</b></li>
       <li>In Claude, open <b>Customize → Connectors</b>, click <b>Add custom connector</b>, name it Study Notebook, paste the address and click Add.</li>
       <li>Click <b>Connect</b> next to it, choose this Google account (${esc(user.email)}), then click the blue <b>Connect</b> on the Study Notebook page that opens.</li></ol>
-    <div class="actions"><a class="btn" href="https://claude.ai/customize/connectors" target="_blank" rel="noopener">Open Claude’s connectors</a></div>`;
+    <div class="actions"><a class="btn" href="https://claude.ai/customize/connectors" target="_blank" rel="noopener">Open Claude’s connectors</a></div>
+    <p class="empty">Gemini can use the same notebook too (Google offers this in the US for now): on gemini.google.com open Settings → Connected Apps → Add a custom app, paste the same address and follow the steps.</p>`;
   const pcRows = computers.length ? `<ul class="rows">${computers.map(c => `<li><div><div class="t">${esc(c.label || 'A computer')}</div><div class="d">Linked ${when(c.created)} · last synced ${when(c.last_used)}</div></div>
     <form method="post" action="/account/unlink"><input type="hidden" name="t" value="${esc(token)}"><input type="hidden" name="id" value="${esc(c.id)}"><button class="btn">Unlink</button></form></li>`).join('')}</ul>`
     : `<p class="empty">No computer linked. In the Study Notebook app: Settings → Sign in with Google.</p>`;
@@ -145,7 +147,7 @@ export function accountPage({ user, token, notes, grants, computers, legacy, msg
   ${msg ? `<p class="okmsg" role="status">${esc(msg)}</p>` : ''}
   ${whoRow(user, '/account')}
   <p>${notes} ${notes === 1 ? 'item' : 'items'} in your notebook. <a href="/app/">Open notebook</a></p>
-  <h2>Claude</h2>${grantRows}
+  <h2>Claude and Gemini</h2>${grantRows}
   <h2>Computers</h2>${pcRows}
   ${legacy ? `<h2>Notes from the password version</h2><p>This site still holds ${legacy.count} items from before accounts existed. If they're yours, enter that notebook's old password to move them into your account.</p>
   <form method="post" action="/account/claim"><input type="hidden" name="t" value="${esc(token)}"><label for="pw">Old notebook password</label><input id="pw" type="password" name="password" autocomplete="current-password" required>

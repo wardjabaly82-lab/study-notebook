@@ -107,6 +107,36 @@ const cb = await connectClaude(bob, 'bob@example.com');
 ok(!JSON.stringify(await call(cb, 'list_courses', {})).includes('Linear algebra'), 'Bob’s Claude can’t see Alice’s course');
 const s = await cb.callTool({ name: 'search_notes', arguments: { query: 'Alice' } }); console.log('    search reply:', s.content[0].text.slice(0, 120).replace(/\n/g, ' ')); ok(!/private note|Saved by Claude/.test(s.content[0].text), 'Bob’s Claude finds nothing of Alice’s by searching');
 
+console.log('Gemini connects to the same notebook, next to Claude');
+{
+  const GR = 'https://gemini.google.com/oauth/callback';   // stands in for Gemini's sign-in return address
+  const greg = await (await fetch(asm.registration_endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_name: 'Gemini', redirect_uris: [GR], grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'], token_endpoint_auth_method: 'none' }) })).json();
+  const verifier = b64u(crypto.randomBytes(32)), challenge = b64u(crypto.createHash('sha256').update(verifier).digest());
+  const q = new URLSearchParams({ response_type: 'code', client_id: greg.client_id, redirect_uri: GR, code_challenge: challenge, code_challenge_method: 'S256', state: 'g1', resource: O + '/mcp' });
+  let r = await alice.go('/authorize?' + q); const html = await r.text();
+  ok(/Connect Gemini to your notebook/.test(html) && !/Access goes to/.test(html), 'consent page says “Connect Gemini” (no warning for Google’s own address)');
+  const handle = html.match(/name="handle" value="([^"]+)"/)[1], t = html.match(/name="t" value="([^"]+)"/)[1];
+  r = await alice.go('/authorize?' + q, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ handle, t, decision: 'approve' }) });
+  const code = new URL(r.headers.get('location')).searchParams.get('code');
+  const tok = await (await fetch(asm.token_endpoint, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: GR, client_id: greg.client_id, code_verifier: verifier }) })).json();
+  const g = new Client({ name: 'gemini-sim', version: '1' });
+  await g.connect(new StreamableHTTPClientTransport(new URL(O + '/mcp'), { requestInit: { headers: { Authorization: 'Bearer ' + tok.access_token } } }));
+  ok(JSON.stringify(await call(g, 'list_courses', {})).includes('Linear algebra'), 'Gemini sees the same notes Claude saved');
+  const gs = await call(g, 'save_section', { course: 'Linear algebra', title: 'Eigenvalues', content: 'Saved by Gemini for Alice' });
+  const cl = await call(ca, 'save_section', { course: 'Linear algebra', title: 'Eigenvectors', content: 'Saved by Claude for Alice' });
+  const all = (await api(alice, 'docs')).docs;
+  const byTitle = tt => Object.values(all).find(d => d && d.title === tt);
+  ok(byTitle('Eigenvalues').by === 'gemini' && !byTitle('Eigenvectors').by, 'each topic remembers who saved it (Gemini / Claude)');
+  await call(ca, 'edit_part', { course: 'Linear algebra', section_id: gs.section_id, find: 'Saved by Gemini', replace: 'Saved by Gemini, then deepened by Claude' });
+  ok(!Object.values((await api(alice, 'docs')).docs).find(d => d && d.title === 'Eigenvalues').by, 'when Claude then updates a Gemini topic, it shows as updated by Claude');
+  const again = await call(g, 'save_section', { course: 'Linear algebra', title: 'Eigenvalues', content: 'Gemini again' });
+  ok(again.section_id === gs.section_id, 'saving the same topic again from Gemini updates it (no double topic)');
+  const me2 = await api(alice, 'me');
+  ok(me2.claude >= 1 && me2.gemini === 1, `Claude and Gemini are both connected, each counted separately (Claude ${me2.claude}, Gemini ${me2.gemini})`);
+  ok(JSON.stringify(await call(ca, 'list_courses', {})).includes('Linear algebra'), 'Claude still works the same');
+  await g.close();
+}
+
 console.log('Desktop app links for Alice');
 const verifier = b64u(crypto.randomBytes(32)), challenge = b64u(crypto.createHash('sha256').update(verifier).digest()), st = b64u(crypto.randomBytes(18));
 r = await alice.go(`/link?port=45678&state=${st}&challenge=${challenge}&device=Jeff%E2%80%99s%20laptop`); let html = await r.text();
@@ -121,7 +151,7 @@ const app = await (await fetch(O + '/auth/app/token', { method: 'POST', headers:
 ok(app.token && app.email === 'alice@example.com', 'the app gets its own sign-in for Alice');
 r = await fetch(O + '/auth/app/token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code2, verifier }) }); ok(r.status === 400, 'a code works only once');
 const H = { Authorization: 'Bearer ' + app.token };
-const ping = await (await fetch(O + '/sync/ping', { headers: H })).json(); ok(ping.email === 'alice@example.com' && ping.docs === 12, `app sync sees Alice’s ${ping.docs} items (course, 5 topics, 6 lectures)`);
+const ping = await (await fetch(O + '/sync/ping', { headers: H })).json(); ok(ping.email === 'alice@example.com' && ping.docs === 14, `app sync sees Alice’s ${ping.docs} items (course, 7 topics, 6 lectures)`);
 const pull = await (await fetch(O + '/sync/pull?since=0', { headers: H })).json(); ok(pull.changes.some(c => c.data && c.data.content === 'Saved by Claude for Alice'), 'app pulls what Claude saved');
 ok((await fetch(O + '/sync/ping', { headers: { Authorization: 'Bearer nonsense-token-nonsense-token' } })).status === 401, 'made-up app token refused');
 
@@ -134,14 +164,14 @@ console.log('Claude connection status');
 console.log('Account page');
 r = await alice.go('/account'); html = await r.text();
 ok(/Your account/.test(html) && /Claude/.test(html) && /Jeff’s laptop/.test(html) && /last used/.test(html), 'lists Claude (with when it was last used) and the linked computer');
-r = await alice.go('/api/export'); const exp = await r.json(); ok(exp.version === 1 && Object.keys(exp.docs).length === 12 && /attachment/.test(r.headers.get('content-disposition')), 'download my notes works');
+r = await alice.go('/api/export'); const exp = await r.json(); ok(exp.version === 1 && Object.keys(exp.docs).length === 14 && /attachment/.test(r.headers.get('content-disposition')), 'download my notes works');
 const tb = (await (await bob.go('/account')).text()).match(/name="t" value="([^"]+)"/)[1];
 r = await bob.go('/account/delete', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ t: 'forged', sure: '1' }) }); ok(r.status === 302 && (await api(bob, 'me')).email, 'delete with a forged form token does nothing');
 r = await bob.go('/account/delete', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ t: tb, sure: '1' }) });
 ok(/account is deleted/.test(await r.text()), 'Bob deletes his account');
 ok((await bob.go('/api/me')).status === 401, 'Bob’s browser is signed out');
 const dead = await cb.callTool({ name: 'list_courses', arguments: {} }).then(() => 'worked', e => 'refused'); ok(dead === 'refused', 'Bob’s Claude connection stops working');
-ok(Object.keys((await api(alice, 'docs')).docs).length === 12, 'Alice’s notes untouched');
+ok(Object.keys((await api(alice, 'docs')).docs).length === 14, 'Alice’s notes untouched');
 
 console.log('Highlights survive Claude’s changes');
 {
@@ -165,9 +195,9 @@ console.log('Highlights survive Claude’s changes');
 }
 
 console.log('Rate limits');
-let codes = []; for (let i = 0; i < 33; i++) codes.push(...await Promise.all(Array.from({ length: 10 }, () => fetch(O + '/sync/ping', { headers: H }).then(r => r.status))));
+let codes = []; for (let i = 0; i < 33; i++) codes.push(...await Promise.all(Array.from({ length: 10 }, () => fetch(O + '/sync/pull?since=999999999', { headers: H }).then(r => r.status))));
 ok(codes.filter(c => c === 200).length >= 250 && codes.includes(429), `one account flooding the server is slowed down (${codes.filter(c => c === 429).length} of 330 refused)`);
-const ra = await fetch(O + '/sync/ping', { headers: H }); ok(ra.status === 429 && ra.headers.get('retry-after') === '60' && /Wait a minute/.test((await ra.json()).message), 'it gets a clear “wait a minute” answer');
+const ra = await fetch(O + '/sync/pull?since=999999999', { headers: H }); ok(ra.status === 429 && ra.headers.get('retry-after') === '60' && /Wait a minute/.test((await ra.json()).message), 'it gets a clear “wait a minute” answer');
 const dave = await signIn('dave@example.com'); ok((await api(dave, 'me')).email === 'dave@example.com', 'other students are not affected');
 codes = []; for (let i = 0; i < 7; i++) codes.push(...await Promise.all(Array.from({ length: 10 }, () => fetch(O + '/auth/google', { redirect: 'manual' }).then(r => r.status))));
 ok(codes.includes(429), `repeated sign-in attempts from one address are stopped (${codes.filter(c => c === 429).length} of 70 refused)`);

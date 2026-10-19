@@ -297,7 +297,7 @@
       const content = text.slice(0, at) + newPart + text.slice(at + len);
       if (content.length > MAX_CONTENT) throw new OpError('The section would get too long. Put the deeper explanation in a new sub-topic instead (save_section with parent_id).');
       const updated = { ...s, content, rev: (s.rev || 1) + 1, updatedAt: now, prevTitle: s.title, prevContent: s.content, source: 'claude' };
-      delete updated.id;
+      delete updated.id; delete updated.by;   // saved by Claude unless the online server marks another assistant
       return { result: { action: 'updated', part: true, course: c.name, section_id: s.id, title: s.title, path: pathOf(secs, s.id), revision: updated.rev }, writes: [{ path: `${BASE}/${c.id}/sections/${s.id}`, data: updated }] };
     }
   };

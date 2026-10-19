@@ -18,7 +18,7 @@
     if (!r.ok) throw new Error('http ' + r.status);
     return r.json();
   }
-  const status = () => ({ enabled: true, web: true, email: me && me.email, name: me && me.name, mcp: me && me.mcp, claude: me && me.claude, claudeLast: me && me.claudeLast, lastSync, syncing: !!pulling, error, online });
+  const status = () => ({ enabled: true, web: true, email: me && me.email, name: me && me.name, mcp: me && me.mcp, claude: me && me.claude, claudeLast: me && me.claudeLast, gemini: me && me.gemini, geminiLast: me && me.geminiLast, lastSync, syncing: !!pulling, error, online });
   const tell = () => { if (onCloud) onCloud(status()); };
 
   async function pull() {

@@ -392,7 +392,8 @@
   function sectionHtml(c, s, d, secs) {
     const tag = ['h2', 'h3', 'h4', 'h4', 'h4'][Math.min(d, 4)];
     const recent = (s.updatedAt || 0) > Date.now() - 86400000;
-    const badge = s.source === 'claude' && recent ? `<span class="tag">${esc((s.rev || 1) > 1 ? t('Updated by Claude {when}', { when: ago(s.updatedAt) }) : t('Saved by Claude {when}', { when: ago(s.updatedAt) }))}</span>`
+    const gem = s.by === 'gemini';
+    const badge = s.source === 'claude' && recent ? `<span class="tag">${esc((s.rev || 1) > 1 ? t(gem ? 'Updated by Gemini {when}' : 'Updated by Claude {when}', { when: ago(s.updatedAt) }) : t(gem ? 'Saved by Gemini {when}' : 'Saved by Claude {when}', { when: ago(s.updatedAt) }))}</span>`
       : (s.rev || 1) > 1 && recent ? `<span class="tag plain">${esc(t('Edited {when}', { when: ago(s.updatedAt) }))}</span>` : '';
     const crumb = S.search ? crumbs(secs, s.id) : [];
     let body;
@@ -1456,16 +1457,36 @@
               <li><span class="n">3</span><div><b>${t('Click Connect')}</b><p>${t('Next to Study Notebook, click Connect. Choose your Google account ({email}), then click the blue Connect button on the Study Notebook page that opens.', { email: s.email })}</p></div></li>
             </ol>
             <p class="cc-wait" role="status"><span class="spin" aria-hidden="true"></span>${t('Waiting for Claude… this turns green by itself when it’s connected.')}</p>`}
+        ${s.gemini ? `<div class="cs-state ok gemini-ok"><span class="cs-ico">✓</span><div><b>${t('Gemini is connected')}</b><p>${esc(s.geminiLast ? t('Gemini last used your notebook {when}.', { when: ago(s.geminiLast) }) : t('Gemini hasn’t used it yet. In a Gemini chat, type @ and pick Study Notebook.'))}</p></div></div>`
+          : `<details class="cs-more gemini-more"><summary>${t('Use Gemini too')}</summary>
+            <p class="small">${t('Gemini can use the same notebook, next to Claude: both save to the same notes. Google offers this only in the US for now (18+, personal Google account, English).')}</p>
+            <ol class="cc-steps">
+              <li><span class="n">1</span><div><b>${t('Copy the same address')}</b><div class="row"><button class="btn" type="button" id="gemCopy">${t('Copy address')}</button></div></div></li>
+              <li><span class="n">2</span><div><b>${t('Add it in Gemini')}</b><p>${t('On gemini.google.com open Settings → Connected Apps, click “Add a custom app”, paste the address and click Next.')}</p><button class="btn" type="button" id="gemOpen">${t('Open Gemini')}</button></div></li>
+              <li><span class="n">3</span><div><b>${t('Sign in and connect')}</b><p>${t('Choose your Google account ({email}), then click the blue Connect button on the Study Notebook page. In a chat, type @ and pick Study Notebook.', { email: s.email })}</p></div></li>
+            </ol></details>`}
         <div class="row">${WEB ? '' : `<button class="btn" type="button" id="cloudNow">${t('Sync now')}</button><button class="btn" type="button" id="cloudWeb">${t('Open on the web')}</button>`}<button class="btn" type="button" id="cloudAcct">${t('Your account')}</button><button class="btn ghost" type="button" id="cloudOff">${t('Sign out')}</button></div>`;
       box.querySelector('#cloudCopy').onclick = () => copy(s.mcp, t('Address copied. Paste it in Claude’s connector settings.'));
+      const gc = box.querySelector('#gemCopy'); if (gc) gc.onclick = () => copy(s.mcp, t('Address copied. Paste it in Gemini’s Connected Apps.'));
+      const go = box.querySelector('#gemOpen'); if (go) go.onclick = () => { copy(s.mcp, t('Address copied. Paste it in Gemini’s Connected Apps.')); D.openExternal('https://gemini.google.com/'); };
       const oc = box.querySelector('#cloudOpenClaude'); if (oc) oc.onclick = () => { copy(s.mcp, t('Address copied. Paste it in Claude’s connector settings.')); D.openExternal('https://claude.ai/customize/connectors'); };
-      // While Claude isn't connected yet, check every few seconds so the box turns green by itself.
+      // While Claude isn't connected yet (or Gemini's steps are open), check every few seconds so the
+      // box turns green by itself.
       clearTimeout(box._poll);
-      if (!s.claude) box._poll = setTimeout(async () => {
+      const gemOpen = () => { const g = box.querySelector('details.gemini-more'); return !!(g && g.open); };
+      const tick = async () => {
         if (!box.isConnected) return;
-        const was = cloudState && cloudState.claude; cloudState = await D.cloudStatus();
-        if (box.isConnected && !box.dataset.busy) { paintCloud(box); if (!was && cloudState.claude) { toast(t('Claude is connected')); renderClaudePill(); } }
-      }, 4000);
+        const was = !!(cloudState && cloudState.claude), wasG = !!(cloudState && cloudState.gemini), keepOpen = gemOpen();
+        cloudState = await D.cloudStatus();
+        if (!box.isConnected || box.dataset.busy) return;
+        paintCloud(box);
+        const g = box.querySelector('details.gemini-more'); if (g && keepOpen) { g.open = true; schedule(); }
+        if (!was && cloudState.claude) { toast(t('Claude is connected')); renderClaudePill(); }
+        if (!wasG && cloudState.gemini) toast(t('Gemini is connected'));
+      };
+      const schedule = () => { clearTimeout(box._poll); box._poll = setTimeout(tick, 4000); };
+      if (!s.claude) schedule();
+      const gd = box.querySelector('details.gemini-more'); if (gd) gd.addEventListener('toggle', () => { if (gd.open) schedule(); });
       if (box.querySelector('#cloudNow')) box.querySelector('#cloudNow').onclick = () => D.cloudSync();
       if (box.querySelector('#cloudWeb')) box.querySelector('#cloudWeb').onclick = () => D.openExternal(site + '/app/');
       box.querySelector('#cloudAcct').onclick = () => D.openExternal(site + '/account');
@@ -1501,19 +1522,19 @@
         <p class="small">${t('Automatic follows your computer’s light or dark setting.')}</p>
         <div class="seg" role="group" aria-label="${esc(t('Paper warmth'))}">${Object.entries(WARMTH).map(([k, [name, sw]]) => `<button type="button" data-warmth-pick="${k}" aria-pressed="${warmth() === k}"><i class="swatch" style="background:${sw}" aria-hidden="true"></i>${t(name)}</button>`).join('')}</div>
         <p class="small">${t('Paper warmth: how warm the pages and the shelf look, in light and in dark.')}</p>
-        ${fontTiles()}
-        <p class="small">${t('Notes font: the typeface your notes are written in.')}</p>
+        <p class="small">${t('Fonts, text size and page width are in the Edit button above your notes.')}</p>
         ${WEB ? '' : `<p class="small">${t('Text size: Ctrl + and Ctrl − (Ctrl 0 for normal).')}`} <button type="button" class="sn-link" id="keysLink">${t('All keyboard shortcuts')}</button>${WEB ? '' : '</p>'}</section>
       <section class="group"><h3>${t('Language')}</h3>
         <div class="seg" role="group" aria-label="${esc(t('Language'))}"><button type="button" data-ui-lang="en" aria-pressed="${uiLang === 'en'}">English</button><button type="button" data-ui-lang="he" aria-pressed="${uiLang === 'he'}">עברית</button></div>
         <p class="small">${t('The language of the app’s buttons and menus. Each course’s notes keep their own language.')}</p></section>
       <section class="group"><h3>${t('Your notes')}</h3><div class="box">
         ${WEB ? `<p class="small">${t('Your notes are saved in your account as you go. You can also keep a copy as a file, or replace everything with a backup.')}</p>
-        <div class="row"><button class="btn" type="button" id="backup">${t('Back up all notes')}</button><button class="btn" type="button" id="restore">${t('Restore from a backup')}</button></div></div></section></div>` : `<p class="small">${s.lastBackup ? esc(t('Notes save automatically on this computer, and a backup copy is kept each day (the last 14); the latest is from {date}. To move your notes to another laptop, back them up to a file and restore it there.', { date: new Date(s.lastBackup + 'T12:00').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' }) })) : t('Notes save automatically on this computer, and a backup copy is kept each day (the last 14). To move your notes to another laptop, back them up to a file and restore it there.')}</p>
+        <div class="row"><button class="btn" type="button" id="backup">${t('Back up all notes')}</button><button class="btn" type="button" id="restore">${t('Restore from a backup')}</button></div></div></section>
+        <section class="group"><h3>${t('Updates')}</h3><div class="box"><p class="small">${t('The website always has the newest version.')}</p><div class="row"><button class="btn" type="button" data-act="whats-new">${t('What’s new')}</button></div></div></section></div>` : `<p class="small">${s.lastBackup ? esc(t('Notes save automatically on this computer, and a backup copy is kept each day (the last 14); the latest is from {date}. To move your notes to another laptop, back them up to a file and restore it there.', { date: new Date(s.lastBackup + 'T12:00').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' }) })) : t('Notes save automatically on this computer, and a backup copy is kept each day (the last 14). To move your notes to another laptop, back them up to a file and restore it there.')}</p>
         <div class="row"><button class="btn" type="button" id="backup">${t('Back up all notes')}</button><button class="btn" type="button" id="restore">${t('Restore from a backup')}</button><button class="btn ghost" type="button" id="folder">${t('Open notes folder')}</button></div>
         <div class="path" dir="ltr">${esc(s.dataDir || '')}</div></div></section>
       <section class="group"><h3>${t('Updates')}</h3><div class="box" id="updBox"><p class="small">${esc(t('Version {v}.', { v: s.version || '' }))}</p></div><div class="row news-row"><button class="btn" type="button" data-act="whats-new">${t('What’s new')}</button></div></section></div>`}
-      ${WEB ? `<section class="group"><h3>${t('Updates')}</h3><div class="box"><p class="small">${t('The website always has the newest version.')}</p><div class="row"><button class="btn" type="button" data-act="whats-new">${t('What’s new')}</button></div></div></section>` : ''}`, d => {
+      `, d => {
       drawCloud(d); if (!WEB) { wireClaude(d); drawSpeech(d); drawUpdates(d); }
       const kl = d.querySelector('#keysLink'); if (kl) kl.onclick = () => openShortcuts();
       d.querySelectorAll('[data-theme-pick]').forEach(b => b.onclick = () => setTheme(b.dataset.themePick));

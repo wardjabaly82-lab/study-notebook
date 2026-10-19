@@ -25,6 +25,23 @@ const ERRORS = {
   unverified: 'That Google account has no confirmed email address.'
 };
 
+/* ---------------- which assistants are connected ---------------- */
+// Claude and Gemini each have their own connection; anything not recognised counts as Claude
+// (every connection made before Gemini support was Claude's).
+async function assistants(helpers, env, uid) {
+  const out = { claude: 0, gemini: 0 };
+  try {
+    const grants = (await helpers.listUserGrants(uid)).items;
+    for (const g of grants) {
+      let app = g.metadata && g.metadata.app;
+      if (!app) { try { const c = await helpers.lookupClient(g.clientId); app = store.assistantOf(((c && c.redirectUris) || [])[0] ? new URL(c.redirectUris[0]).hostname : '', c && c.clientName); } catch (e) { app = 'claude'; } }
+      if (app === 'gemini') out.gemini++; else out.claude++;
+    }
+  } catch (e) {}
+  const last = await store.lastUses(env, uid);
+  return { ...out, claudeLast: last.claude, geminiLast: last.gemini };
+}
+
 /* ---------------- the website's data API (signed-in browser) ---------------- */
 
 async function api(request, env, url, user) {
@@ -33,8 +50,8 @@ async function api(request, env, url, user) {
   // Reading and changing data needs this header, which other sites can't send with the cookie.
   if (request.method !== 'GET' && request.headers.get('X-Study-Notebook') !== '1') return json({ error: 'forbidden' }, 403);
   if (route === 'me' && request.method === 'GET') {
-    let claude = 0; try { claude = (await env.OAUTH_PROVIDER.listUserGrants(user.id)).items.length; } catch (e) {}
-    return json({ email: user.email, name: user.name || '', mcp: `${url.origin}/mcp`, claude, claudeLast: await store.claudeLastUse(env, user.id), rev: await store.currentRev(env, user.id) });
+    const a = await assistants(env.OAUTH_PROVIDER, env, user.id);
+    return json({ email: user.email, name: user.name || '', mcp: `${url.origin}/mcp`, ...a, rev: await store.currentRev(env, user.id) });
   }
   if (route === 'docs' && request.method === 'GET') {
     const rev = await store.currentRev(env, user.id);
@@ -70,8 +87,8 @@ async function sync(request, env, url) {
   if (await over(env.RL_USER, 'u:' + user.id)) return tooMany();
   const route = url.pathname.replace(/^\/sync\/?/, '');
   if (route === 'ping' && request.method === 'GET') {
-    let claude = 0; try { claude = (await (env.OAUTH_PROVIDER || getOAuthApi(providerOptions(url.origin), env)).listUserGrants(user.id)).items.length; } catch (e) {}
-    return json({ ok: true, version: VERSION, rev: await store.currentRev(env, user.id), docs: await store.countDocs(env, user.id), email: user.email, name: user.name || '', mcp: `${url.origin}/mcp`, claude, claudeLast: await store.claudeLastUse(env, user.id) });
+    const a = await assistants(env.OAUTH_PROVIDER || getOAuthApi(providerOptions(url.origin), env), env, user.id);
+    return json({ ok: true, version: VERSION, rev: await store.currentRev(env, user.id), docs: await store.countDocs(env, user.id), email: user.email, name: user.name || '', mcp: `${url.origin}/mcp`, ...a });
   }
   if (route === 'pull' && request.method === 'GET') {
     const since = Math.max(0, Number(url.searchParams.get('since')) || 0);
@@ -132,7 +149,9 @@ async function accountGrants(env, uid) {
       const page = await env.OAUTH_PROVIDER.listUserGrants(uid, { cursor });
       for (const g of page.items) {
         let client = null; try { client = await env.OAUTH_PROVIDER.lookupClient(g.clientId); } catch (e) {}
-        out.push({ id: g.id, client: client && client.clientName, createdAt: g.createdAt });
+        let host = ''; try { host = new URL(((client && client.redirectUris) || [])[0]).hostname; } catch (e) {}
+        const app = (g.metadata && g.metadata.app) || store.assistantOf(host, client && client.clientName);
+        out.push({ id: g.id, client: app === 'gemini' ? 'Gemini' : app === 'claude' ? 'Claude' : client && client.clientName, app, createdAt: g.createdAt });
       }
       cursor = page.cursor;
     } while (cursor);
@@ -146,9 +165,9 @@ async function computers(env, uid) {
 async function account(request, env, url, user) {
   const u = { ...user, mcp: `${url.origin}/mcp` };
   if (request.method === 'GET' && url.pathname === '/account') {
-    const [notes, grants, pcs, owner, claudeLast] = await Promise.all([store.countDocs(env, user.id), accountGrants(env, user.id), computers(env, user.id), store.isOwner(env, user.id), store.claudeLastUse(env, user.id)]);
+    const [notes, grants, pcs, owner, uses] = await Promise.all([store.countDocs(env, user.id), accountGrants(env, user.id), computers(env, user.id), store.isOwner(env, user.id), store.lastUses(env, user.id)]);
     const legacy = owner ? await store.legacyInfo(env) : null;   // only the site's owner can claim the old password notebook
-    return P.html(P.accountPage({ user: u, token: await formToken(request), notes, grants, computers: pcs, legacy, claudeLast, msg: url.searchParams.get('done') || '' }));
+    return P.html(P.accountPage({ user: u, token: await formToken(request), notes, grants, computers: pcs, legacy, uses, msg: url.searchParams.get('done') || '' }));
   }
   if (request.method !== 'POST') return redirect('/account');
   const form = await request.formData();
@@ -190,7 +209,8 @@ async function claudeConsent(request, env, url, user) {
     const details = await oauth.describeConsent(req);
     const consent = await oauth.beginConsent(req);
     const host = String(details.redirectHost || '');
-    const page = P.claudeConsentPage({ user, handle: consent.handle, token: await formToken(request), clientName: details.clientName, redirectHost: host, isClaude: /(^|\.)claude\.(ai|com)$/.test(host), loopback: details.redirectIsLoopback, here: here(url) });
+    const app = store.assistantOf(host, details.clientName);
+    const page = P.claudeConsentPage({ user, handle: consent.handle, token: await formToken(request), clientName: details.clientName, redirectHost: host, app, isClaude: /(^|\.)claude\.(ai|com)$/.test(host), loopback: details.redirectIsLoopback, here: here(url) });
     const res = P.html(page);
     for (const [k, v] of consent.headers) if (k.toLowerCase() === 'set-cookie') res.headers.append(k, v);
     return res;
@@ -202,7 +222,9 @@ async function claudeConsent(request, env, url, user) {
     return new Response(null, { status: 302, headers: denied.headers });
   }
   const approved = await oauth.approveConsent(request, handle, { scope: form.getAll('scope').map(String) });
-  const { redirectTo } = await oauth.completeAuthorization({ request: approved.request, userId: user.id, metadata: { label: 'Study Notebook' }, scope: approved.request.scope, props: { uid: user.id } });
+  let app = 'claude';
+  try { const d = await oauth.describeConsent(approved.request); app = store.assistantOf(d.redirectHost, d.clientName); } catch (e) {}
+  const { redirectTo } = await oauth.completeAuthorization({ request: approved.request, userId: user.id, metadata: { label: 'Study Notebook', app }, scope: approved.request.scope, props: { uid: user.id, app } });
   approved.headers.set('Location', redirectTo);
   return new Response(null, { status: 302, headers: approved.headers });
 }

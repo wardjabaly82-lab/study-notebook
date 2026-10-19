@@ -2,6 +2,9 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.17.0', date: '2026-10-19',
+    en: ['Gemini can use your notebook too, next to Claude: both save to the same notes, and each topic shows who saved it. (Google offers this in the US for now: Settings → Your account → Use Gemini too.)', 'Fonts moved out of Settings: they’re in the Edit button above your notes, with text size and page width.'],
+    he: ['גם Gemini יכול להשתמש במחברת, לצד Claude: שניהם שומרים לאותם סיכומים, וכל נושא מראה מי שמר אותו. (Google מציעה את זה בינתיים בארה״ב: הגדרות ← החשבון שלך ← להשתמש גם ב-Gemini.)', 'הגופנים יצאו מההגדרות: הם בכפתור ”עריכה” שמעל הסיכומים, יחד עם גודל הטקסט ורוחב הדף.'] },
   { v: '1.16.1', date: '2026-10-19',
     en: ['A side panel that popped out from the edge now closes when the mouse leaves the app or you switch to another app; it no longer gets stuck open.'],
     he: ['פאנל שקפץ מהקצה נסגר עכשיו כשהעכבר יוצא מהאפליקציה או כשעוברים לאפליקציה אחרת, ולא נשאר תקוע פתוח.'] },

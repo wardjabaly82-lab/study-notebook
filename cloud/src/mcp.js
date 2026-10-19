@@ -2,7 +2,7 @@
 import Ops from './notebook-ops.js';
 import { INSTRUCTIONS } from './instructions.js';
 import { over, MESSAGE } from './limits.js';
-import { loadDocs, writeDocs, userById, usage, QUOTA_BYTES, noteClaudeUse } from './store.js';
+import { loadDocs, writeDocs, userById, usage, QUOTA_BYTES, noteUse } from './store.js';
 
 export const VERSION = '2.0.0';
 
@@ -32,7 +32,7 @@ const TOOLS = [
 const READ_ONLY = new Set(TOOLS.filter(t => t.annotations.readOnlyHint).map(t => t.name));
 const ONLINE_NOTE = 'Saved in the student’s Study Notebook. It shows on the website right away, and in the app on their computer within a minute if it is open.';
 
-async function callTool(env, uid, name, args) {
+async function callTool(env, uid, name, args, app = 'claude') {
   if (!TOOLS.some(t => t.name === name)) return { content: [{ type: 'text', text: `Unknown tool "${name}".` }], isError: true };
   try {
     // Lectures are loaded only when this request is about one (they can be large).
@@ -40,6 +40,8 @@ async function callTool(env, uid, name, args) {
     const docs = await loadDocs(env, uid, { skipLarge: !aboutLecture });
     const { result, writes } = Ops.run(docs, name, args || {});
     if (writes && writes.length) {
+      // which assistant saved it ("Saved by Gemini" in the app); no mark means Claude
+      for (const w of writes) if (w.data && w.path.includes('/sections/') && w.data.source === 'claude') { if (app === 'gemini') w.data.by = 'gemini'; else delete w.data.by; }
       const adding = writes.reduce((n, w) => n + (w.data ? JSON.stringify(w.data).length : 0), 0);
       if ((await usage(env, uid)).bytes + adding > QUOTA_BYTES) return { content: [{ type: 'text', text: 'The student’s notebook is full (15 MB). Nothing was saved; ask them to delete old recordings or courses.' }], isError: true };
       await writeDocs(env, uid, writes);
@@ -54,7 +56,7 @@ async function callTool(env, uid, name, args) {
 }
 
 const PROTOCOLS = ['2026-07-28', '2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
-async function rpc(env, uid, msg) {
+async function rpc(env, uid, msg, app) {
   const reply = result => ({ jsonrpc: '2.0', id: msg.id, result });
   const fail = (code, message) => ({ jsonrpc: '2.0', id: msg.id ?? null, error: { code, message } });
   if (!msg || msg.jsonrpc !== '2.0' || typeof msg.method !== 'string') return fail(-32600, 'Invalid request');
@@ -66,7 +68,7 @@ async function rpc(env, uid, msg) {
     }
     case 'ping': return reply({});
     case 'tools/list': return reply({ tools: TOOLS });
-    case 'tools/call': return reply(await callTool(env, uid, msg.params && msg.params.name, msg.params && msg.params.arguments));
+    case 'tools/call': return reply(await callTool(env, uid, msg.params && msg.params.name, msg.params && msg.params.arguments, app));
     case 'resources/list': return reply({ resources: [] });
     case 'prompts/list': return reply({ prompts: [] });
     default: return fail(-32601, `Method not found: ${msg.method}`);
@@ -77,12 +79,14 @@ export const McpHandler = {
   async fetch(request, env, ctx) {
     const uid = ctx && ctx.props && ctx.props.uid;
     if (!uid || !(await userById(env, uid))) return Response.json({ jsonrpc: '2.0', id: null, error: { code: -32001, message: 'This Study Notebook account no longer exists. Connect again.' } }, { status: 401, headers: { 'WWW-Authenticate': 'Bearer error="invalid_token"' } });
-    try { const job = noteClaudeUse(env, uid); if (ctx && ctx.waitUntil) ctx.waitUntil(job); else await job; } catch (e) {}
+    // connections made before assistants were told apart are Claude's
+    const app = (ctx.props.app === 'gemini' || ctx.props.app === 'other') ? ctx.props.app : 'claude';
+    try { const job = noteUse(env, uid, app); if (ctx && ctx.waitUntil) ctx.waitUntil(job); else await job; } catch (e) {}
     if (await over(env.RL_USER, 'u:' + uid)) return Response.json({ jsonrpc: '2.0', id: null, error: { code: -32029, message: 'Study Notebook: ' + MESSAGE } }, { status: 429, headers: { 'Retry-After': '60' } });
     if (request.method !== 'POST') return new Response('Use POST for MCP requests.', { status: 405, headers: { Allow: 'POST' } });
     let body; try { body = await request.json(); } catch (e) { return Response.json({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }, { status: 400 }); }
     const batch = Array.isArray(body);
-    const out = (await Promise.all((batch ? body : [body]).map(m => rpc(env, uid, m)))).filter(Boolean);
+    const out = (await Promise.all((batch ? body : [body]).map(m => rpc(env, uid, m, app)))).filter(Boolean);
     if (!out.length) return new Response(null, { status: 202 });
     return Response.json(batch ? out : out[0], { headers: { 'Cache-Control': 'no-store' } });
   }
