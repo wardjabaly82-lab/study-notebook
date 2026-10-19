@@ -134,9 +134,9 @@ export function accountPage({ user, token, notes, grants, computers, legacy, msg
     <form method="post" action="/account/revoke"><input type="hidden" name="t" value="${esc(token)}"><input type="hidden" name="grant" value="${esc(g.id)}"><button class="btn">Disconnect</button></form></li>`).join('')}</ul>`
     : `<p class="empty">Not connected yet. It takes about a minute, once:</p>
     <ol class="steps"><li>Copy this address: <b>${esc(user.mcp)}</b></li>
-      <li>In Claude, open the connector settings (Settings → Connectors, called Customize → Connectors in some versions), click <b>Add custom connector</b>, name it Study Notebook, paste the address and click Add.</li>
+      <li>In Claude, open <b>Customize → Connectors</b>, click <b>Add custom connector</b>, name it Study Notebook, paste the address and click Add.</li>
       <li>Click <b>Connect</b> next to it, choose this Google account (${esc(user.email)}), then click the blue <b>Connect</b> on the Study Notebook page that opens.</li></ol>
-    <div class="actions"><a class="btn" href="https://claude.ai/settings/connectors" target="_blank" rel="noopener">Open Claude’s connectors</a></div>`;
+    <div class="actions"><a class="btn" href="https://claude.ai/customize/connectors" target="_blank" rel="noopener">Open Claude’s connectors</a></div>`;
   const pcRows = computers.length ? `<ul class="rows">${computers.map(c => `<li><div><div class="t">${esc(c.label || 'A computer')}</div><div class="d">Linked ${when(c.created)} · last synced ${when(c.last_used)}</div></div>
     <form method="post" action="/account/unlink"><input type="hidden" name="t" value="${esc(token)}"><input type="hidden" name="id" value="${esc(c.id)}"><button class="btn">Unlink</button></form></li>`).join('')}</ul>`
     : `<p class="empty">No computer linked. In the Study Notebook app: Settings → Sign in with Google.</p>`;

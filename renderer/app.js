@@ -1445,13 +1445,13 @@
           : `<h4 class="cc-title">${t('Connect Claude (once, about a minute)')}</h4>
             <ol class="cc-steps">
               <li><span class="n">1</span><div><b>${t('Copy this address')}</b><div class="row"><code class="path" dir="ltr">${esc(s.mcp || '')}</code><button class="btn" type="button" id="cloudCopy">${t('Copy address')}</button></div></div></li>
-              <li><span class="n">2</span><div><b>${t('Add it in Claude')}</b><p>${t('Open Claude’s connector settings, click “Add custom connector”, name it Study Notebook, paste the address and click Add.')}</p><button class="btn" type="button" id="cloudOpenClaude">${t('Open Claude’s connectors')}</button></div></li>
+              <li><span class="n">2</span><div><b>${t('Add it in Claude')}</b><p>${t('In Claude open Customize → Connectors, click “Add custom connector”, name it Study Notebook, paste the address and click Add.')}</p><button class="btn" type="button" id="cloudOpenClaude">${t('Open Claude’s connectors')}</button></div></li>
               <li><span class="n">3</span><div><b>${t('Click Connect')}</b><p>${t('Next to Study Notebook, click Connect. Choose your Google account ({email}), then click the blue Connect button on the Study Notebook page that opens.', { email: s.email })}</p></div></li>
             </ol>
             <p class="cc-wait" role="status"><span class="spin" aria-hidden="true"></span>${t('Waiting for Claude… this turns green by itself when it’s connected.')}</p>`}
         <div class="row">${WEB ? '' : `<button class="btn" type="button" id="cloudNow">${t('Sync now')}</button><button class="btn" type="button" id="cloudWeb">${t('Open on the web')}</button>`}<button class="btn" type="button" id="cloudAcct">${t('Your account')}</button><button class="btn ghost" type="button" id="cloudOff">${t('Sign out')}</button></div>`;
       box.querySelector('#cloudCopy').onclick = () => copy(s.mcp, t('Address copied. Paste it in Claude’s connector settings.'));
-      const oc = box.querySelector('#cloudOpenClaude'); if (oc) oc.onclick = () => { copy(s.mcp, t('Address copied. Paste it in Claude’s connector settings.')); D.openExternal('https://claude.ai/settings/connectors'); };
+      const oc = box.querySelector('#cloudOpenClaude'); if (oc) oc.onclick = () => { copy(s.mcp, t('Address copied. Paste it in Claude’s connector settings.')); D.openExternal('https://claude.ai/customize/connectors'); };
       // While Claude isn't connected yet, check every few seconds so the box turns green by itself.
       clearTimeout(box._poll);
       if (!s.claude) box._poll = setTimeout(async () => {
