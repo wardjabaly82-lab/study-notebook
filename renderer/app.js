@@ -240,12 +240,30 @@
       : `<button class="btn rec-btn" id="recBtn" type="button"><span class="rec-dot"></span>${t('Record lecture')}</button>`;
   }
 
+  // Page width the student set by hand (0 = automatic: the course's narrow/normal/wide, growing when side panels are hidden).
+  // The notes fill whatever width is chosen, so the text already written reflows to it.
+  const pageW = () => Number(document.documentElement.dataset.pagew) || 0;
+  const curPageW = () => { const sh = $('sheet'); return sh ? Math.round(sh.getBoundingClientRect().width) : 780; };
+  const maxPageW = () => { const w = $('sheetWrap'); return 480 + Math.floor((Math.max(800, (w ? w.clientWidth : 1200) - 8) - 480) / 10) * 10; };
+  function setPageW(px) {
+    const root = document.documentElement;
+    if (px) { root.dataset.pagew = String(px); root.style.setProperty('--page-w', px + 'px'); store('sn-page-width', String(px)); }
+    else { delete root.dataset.pagew; root.style.removeProperty('--page-w'); store('sn-page-width', ''); }
+    const out = $('pageWidthOut'); if (out) out.textContent = px ? px + ' px' : t('Automatic');
+    const auto = document.querySelector('[data-act="page-width-auto"]'); if (auto) auto.hidden = !px;
+  }
+  document.addEventListener('input', e => { if (e.target.id === 'pageWidth') setPageW(+e.target.value); });
   // The Edit panel in the toolbar: how the notes look (more settings will be added here).
   function editPanel() {
     const z = window.SNGestures ? Math.round(SNGestures.noteZoom() * 100) : 100;
     return `<div class="menu edit-panel" role="dialog" aria-label="${esc(t('Edit'))}" dir="${UIDIR}">
       <div class="ep-row"><span class="ep-label">${t('Text size')}</span>
         <div class="ep-size"><button type="button" class="btn" data-act="zoom-step" data-dir="-1" aria-label="${esc(t('Smaller'))}">A−</button><button type="button" class="ep-pct" data-act="zoom-step" data-dir="0" title="${esc(t('Normal text size'))}">${z}%</button><button type="button" class="btn" data-act="zoom-step" data-dir="1" aria-label="${esc(t('Bigger'))}">A+</button></div></div>
+      <div class="ep-row"><span class="ep-label">${t('Page width')}</span><button type="button" class="sn-link" data-act="page-width-auto" ${pageW() ? '' : 'hidden'}>${t('Automatic')}</button></div>
+      <div class="ep-width"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="4" width="10" height="16" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+        <input type="range" id="pageWidth" min="480" max="${maxPageW()}" step="10" value="${pageW() || curPageW()}" aria-label="${esc(t('Page width'))}">
+        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4" width="19" height="16" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+        <output id="pageWidthOut">${pageW() ? pageW() + ' px' : t('Automatic')}</output></div>
       <div class="ep-label">${t('Font')}</div>${fontTiles()}
       <p class="small ep-hint">${t('Tip: pinch on your notes with the touchpad to change the size.')}</p>
     </div>`;
@@ -844,6 +862,7 @@
     switch (b.dataset.act) {
       case 'new-course': openNewCourse(); break;
       case 'hide-panel': setHidden(b.dataset.panel, true); break;
+      case 'page-width-auto': setPageW(0); renderTop(); break;
       case 'show-panel': setHidden(b.dataset.panel, false); break;
       case 'zoom-step': if (window.SNGestures) { const dir = +b.dataset.dir; SNGestures.setNoteZoom(dir ? SNGestures.noteZoom() * (dir > 0 ? 1.1 : 1 / 1.1) : 1); renderTop(); } break;
       case 'settings': openSettings(); break;
