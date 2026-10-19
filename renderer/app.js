@@ -138,6 +138,13 @@
   }
 
   /* ================= markdown + math ================= */
+  // Notes sometimes start with their own title as a heading ("## Topic"); the page already shows the
+  // title, so that first line is left out instead of showing the title twice.
+  const titleKey = x => String(x || '').replace(/[#*_`=\\]|\$\$?|\\[()]/g, '').replace(/^\s*\d+(\.\d+)*[.)]?\s+/, '').replace(/[\s:.\-–—]+/g, '').toLowerCase();
+  function noteBody(s) {
+    const c = String(s.content || ''), m = c.match(/^\s*(?:#{1,6}[ \t]+([^\n]+)|\*\*([^\n*]+)\*\*[ \t]*)\n+/);
+    return m && titleKey(m[1] || m[2]) === titleKey(s.title) ? c.slice(m[0].length) : c;
+  }
   function mdToHtml(md) {
     const math = [];
     let s = String(md || '').replace(/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)/g, m => { math.push(m); return 'MATHPH' + (math.length - 1) + 'X'; });
@@ -382,7 +389,7 @@
     root.querySelectorAll('[data-note]').forEach(el => {
       const s = secs[el.dataset.note], key = drawnKey(s);
       if (!q && drawn.has(key)) { el.innerHTML = drawn.get(key); wireLinks(el); if (window.SNFig) SNFig.upgrade(el); marks(el); return; }
-      el.innerHTML = mdToHtml(s.content); decorate(el); highlight(el, q);
+      el.innerHTML = mdToHtml(noteBody(s)); decorate(el); highlight(el, q);
       if (hasMath(el)) fresh.push([el, key]); else { if (!q) drawn.set(key, el.innerHTML); marks(el); }
     });
     const heads = [...root.querySelectorAll('.sec-head')].filter(hasMath);
@@ -1535,7 +1542,7 @@
       const base = window.snPrintSource(null);
       return { ...base, subtitle: t('Formula sheet'), sections: formulaItems(c, secs).map(x => ({ id: x.id, title: x.title, depth: x.depth, html: x.md ? mdToHtml(x.md) : '' })) };
     }
-    const add = (s, d) => out.push({ id: s.id, title: s.title, depth: d, html: mdToHtml(s.content), marks: s.marks || [], ink: s.ink || [] });
+    const add = (s, d) => out.push({ id: s.id, title: s.title, depth: d, html: mdToHtml(noteBody(s)), marks: s.marks || [], ink: s.ink || [] });
     if (Array.isArray(pickedIds)) walk(secs, (s, d) => { if (pickedIds.includes(s.id)) add(s, d); });
     else if (topicId && secs[topicId]) { add(secs[topicId], 0); walk(secs, (s, d) => add(s, d + 1), topicId); }
     else walk(secs, add);

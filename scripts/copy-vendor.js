@@ -32,13 +32,23 @@ for (const dir of ['input', 'output', 'ui', 'a11y', 'adaptors']) {
   fs.cpSync(path.join(mj, dir), path.join(mjOut, dir), { recursive: true });
 }
 
-// Fonts: Rubik (friendly UI and headings) and Frank Ruhl Libre (reading text); both cover Hebrew.
-for (const pkg of ['rubik', 'frank-ruhl-libre']) {
-  const from = path.join(nm, '@fontsource-variable', pkg);
+// Fonts for the notes (all cover Hebrew). Only the Latin and Hebrew files are kept; a font file is
+// downloaded by the page only when that font is picked.
+//   variable fonts (one file for all weights): index.css as is
+//   fixed-weight fonts: regular and bold, joined into one index.css
+const VARIABLE = ['rubik', 'frank-ruhl-libre', 'heebo', 'assistant', 'open-sans', 'noto-serif-hebrew'];
+const STATIC = ['david-libre', 'alef', 'varela-round', 'amatic-sc'];
+function copyFont(dir, pkg, css) {
   const to = path.join(out, 'fonts', pkg);
   fs.mkdirSync(path.join(to, 'files'), { recursive: true });
-  fs.copyFileSync(path.join(from, 'index.css'), path.join(to, 'index.css'));
-  for (const f of fs.readdirSync(path.join(from, 'files'))) if (/(latin|hebrew)/.test(f) && f.endsWith('.woff2')) fs.copyFileSync(path.join(from, 'files', f), path.join(to, 'files', f));
+  fs.writeFileSync(path.join(to, 'index.css'), css);
+  for (const f of fs.readdirSync(path.join(dir, 'files'))) if (/(latin|hebrew)/.test(f) && !/latin-ext/.test(f) && f.endsWith('.woff2')) fs.copyFileSync(path.join(dir, 'files', f), path.join(to, 'files', f));
+}
+for (const pkg of VARIABLE) { const dir = path.join(nm, '@fontsource-variable', pkg); copyFont(dir, pkg, fs.readFileSync(path.join(dir, 'index.css'), 'utf8')); }
+for (const pkg of STATIC) {
+  const dir = path.join(nm, '@fontsource', pkg);
+  const css = ['400.css', '700.css'].filter(f => fs.existsSync(path.join(dir, f))).map(f => fs.readFileSync(path.join(dir, f), 'utf8')).join('\n');
+  copyFont(dir, pkg, css);
 }
 
 console.log('Copied offline libraries to renderer/vendor');

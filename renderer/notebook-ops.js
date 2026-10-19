@@ -318,7 +318,11 @@
       const c = findCourse(docs, course);
       const secs = sections(docs, c.id);
       const t = cleanText(title, MAX_TITLE, 'Title').replace(/\n+/g, ' ').trim();
-      const body = cleanText(content, MAX_CONTENT, 'Content');
+      let body = cleanText(content, MAX_CONTENT, 'Content');
+      // The title is shown above the notes, so a first line repeating it as a heading is dropped.
+      const key = x => String(x || '').replace(/[#*_`=]/g, '').replace(/^\s*\d+(\.\d+)*[.)]?\s+/, '').replace(/[\s:.\-–—]+/g, '').toLowerCase();
+      const first = body.match(/^\s*(?:#{1,6}[ \t]+([^\n]+)|\*\*([^\n*]+)\*\*[ \t]*)\n+/);
+      if (first && key(first[1] || first[2]) === key(t) && body.length > first[0].length) body = body.slice(first[0].length);
       const base = `${BASE}/${c.id}/sections/`;
 
       if (section_id) {
