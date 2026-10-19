@@ -987,3 +987,12 @@ kbd { font-family: var(--f-ui); font-size: 12px; font-weight: 500; background: v
 .cc-wait .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line-strong); border-top-color: var(--accent); animation: cc-spin 1s linear infinite; }
 @keyframes cc-spin { to { transform: rotate(360deg); } }
 .claude-ok { margin-top: 10px; }
+
+/* What's new */
+.news-v { margin: 4px 0 2px; }
+.news-v h3 { margin: 10px 0 4px; font: 650 14.5px/1.3 var(--f-ui); color: var(--ink); }
+.news-v h3 span { font-weight: 400; font-size: 12.5px; color: var(--muted); margin-inline-start: 6px; }
+.news-v ul { margin: 0; padding-inline-start: 20px; font-size: 14px; line-height: 1.55; color: var(--ink); }
+.news-v li { margin: 3px 0; }
+.dlg-in.news { max-height: min(78vh, 720px); overflow: auto; }
+.news-row { margin-top: 8px; }

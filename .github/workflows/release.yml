@@ -26,8 +26,11 @@ jobs:
           V=$(node -p "require('./package.json').version")
           ls -la dist
           FILES="dist/Study-Notebook-Setup-$V.exe dist/Study-Notebook-Setup-$V.exe.blockmap dist/latest.yml"
+          NEW=$(node -e "global.window={};require('./renderer/whats-new.js');const n=window.SNWhatsNew.find(x=>x.v===process.argv[1]);if(n)console.log('**What is new**\\n\\n'+n.en.map(x=>'- '+x).join('\\n'))" "$V")
           cat > notes.md <<EOF
           Study Notebook $V
+
+          $NEW
 
           **Windows:** download \`Study-Notebook-Setup-$V.exe\`. Installed apps update themselves.
 

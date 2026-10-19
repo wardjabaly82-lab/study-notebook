@@ -865,6 +865,7 @@
       case 'new-course': openNewCourse(); break;
       case 'hide-panel': setHidden(b.dataset.panel, true); break;
       case 'page-width-auto': setPageW(0); renderTop(); break;
+      case 'whats-new': openNews(null); break;
       case 'toggle-panel': setHidden(b.dataset.panel, !isHidden(b.dataset.panel)); renderTop(); break;
       case 'show-panel': setHidden(b.dataset.panel, false); break;
       case 'zoom-step': if (window.SNGestures) { const dir = +b.dataset.dir; SNGestures.setNoteZoom(dir ? SNGestures.noteZoom() * (dir > 0 ? 1.1 : 1 / 1.1) : 1); renderTop(); } break;
@@ -1505,7 +1506,8 @@
         <div class="row"><button class="btn" type="button" id="backup">${t('Back up all notes')}</button><button class="btn" type="button" id="restore">${t('Restore from a backup')}</button></div></div></section></div>` : `<p class="small">${s.lastBackup ? esc(t('Notes save automatically on this computer, and a backup copy is kept each day (the last 14); the latest is from {date}. To move your notes to another laptop, back them up to a file and restore it there.', { date: new Date(s.lastBackup + 'T12:00').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' }) })) : t('Notes save automatically on this computer, and a backup copy is kept each day (the last 14). To move your notes to another laptop, back them up to a file and restore it there.')}</p>
         <div class="row"><button class="btn" type="button" id="backup">${t('Back up all notes')}</button><button class="btn" type="button" id="restore">${t('Restore from a backup')}</button><button class="btn ghost" type="button" id="folder">${t('Open notes folder')}</button></div>
         <div class="path" dir="ltr">${esc(s.dataDir || '')}</div></div></section>
-      <section class="group"><h3>${t('Updates')}</h3><div class="box" id="updBox"><p class="small">${esc(t('Version {v}.', { v: s.version || '' }))}</p></div></section></div>`}`, d => {
+      <section class="group"><h3>${t('Updates')}</h3><div class="box" id="updBox"><p class="small">${esc(t('Version {v}.', { v: s.version || '' }))}</p></div><div class="row news-row"><button class="btn" type="button" data-act="whats-new">${t('What’s new')}</button></div></section></div>`}
+      ${WEB ? `<section class="group"><h3>${t('Updates')}</h3><div class="box"><p class="small">${t('The website always has the newest version.')}</p><div class="row"><button class="btn" type="button" data-act="whats-new">${t('What’s new')}</button></div></div></section>` : ''}`, d => {
       drawCloud(d); if (!WEB) { wireClaude(d); drawSpeech(d); drawUpdates(d); }
       const kl = d.querySelector('#keysLink'); if (kl) kl.onclick = () => openShortcuts();
       d.querySelectorAll('[data-theme-pick]').forEach(b => b.onclick = () => setTheme(b.dataset.themePick));
@@ -1641,6 +1643,30 @@
     return { tree, course: c.name, lang: c.lang === 'he' || c.lang === 'en' ? c.lang : (dirOf(c) === 'rtl' ? 'he' : 'auto'), sections: out, topics: kids(secs, null).map(s => ({ id: s.id, title: s.title })), subtitle: topicId && secs[topicId] ? secs[topicId].title : '' };
   };
 
+  /* ================= what's new ================= */
+  const NEWS = Array.isArray(window.SNWhatsNew) ? window.SNWhatsNew : [];
+  const vcmp = (a, b) => { const x = String(a || '').split('.').map(n => parseInt(n, 10) || 0), y = String(b || '').split('.').map(n => parseInt(n, 10) || 0); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
+  // since: the version the student had before (shows only what came after it); none = the latest few.
+  function openNews(since) {
+    const list = NEWS.filter(n => !since || vcmp(n.v, since) > 0).slice(0, since ? 40 : 12);
+    if (!list.length) return false;
+    const day = d => { try { return new Date(d + 'T12:00').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' }); } catch (e) { return d; } };
+    openDlg('news', `<div class="dlg-in news" dir="${UIDIR}">${head(t('What’s new'), since ? t('Study Notebook was updated to version {v}.', { v: list[0].v }) : '')}
+      ${list.map(n => `<section class="news-v"><h3>${esc(t('Version {v}', { v: n.v }))} <span>${esc(day(n.date))}</span></h3><ul>${((uiLang === 'he' && n.he) || n.en || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>`).join('')}
+      <div class="row"><button class="btn primary" type="button" data-close>${t('Got it')}</button></div></div>`);
+    return true;
+  }
+  // Once after an update: what changed since the version the student had.
+  function newsAfterUpdate(current) {
+    if (!current || current === 'web') current = NEWS[0] && NEWS[0].v;
+    if (!current) return false;
+    let seen = store('sn-seen-version');
+    // People updating from a version before this window existed get to see it once.
+    if (!seen && Object.keys(docs).length) seen = '1.15.1';
+    store('sn-seen-version', current);
+    return !!seen && vcmp(current, seen) > 0 && openNews(seen);
+  }
+
   /* ================= start ================= */
   D.onClaudeSeen(() => {
     S.claudeSeen = Date.now(); S.lastClaude = Math.max(S.lastClaude, 0); renderClaudePill();
@@ -1659,7 +1685,8 @@
     D.setTheme(theme());
     render(); restorePos();
     $('sheetWrap').addEventListener('scroll', () => { clearTimeout(posTimer); posTimer = setTimeout(savePos, 250); }, { passive: true });
-    if (WEB) { cloudState = await D.cloudStatus(); renderClaudePill(); if (store('sn-welcomed') !== '1' && !cloudState.claude) setTimeout(openWelcome, 250); }
+    if (WEB) { cloudState = await D.cloudStatus(); renderClaudePill(); if (store('sn-welcomed') !== '1' && !cloudState.claude) setTimeout(openWelcome, 250); else setTimeout(() => newsAfterUpdate('web'), 400); }
     else if (store('sn-welcomed') !== '1' && !settings.connectorLastUse) setTimeout(openWelcome, 250);
+    else setTimeout(() => newsAfterUpdate(settings.version), 400);
   })();
 })();
