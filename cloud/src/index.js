@@ -273,7 +273,13 @@ function providerFor(origin) {
     tokenEndpoint: '/token',
     clientRegistrationEndpoint: '/register',
     clientIdMetadataDocumentEnabled: true,
-    accessTokenTTL: 3600,
+    // Claude's sign-in lasts a week before it renews itself. Each renewal swaps the renewal key, and
+    // Cloudflare's key store can take up to a minute to show the swap everywhere; with hourly renewals
+    // a renewal that landed on a stale copy made claude.ai drop the connection ("tools don't load").
+    // A week means ~170x fewer renewals. Disconnecting Claude on the account page still ends it at once.
+    accessTokenTTL: 7 * 24 * 3600,
+    // Refused sign-in steps show up in the Cloudflare logs, so connection problems can be traced.
+    onError: ({ code, description, internal }) => { console.warn('oauth', code, description, internal ? JSON.stringify(internal) : ''); },
     resourceMetadata: { resource: `${origin}/mcp`, authorization_servers: [origin], resource_name: 'Study Notebook' }
   }));
   return providers.get(origin);
