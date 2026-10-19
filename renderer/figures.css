@@ -67,6 +67,15 @@
 .s-yellow { stroke: var(--fig-yellow); } .f-yellow { fill: var(--fig-yellow); }
 .f-page { fill: var(--fig-page); } .f-ink { fill: var(--fig-ink); }
 
+/* zooming into a graph or diagram (pinch on a trackpad or touch screen) */
+figure.fig-plot, figure.fig-dia { position: relative; touch-action: pan-x pan-y; }
+figure.zoomed { cursor: zoom-out; }
+figure .fig-scroll { overflow: auto; overscroll-behavior: auto; text-align: left; border-radius: 10px; outline: 1px solid var(--fig-grid); touch-action: pan-x pan-y; }
+figure .fig-scroll svg { display: block; margin: 0 auto; }
+.zoom-chip { position: absolute; top: 8px; right: 8px; z-index: 2; font: 600 12px/1 "Rubik Variable", Rubik, "Segoe UI", Arial, sans-serif;
+  padding: 6px 9px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--fig-ink) 78%, transparent); color: var(--fig-page); cursor: pointer; }
+@media print { .zoom-chip { display: none; } }
+
 /* ---------- colored text and highlights Claude writes into notes ---------- */
 .c-blue { color: var(--fig-blue); } .c-red { color: var(--fig-red); } .c-green { color: var(--fig-green); }
 .c-orange { color: var(--fig-orange); } .c-purple { color: var(--fig-purple); } .c-teal { color: var(--fig-teal); }

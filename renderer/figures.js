@@ -307,6 +307,44 @@
   }
 
   /* ---------------- Mermaid diagrams ---------------- */
+  /* Diagram labels can't show typeset formulas, so math written in them (LaTeX like \beta_1, \( E(u \mid x) = 0 \),
+     or spelled out like beta1, sigma^2) becomes plain symbols: β₁, E(u | x) = 0, σ². */
+  const GREEK = { alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε', varepsilon: 'ε', zeta: 'ζ', eta: 'η', theta: 'θ', iota: 'ι', kappa: 'κ', lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ', pi: 'π', rho: 'ρ', sigma: 'σ', tau: 'τ', upsilon: 'υ', phi: 'φ', varphi: 'φ', chi: 'χ', psi: 'ψ', omega: 'ω', Gamma: 'Γ', Delta: 'Δ', Theta: 'Θ', Lambda: 'Λ', Xi: 'Ξ', Pi: 'Π', Sigma: 'Σ', Phi: 'Φ', Psi: 'Ψ', Omega: 'Ω' };
+  const SYM = { mid: '|', vert: '|', cdot: '·', times: '×', div: '÷', pm: '±', le: '≤', leq: '≤', ge: '≥', geq: '≥', neq: '≠', ne: '≠', approx: '≈', sim: '~', equiv: '≡', infty: '∞', sum: 'Σ', prod: 'Π', int: '∫', partial: '∂', to: '→', rightarrow: '→', Rightarrow: '⇒', leftarrow: '←', Leftrightarrow: '⇔', implies: '⇒', iff: '⇔', in: '∈', notin: '∉', subset: '⊂', cup: '∪', cap: '∩', forall: '∀', exists: '∃', neg: '¬', land: '∧', lor: '∨', ldots: '…', cdots: '⋯', dots: '…', perp: '⊥', circ: '∘', nabla: '∇', emptyset: '∅', varnothing: '∅' };
+  const SUB = { 0: '₀', 1: '₁', 2: '₂', 3: '₃', 4: '₄', 5: '₅', 6: '₆', 7: '₇', 8: '₈', 9: '₉', '+': '₊', '-': '₋', '=': '₌', '(': '₍', ')': '₎', a: 'ₐ', e: 'ₑ', h: 'ₕ', i: 'ᵢ', j: 'ⱼ', k: 'ₖ', l: 'ₗ', m: 'ₘ', n: 'ₙ', o: 'ₒ', p: 'ₚ', r: 'ᵣ', s: 'ₛ', t: 'ₜ', u: 'ᵤ', v: 'ᵥ', x: 'ₓ' };
+  const SUP = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹', '+': '⁺', '-': '⁻', '=': '⁼', '(': '⁽', ')': '⁾', a: 'ᵃ', b: 'ᵇ', c: 'ᶜ', d: 'ᵈ', e: 'ᵉ', i: 'ⁱ', j: 'ʲ', k: 'ᵏ', n: 'ⁿ', t: 'ᵗ', T: 'ᵀ', x: 'ˣ', y: 'ʸ', '*': '*', '′': '′' };
+  const script = (txt, map, mark) => [...txt].every(c => map[c]) ? [...txt].map(c => map[c]).join('') : mark + (txt.length > 1 ? '(' + txt + ')' : txt);
+  function mathText(t) {
+    let s = String(t);
+    s = s.replace(/\\[()[\]]|\$\$?/g, ' ');
+    s = s.replace(/\\(?:text|mathrm|mathit|mathbf|operatorname|textbf|mathbb|mathcal)\s*\{([^{}]*)\}/g, '$1');
+    s = s.replace(/\\(hat|widehat|bar|overline|tilde|widetilde|dot|vec)\s*\{([^{}]*)\}|\\(hat|bar|tilde|dot|vec)\s*(\\[A-Za-z]+|[A-Za-z])/g, (m, k1, a1, k2, a2) => {
+      const k = k1 || k2, a = a1 || a2; const mark = { hat: '̂', widehat: '̂', bar: '̄', overline: '̄', tilde: '̃', widetilde: '̃', dot: '̇', vec: '⃗' }[k];
+      return '{' + a + '}' + mark; });
+    s = s.replace(/\\([A-Za-z]+) ?/g, (m, w) => GREEK[w] || (SYM[w] ? SYM[w] + (m.endsWith(' ') ? ' ' : '') : '') || (/^(frac|dfrac|tfrac|sqrt)$/.test(w) ? '\\' + w : /^(left|right|big|Big|bigg|Bigg|displaystyle|limits|quad|qquad)$/.test(w) ? '' : w));
+    const wrap = a => (a = a.trim(), [...a].length > 1 ? '(' + a + ')' : a);
+    s = s.replace(/\\[dt]?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, (_, a, b) => wrap(a) + '/' + wrap(b));
+    s = s.replace(/\\sqrt\s*\{([^{}]*)\}/g, (_, a) => '√' + wrap(a));
+    s = s.replace(/\\[,;:! ]/g, ' ');
+    // spelled-out Greek: beta0, beta_1, sigma^2, "beta" on its own
+    s = s.replace(/\b(alpha|beta|gamma|delta|epsilon|theta|lambda|sigma|rho|mu)(?=[\d_^]|\b)/g, (m, w) => GREEK[w]);
+    s = s.replace(/([α-ωΑ-Ω̂̄])(\d+)/g, (_, g, d) => g + script(d, SUB, '_'));
+    // {x}^ accent groups from above, then sub- and superscripts
+    s = s.replace(/\{([^{}]+)\}([̂̄̃̇⃗])/g, (_, a, mark) => a.length === 1 ? a + mark : a + mark);
+    s = s.replace(/_\{([^{}]*)\}|_(\\?[A-Za-z0-9+\-α-ω])/g, (_, a, b) => script(a !== undefined ? a : b, SUB, '_'));
+    s = s.replace(/\^\{([^{}]*)\}|\^([A-Za-z0-9+\-*′α-ω])/g, (_, a, b) => script(a !== undefined ? a : b, SUP, '^'));
+    s = s.replace(/[{}]/g, '').replace(/\s{2,}/g, ' ').trim();
+    return s;
+  }
+  // Only the label text of a diagram is changed (quoted labels, [box], (round), {diamond} and |edge| labels).
+  function mermaidMath(src) {
+    if (!/[\\_^$]|\b(alpha|beta|gamma|delta|epsilon|theta|lambda|sigma|rho|mu)\d/.test(src)) return src;
+    return src.split('\n').map(line => /^\s*(%%|classDef|style|linkStyle|class\s)/.test(line) ? line
+      : line.replace(/"([^"\n]*)"/g, (m, a) => '"' + mathText(a).replace(/"/g, "'") + '"')
+            .replace(/(\w)(\[\[|\[\(|\(\[|\[|\(\(|\(|\{\{|\{)([^"\]\)\}\n][^\]\)\}\n]*?)(\]\]|\)\]|\]\)|\]|\)\)|\)|\}\}|\})(?=\s|$|-|:|;|&)/g, (m, id, o, a, c) => id + o + mathText(a) + c)
+            .replace(/\|([^|"\n]+)\|/g, (m, a) => '|' + mathText(a) + '|')).join('\n');
+  }
+
   let mermaidLoad = null, uid = 0;
   const diagrams = new Map();   // source → drawn SVG, so a redraw of the page is instant
   function scriptBase() { const s = document.querySelector('script[src$="figures.js"]'); return s ? s.getAttribute('src').replace(/figures\.js$/, '') : ''; }
@@ -327,7 +365,7 @@
     const src = fig.dataset.src || '';
     try {
       let svg = diagrams.get(src);
-      if (!svg) { const m = await loadMermaid(); ({ svg } = await m.render('sn-mmd-' + (++uid), src)); diagrams.set(src, svg); if (diagrams.size > 300) diagrams.clear(); }
+      if (!svg) { const m = await loadMermaid(); ({ svg } = await m.render('sn-mmd-' + (++uid), mermaidMath(src))); diagrams.set(src, svg); if (diagrams.size > 300) diagrams.clear(); }
       fig.innerHTML = svg; fig.dataset.done = '1';
       const el = fig.querySelector('svg'); if (el) { el.removeAttribute('height'); el.style.maxWidth = Math.min(640, parseFloat(el.style.maxWidth) || 640) + 'px'; el.setAttribute('role', 'img'); }
     } catch (e) {
@@ -388,5 +426,5 @@
     return jobs.length ? Promise.all(jobs).then(() => {}) : Promise.resolve();
   }
 
-  window.SNFig = { upgrade, plotSvg, compile };
+  window.SNFig = { upgrade, plotSvg, compile, mathText, mermaidMath };
 })();
