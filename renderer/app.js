@@ -259,6 +259,8 @@
     return `<div class="menu edit-panel" role="dialog" aria-label="${esc(t('Edit'))}" dir="${UIDIR}">
       <div class="ep-row"><span class="ep-label">${t('Text size')}</span>
         <div class="ep-size"><button type="button" class="btn" data-act="zoom-step" data-dir="-1" aria-label="${esc(t('Smaller'))}">A−</button><button type="button" class="ep-pct" data-act="zoom-step" data-dir="0" title="${esc(t('Normal text size'))}">${z}%</button><button type="button" class="btn" data-act="zoom-step" data-dir="1" aria-label="${esc(t('Bigger'))}">A+</button></div></div>
+      <div class="ep-row"><span class="ep-label">${t('Side panels')}</span>
+        <div class="ep-toggles"><button type="button" class="btn" data-act="toggle-panel" data-panel="contents" aria-pressed="${!isHidden('contents')}">${t('Contents')}</button><button type="button" class="btn" data-act="toggle-panel" data-panel="slip" aria-pressed="${!isHidden('slip')}">${t('Review slip')}</button></div></div>
       <div class="ep-row"><span class="ep-label">${t('Page width')}</span><button type="button" class="sn-link" data-act="page-width-auto" ${pageW() ? '' : 'hidden'}>${t('Automatic')}</button></div>
       <div class="ep-width"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="4" width="10" height="16" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
         <input type="range" id="pageWidth" min="480" max="${maxPageW()}" step="10" value="${pageW() || curPageW()}" aria-label="${esc(t('Page width'))}">
@@ -863,6 +865,7 @@
       case 'new-course': openNewCourse(); break;
       case 'hide-panel': setHidden(b.dataset.panel, true); break;
       case 'page-width-auto': setPageW(0); renderTop(); break;
+      case 'toggle-panel': setHidden(b.dataset.panel, !isHidden(b.dataset.panel)); renderTop(); break;
       case 'show-panel': setHidden(b.dataset.panel, false); break;
       case 'zoom-step': if (window.SNGestures) { const dir = +b.dataset.dir; SNGestures.setNoteZoom(dir ? SNGestures.noteZoom() * (dir > 0 ? 1.1 : 1 / 1.1) : 1); renderTop(); } break;
       case 'settings': openSettings(); break;
