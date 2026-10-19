@@ -13,7 +13,12 @@
   let api = null, bar = null, tools = null, drawing = null;   // drawing = { id, note, overlay, undo: [] }
   const opt = { tool: 'pen', color: 'blue', size: 2 };
   try { Object.assign(opt, JSON.parse(localStorage.getItem('sn-draw') || '{}')); } catch (e) {}
-  const remember = () => { try { localStorage.setItem('sn-draw', JSON.stringify(opt)); } catch (e) {} };
+  // Each notebook keeps its own pen, marker, color and size (saved through SNView, on this device).
+  const remember = () => { if (window.SNView) SNView.save({ draw: { ...opt } }); else try { localStorage.setItem('sn-draw', JSON.stringify(opt)); } catch (e) {} };
+  function setOptions(o) {
+    Object.assign(opt, { tool: 'pen', color: 'blue', size: 2 }, o && typeof o === 'object' ? o : {});
+    if (tools && !tools.hidden && typeof drawTools === 'function') drawTools();
+  }
   const T = (k, v) => (api ? api.t(k, v) : k);
   const rid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -303,5 +308,5 @@
     addEventListener('resize', placeTools);
   }
 
-  window.SNMarkup = { init, apply, toggleDrawing, startDrawing, stopDrawing, refresh, isDrawing: () => !!drawing };
+  window.SNMarkup = { init, apply, toggleDrawing, startDrawing, stopDrawing, refresh, setOptions, isDrawing: () => !!drawing };
 })();

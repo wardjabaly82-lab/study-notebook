@@ -71,10 +71,12 @@
   }
 
   // Pinch on the notes: only the notes text gets bigger or smaller (not the sidebar, toolbar or
-  // buttons), and the line under the mouse stays under the mouse. Remembered on this device.
+  // buttons), and the line under the mouse stays under the mouse. Each notebook keeps its own size
+  // (saved through SNView, on this device).
   const ZKEY = 'sn-note-zoom', ZMIN = 0.75, ZMAX = 2.5;
   let noteZoom = 1;
-  try { noteZoom = Math.min(ZMAX, Math.max(ZMIN, Number(localStorage.getItem(ZKEY)) || 1)); } catch (e) {}
+  try { noteZoom = Math.min(ZMAX, Math.max(ZMIN, Number(document.documentElement.style.getPropertyValue('--note-zoom')) || Number(localStorage.getItem(ZKEY)) || 1)); } catch (e) {}
+  const keep = () => { if (window.SNView) SNView.save({ zoom: noteZoom }); else try { localStorage.setItem(ZKEY, String(noteZoom)); } catch (e) {} };
   const applyZoom = () => document.documentElement.style.setProperty('--note-zoom', String(noteZoom));
   applyZoom();
   let badge = null, badgeTimer = 0, saveTimer = 0;
@@ -94,11 +96,13 @@
     noteZoom = z2; applyZoom();
     if (el && wrap && el.isConnected) { const r1 = el.getBoundingClientRect(); wrap.scrollTop += (r1.top + f * r1.height) - cy; }
     showBadge();
-    clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { localStorage.setItem(ZKEY, String(noteZoom)); } catch (e) {} }, 400);
+    clearTimeout(saveTimer); saveTimer = setTimeout(keep, 400);
   }
-  function setNoteZoom(z) {
-    noteZoom = Math.min(ZMAX, Math.max(ZMIN, Number(z) || 1)); applyZoom(); showBadge();
-    try { localStorage.setItem(ZKEY, String(noteZoom)); } catch (e) {}
+  // quiet: set when switching notebooks (no size badge, nothing saved)
+  function setNoteZoom(z, quiet) {
+    clearTimeout(saveTimer);
+    noteZoom = Math.min(ZMAX, Math.max(ZMIN, Number(z) || 1)); applyZoom();
+    if (!quiet) { showBadge(); keep(); }
   }
   const overNotes = (x, y) => document.elementsFromPoint(x, y).some(n => n.id === 'sheet' || n.id === 'sheetWrap');
 

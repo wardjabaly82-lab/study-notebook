@@ -2,6 +2,9 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.18.0', date: '2026-10-19',
+    en: ['Each notebook now has its own look: font, text size, page width, hidden side panels and drawing tools. Changing one notebook doesn’t change the others.', 'The app reopens the notebook you were last using.'],
+    he: ['לכל מחברת יש עכשיו מראה משלה: גופן, גודל טקסט, רוחב הדף, פאנלים מוסתרים וכלי הציור. שינוי במחברת אחת לא משנה את האחרות.', 'האפליקציה נפתחת במחברת שהייתם בה לאחרונה.'] },
   { v: '1.17.2', date: '2026-10-19',
     en: ['Connecting Gemini: the notebook recognises Gemini’s sign-in, and keeps a short private record of the connection steps so problems can be found.'],
     he: ['חיבור Gemini: המחברת מזהה את ההתחברות של Gemini, ושומרת רישום קצר ופרטי של שלבי החיבור כדי שאפשר יהיה למצוא תקלות.'] },

@@ -59,6 +59,40 @@
   // view: 'notes' | 'lecture' | 'practice'
   const S = { claudeSeen: 0, view: 'notes', lecture: null, lecAt: null, confirmLec: false, renamingLec: false, courseId: store('sn-course') || '', search: '', editing: null, confirmDel: null, collapsed: new Set(), flash: new Set(), menu: false, settings: null, lastClaude: 0, prac: null, pracTopic: '', pracMode: 'due', genType: 'mixed' };
   const course = () => courses().find(c => c.id === S.courseId) || null;
+  /* ---------- each notebook's own look: font, text size, page width, side panels, drawing tools ---------- */
+  // Kept on this device, per course; changing one notebook never changes another. When this
+  // first runs, every existing course starts from the settings used until now (nothing jumps);
+  // a course made later starts from the normal look.
+  const VDEF = { font: 'book', zoom: 1, pagew: 0, hideContents: false, hideSlip: false, draw: null };
+  const VKEY = id => 'sn-view:' + id;
+  function oldShared() {
+    let draw = null; try { draw = JSON.parse(store('sn-draw') || 'null'); } catch (e) {}
+    return { font: store('sn-notefont') || 'book', zoom: Number(store('sn-note-zoom')) || 1, pagew: Number(store('sn-page-width')) || 0, hideContents: store('sn-hide-contents') === '1', hideSlip: store('sn-hide-slip') === '1', draw };
+  }
+  function viewOf(id) {
+    if (!id) return { ...VDEF };
+    let v = null; try { v = JSON.parse(store(VKEY(id)) || 'null'); } catch (e) {}
+    return { ...VDEF, ...(v || {}) };
+  }
+  function saveView(patch) { const id = S.courseId; if (!id) return; store(VKEY(id), JSON.stringify({ ...viewOf(id), ...patch })); }
+  window.SNView = { get: () => viewOf(S.courseId), save: saveView };
+  function splitViews() {
+    if (store('sn-views') === '1') return;
+    const old = oldShared();
+    for (const c of courses()) if (!store(VKEY(c.id))) store(VKEY(c.id), JSON.stringify(old));
+    store('sn-views', '1');
+  }
+  let viewFor = null;
+  function applyView(force) {
+    if (!force && viewFor === S.courseId) return;
+    viewFor = S.courseId;
+    const v = viewOf(S.courseId), root = document.documentElement;
+    root.setAttribute('data-notefont', NOTEFONT[v.font] ? v.font : 'book');
+    if (v.pagew >= 300) { root.dataset.pagew = String(v.pagew); root.style.setProperty('--page-w', v.pagew + 'px'); } else { delete root.dataset.pagew; root.style.removeProperty('--page-w'); }
+    root.toggleAttribute('data-hide-contents', !!v.hideContents); root.toggleAttribute('data-hide-slip', !!v.hideSlip);
+    if (window.SNGestures) SNGestures.setNoteZoom(v.zoom, true); else root.style.setProperty('--note-zoom', String(v.zoom || 1));
+    if (window.SNMarkup && SNMarkup.setOptions) SNMarkup.setOptions(v.draw);
+  }
   function selectCourse(id) { S.courseId = id || ''; store('sn-course', S.courseId); S.view = 'notes'; S.lecture = null; S.prac = null; S.editing = S.confirmDel = null; S.search = ''; render(); const w = $('sheetWrap'); if (w) w.scrollTop = 0; restorePos(); }
   // Remembers, per course, which section you were reading and where in it, and goes back there.
   let posTimer = null;
@@ -198,11 +232,11 @@
   }
 
   /* ================= rendering ================= */
-  function render() { renderSide(); renderTop(); renderContents(); renderSheet(); if (window.SNMarkup) SNMarkup.refresh(); requestAnimationFrame(markReading); }
+  function render() { renderSide(); applyView(); renderTop(); renderContents(); renderSheet(); if (window.SNMarkup) SNMarkup.refresh(); requestAnimationFrame(markReading); }
 
   function renderSide() {
     const list = courses();
-    if (S.courseId && !list.some(c => c.id === S.courseId)) S.courseId = list[0] ? list[0].id : '';
+    if (list.length && S.courseId && !list.some(c => c.id === S.courseId)) S.courseId = list[0].id;   // (not while the notes are still loading)
     if (!S.courseId && list[0]) S.courseId = list[0].id;
     // Each course is a volume on the shelf: its name on the spine, its course number as the call number.
     // A course keeps its cloth colour wherever it's moved: colours follow the order courses were made in.
@@ -247,8 +281,9 @@
   const maxPageW = () => { const w = $('sheetWrap'); return 480 + Math.floor((Math.max(800, (w ? w.clientWidth : 1200) - 8) - 480) / 10) * 10; };
   function setPageW(px) {
     const root = document.documentElement;
-    if (px) { root.dataset.pagew = String(px); root.style.setProperty('--page-w', px + 'px'); store('sn-page-width', String(px)); }
-    else { delete root.dataset.pagew; root.style.removeProperty('--page-w'); store('sn-page-width', ''); }
+    if (px) { root.dataset.pagew = String(px); root.style.setProperty('--page-w', px + 'px'); }
+    else { delete root.dataset.pagew; root.style.removeProperty('--page-w'); }
+    saveView({ pagew: px || 0 });
     const out = $('pageWidthOut'); if (out) out.textContent = px ? px + ' px' : t('Automatic');
     const auto = document.querySelector('[data-act="page-width-auto"]'); if (auto) auto.hidden = !px;
   }
@@ -286,7 +321,7 @@
     }
     document.documentElement.setAttribute('data-peek', p);
   }
-  function setHidden(p, on) { document.documentElement.toggleAttribute('data-hide-' + p, on); store('sn-hide-' + p, on ? '1' : ''); peek(null); renderContents(); renderSlip(); }
+  function setHidden(p, on) { document.documentElement.toggleAttribute('data-hide-' + p, on); saveView(p === 'contents' ? { hideContents: !!on } : { hideSlip: !!on }); peek(null); renderContents(); renderSlip(); }
   const panelBtn = p => isHidden(p)
     ? `<button type="button" class="panel-btn" data-act="show-panel" data-panel="${p}" title="${esc(t('Keep it shown'))}" aria-label="${esc(t('Keep it shown'))}"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`
     : `<button type="button" class="panel-btn" data-act="hide-panel" data-panel="${p}" title="${esc(t('Hide'))}" aria-label="${esc(t('Hide'))}"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="${(p === 'contents') === (UIDIR === 'rtl') ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
@@ -1078,7 +1113,7 @@
   const NOTEFONT = { book: 'Book', clean: 'Clean', plain: 'Plain', heebo: 'Heebo', assistant: 'Assistant', opensans: 'Open Sans', notoserif: 'Noto Serif', david: 'David', alef: 'Alef', rounded: 'Rounded', hand: 'Handwritten' };
   const fontTiles = () => `<div class="font-grid" role="group" aria-label="${esc(t('Notes font'))}">${Object.entries(NOTEFONT).map(([k, name]) => `<button type="button" data-notefont-pick="${k}" aria-pressed="${noteFont() === k}"><span class="nf-${k}" aria-hidden="true">Aa אב</span>${esc(t(name))}</button>`).join('')}</div>`;
   const noteFont = () => document.documentElement.getAttribute('data-notefont') || 'book';
-  function setNoteFont(f) { if (!NOTEFONT[f]) return; document.documentElement.setAttribute('data-notefont', f); store('sn-notefont', f); if (dlg && dlg.open && dlgKind === 'settings') renderSettings(); if (S.editMenu) renderTop(); }
+  function setNoteFont(f) { if (!NOTEFONT[f]) return; document.documentElement.setAttribute('data-notefont', f); saveView({ font: f }); if (dlg && dlg.open && dlgKind === 'settings') renderSettings(); if (S.editMenu) renderTop(); }
   // The window buttons Windows draws at the top right take the colour of the page behind them.
   function syncTitleBar() {
     if (!D.setTitleBar) return;
@@ -1722,6 +1757,7 @@
     // A recording that was still running when the app closed is kept, marked as stopped early.
     for (const [p, d] of Object.entries(docs)) if (p.includes('/lectures/') && d && d.status === 'recording') docs[p] = { ...d, status: 'stopped' };
     S.settings = settings;
+    splitViews(); applyView(true);
     D.setTheme(theme());
     render(); restorePos();
     $('sheetWrap').addEventListener('scroll', () => { clearTimeout(posTimer); posTimer = setTimeout(savePos, 250); }, { passive: true });
