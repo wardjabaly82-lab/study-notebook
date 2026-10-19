@@ -240,6 +240,48 @@
       : `<button class="btn rec-btn" id="recBtn" type="button"><span class="rec-dot"></span>${t('Record lecture')}</button>`;
   }
 
+  // The Edit panel in the toolbar: how the notes look (more settings will be added here).
+  function editPanel() {
+    const z = window.SNGestures ? Math.round(SNGestures.noteZoom() * 100) : 100;
+    return `<div class="menu edit-panel" role="dialog" aria-label="${esc(t('Edit'))}" dir="${UIDIR}">
+      <div class="ep-row"><span class="ep-label">${t('Text size')}</span>
+        <div class="ep-size"><button type="button" class="btn" data-act="zoom-step" data-dir="-1" aria-label="${esc(t('Smaller'))}">A−</button><button type="button" class="ep-pct" data-act="zoom-step" data-dir="0" title="${esc(t('Normal text size'))}">${z}%</button><button type="button" class="btn" data-act="zoom-step" data-dir="1" aria-label="${esc(t('Bigger'))}">A+</button></div></div>
+      <div class="ep-label">${t('Font')}</div>${fontTiles()}
+      <p class="small ep-hint">${t('Tip: pinch on your notes with the touchpad to change the size.')}</p>
+    </div>`;
+  }
+  /* ---------- hiding the contents and the review slip ---------- */
+  // A hidden panel is gone from the page; moving the mouse to that edge brings it back as a pop-up.
+  const isHidden = p => document.documentElement.hasAttribute('data-hide-' + p);
+  let peekTimer = 0;
+  function peek(p) {
+    clearTimeout(peekTimer);
+    for (const id of ['contents', 'slip']) { const el = $(id); if (el && id !== p) { el.style.left = el.style.right = ''; el.style.removeProperty('--peek-from'); } }
+    if (!p) { document.documentElement.removeAttribute('data-peek'); return; }
+    // the pop-up comes out of the edge the mouse touched (left or right, whatever the language)
+    const el = $(p), strip = document.querySelector('.edge-' + p), body = el && el.parentElement;
+    if (el && strip && body) {
+      const sb = strip.getBoundingClientRect(), bb = body.getBoundingClientRect(), left = sb.left + sb.width / 2 < bb.left + bb.width / 2;
+      el.style.left = left ? '6px' : 'auto'; el.style.right = left ? 'auto' : '6px'; el.style.setProperty('--peek-from', left ? '-14px' : '14px');
+    }
+    document.documentElement.setAttribute('data-peek', p);
+  }
+  function setHidden(p, on) { document.documentElement.toggleAttribute('data-hide-' + p, on); store('sn-hide-' + p, on ? '1' : ''); peek(null); renderContents(); renderSlip(); }
+  const panelBtn = p => isHidden(p)
+    ? `<button type="button" class="panel-btn" data-act="show-panel" data-panel="${p}" title="${esc(t('Keep it shown'))}" aria-label="${esc(t('Keep it shown'))}"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`
+    : `<button type="button" class="panel-btn" data-act="hide-panel" data-panel="${p}" title="${esc(t('Hide'))}" aria-label="${esc(t('Hide'))}"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="${(p === 'contents') === (UIDIR === 'rtl') ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
+  function wirePeek() {
+    const body = $('main').querySelector('.body');
+    for (const p of ['contents', 'slip']) { const d = document.createElement('div'); d.className = 'edge-peek edge-' + p; d.dataset.panel = p; d.setAttribute('aria-hidden', 'true'); body.appendChild(d); }
+    document.addEventListener('mouseover', e => {
+      const strip = e.target.closest && e.target.closest('.edge-peek');
+      if (strip) { if (isHidden(strip.dataset.panel)) peek(strip.dataset.panel); return; }
+      const cur = document.documentElement.getAttribute('data-peek'); if (!cur) return;
+      if (e.target.closest && e.target.closest('#' + cur)) clearTimeout(peekTimer);
+      else { clearTimeout(peekTimer); peekTimer = setTimeout(() => peek(null), 300); }
+    });
+  }
+
   function renderTop() {
     const c = course(); const top = $('top');
     const navBtn = `<button class="icon-btn nav-btn" id="navBtn" type="button" aria-label="${esc(t('Courses'))}" aria-controls="courses" aria-expanded="false"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></button>`;
@@ -257,6 +299,10 @@
         <button class="btn${window.SNMarkup && SNMarkup.isDrawing() ? ' on' : ''}" id="drawBtn" type="button" data-act="draw" aria-pressed="${!!(window.SNMarkup && SNMarkup.isDrawing())}" title="${esc(t('Draw, mark up and highlight on your notes'))}" ${has ? '' : 'disabled'}><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4-1 11-11-3-3L5 16z M14 6l3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>${t('Draw')}</button>
         ${recButton()}
         ${WEB ? '' : `<button class="btn" id="printBtn" type="button" ${has ? '' : 'disabled'}><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>${t('Print / PDF')}</button>`}
+        <div class="menu-wrap">
+          <button class="btn${S.editMenu ? ' on' : ''}" id="editBtn" type="button" aria-haspopup="dialog" aria-expanded="${!!S.editMenu}"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18 9.5 5h1L16 18M6.3 13.5h7.4M17.5 18v-6.2M15 14.3h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>${t('Edit')}</button>
+          ${S.editMenu ? editPanel() : ''}
+        </div>
         <div class="menu-wrap">
           <button class="btn" id="moreBtn" type="button" aria-haspopup="menu" aria-expanded="${S.menu}" aria-label="${esc(t('More'))}">⋯</button>
           ${S.menu ? `<div class="menu" role="menu">
@@ -302,7 +348,7 @@
       }
       return `<li><div class="toc-row"><button type="button" class="toc-tog ${ch.length ? '' : 'none'}" data-tog="${esc(s.id)}" aria-expanded="${open}" aria-label="${esc(t('Show or hide sub-topics'))}">▼</button><button type="button" class="toc-link ${d ? 'sub' : ''} ${s.source === 'claude' && (s.updatedAt || 0) > dayAgo ? 'fresh' : ''}" data-go="${esc(s.id)}" title="${esc(s.title)}"><span class="toc-t" dir="auto">${esc(clean(s.title))}</span>${meta}</button></div>${ch.length && open ? `<ul>${ch.map(k => item(k, d + 1)).join('')}</ul>` : ''}</li>`;
     };
-    el.innerHTML = `<h2>${he ? 'תוכן העניינים' : 'Contents'}</h2><ul>${roots.map(s => item(s, 0)).join('')}</ul>${lecHtml}`;
+    el.innerHTML = `<div class="panel-head"><h2>${he ? 'תוכן העניינים' : 'Contents'}</h2>${panelBtn('contents')}</div><ul>${roots.map(s => item(s, 0)).join('')}</ul>${lecHtml}`;
     markReading();
   }
   // The topic you're reading is marked in the contents as you scroll.
@@ -538,7 +584,7 @@
     const exam = n == null || n < 0 ? `<button type="button" class="sn-link" data-act="exam-date">${t('Set exam date')}</button>`
       : `<div class="exam">${t('Exam')}<b>${esc(new Date(c.examDate + 'T12:00').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' }))} · ${esc(n === 0 ? t('today') : tn(n, '1 day', '{n} days'))}</b></div>`;
     el.setAttribute('dir', UIDIR);
-    el.innerHTML = `<h2>${t('Date due')}</h2><p class="sub">${t('This course’s review slip')}</p>
+    el.innerHTML = `<div class="panel-head"><h2>${t('Date due')}</h2>${panelBtn('slip')}</div><p class="sub">${t('This course’s review slip')}</p>
       ${all.length ? `<table>${rows.join('')}</table>` : `<p class="small">${t('Practice cards appear here once the app makes questions for your topics.')}</p>`}
       ${due ? `<button class="btn primary" type="button" data-act="slip-review">${t('Review today’s cards')}</button>` : ''}${exam}
       ${window.StudyTimer ? `<p class="slip-study">${esc(t('Studied today: {a}', { a: window.StudyTimer.today() }))}</p>` : ''}`;
@@ -785,6 +831,9 @@
     const ch = e.target.closest('[data-choice]'); if (ch && S.prac) { S.prac.chosen = +ch.dataset.choice; renderSheet(); return; }
     const gr = e.target.closest('[data-grade]'); if (gr && S.prac) { const c = course(); const k = cards(c.id).find(x => x.id === S.prac.ids[S.prac.i]); if (k) grade(c, k, +gr.dataset.grade); return; }
     if (S.menu && !e.target.closest('.menu-wrap')) { S.menu = false; renderTop(); }
+    if (S.editMenu && !e.target.closest('.edit-panel, #editBtn')) { S.editMenu = false; renderTop(); }
+    if (e.target.closest('#editBtn')) { S.editMenu = !S.editMenu; S.menu = false; renderTop(); return; }
+    const nfp = e.target.closest('.edit-panel [data-notefont-pick]'); if (nfp) { setNoteFont(nfp.dataset.notefontPick); return; }
     if (e.target.closest('#moreBtn')) { S.menu = !S.menu; renderTop(); return; }
     if (e.target.closest('#printBtn')) { if (window.openPrint) window.openPrint(); return; }
     if (e.target.closest('#recBtn')) { if (window.openRecorder) window.openRecorder(); return; }
@@ -794,6 +843,9 @@
     const secs = c ? sections(c.id) : {};
     switch (b.dataset.act) {
       case 'new-course': openNewCourse(); break;
+      case 'hide-panel': setHidden(b.dataset.panel, true); break;
+      case 'show-panel': setHidden(b.dataset.panel, false); break;
+      case 'zoom-step': if (window.SNGestures) { const dir = +b.dataset.dir; SNGestures.setNoteZoom(dir ? SNGestures.noteZoom() * (dir > 0 ? 1.1 : 1 / 1.1) : 1); renderTop(); } break;
       case 'settings': openSettings(); break;
       case 'clear-search': S.search = ''; render(); break;
       case 'edit': if (window.SNMarkup) SNMarkup.stopDrawing(); S.editing = id; S.confirmDel = null; renderSheet(); setTimeout(() => { const ta = document.querySelector('form.edit textarea'); if (ta) ta.focus(); }, 30); break;
@@ -932,6 +984,7 @@
   document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b' && !e.target.closest('input, textarea, [contenteditable]')) { e.preventDefault(); toggleFold(); } });
   if (window.StudyTimer) window.StudyTimer.init({ t, tn, esc, toast, dir: UIDIR });
   window.__snSlip = () => renderSlip();
+  wirePeek();
   syncTitleBar();
   $('settingsBtn').addEventListener('click', () => openSettings());
   $('claudePill').addEventListener('click', () => openSettings());
@@ -992,9 +1045,10 @@
   const warmth = () => document.documentElement.getAttribute('data-warmth') || 'paper';
   function setWarmth(w) { document.documentElement.setAttribute('data-warmth', w); store('sn-warmth', w); syncTitleBar(); if (dlg && dlg.open && dlgKind === 'settings') renderSettings(); }
   // The typeface the notes are written in; each student picks their own.
-  const NOTEFONT = { book: 'Book', clean: 'Clean', plain: 'Plain' };
+  const NOTEFONT = { book: 'Book', clean: 'Clean', plain: 'Plain', heebo: 'Heebo', assistant: 'Assistant', opensans: 'Open Sans', notoserif: 'Noto Serif', david: 'David', alef: 'Alef', rounded: 'Rounded', hand: 'Handwritten' };
+  const fontTiles = () => `<div class="font-grid" role="group" aria-label="${esc(t('Notes font'))}">${Object.entries(NOTEFONT).map(([k, name]) => `<button type="button" data-notefont-pick="${k}" aria-pressed="${noteFont() === k}"><span class="nf-${k}" aria-hidden="true">Aa אב</span>${esc(t(name))}</button>`).join('')}</div>`;
   const noteFont = () => document.documentElement.getAttribute('data-notefont') || 'book';
-  function setNoteFont(f) { document.documentElement.setAttribute('data-notefont', f); store('sn-notefont', f); if (dlg && dlg.open && dlgKind === 'settings') renderSettings(); }
+  function setNoteFont(f) { if (!NOTEFONT[f]) return; document.documentElement.setAttribute('data-notefont', f); store('sn-notefont', f); if (dlg && dlg.open && dlgKind === 'settings') renderSettings(); if (S.editMenu) renderTop(); }
   // The window buttons Windows draws at the top right take the colour of the page behind them.
   function syncTitleBar() {
     if (!D.setTitleBar) return;
@@ -1403,7 +1457,7 @@
         <p class="small">${t('Automatic follows your computer’s light or dark setting.')}</p>
         <div class="seg" role="group" aria-label="${esc(t('Paper warmth'))}">${Object.entries(WARMTH).map(([k, [name, sw]]) => `<button type="button" data-warmth-pick="${k}" aria-pressed="${warmth() === k}"><i class="swatch" style="background:${sw}" aria-hidden="true"></i>${t(name)}</button>`).join('')}</div>
         <p class="small">${t('Paper warmth: how warm the pages and the shelf look, in light and in dark.')}</p>
-        <div class="seg" role="group" aria-label="${esc(t('Notes font'))}">${Object.entries(NOTEFONT).map(([k, name]) => `<button type="button" data-notefont-pick="${k}" aria-pressed="${noteFont() === k}"><span class="nf-${k}" aria-hidden="true">Aa אב</span>${t(name)}</button>`).join('')}</div>
+        ${fontTiles()}
         <p class="small">${t('Notes font: the typeface your notes are written in.')}</p>
         ${WEB ? '' : `<p class="small">${t('Text size: Ctrl + and Ctrl − (Ctrl 0 for normal).')}`} <button type="button" class="sn-link" id="keysLink">${t('All keyboard shortcuts')}</button>${WEB ? '' : '</p>'}</section>
       <section class="group"><h3>${t('Language')}</h3>

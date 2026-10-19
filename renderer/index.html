@@ -10,12 +10,20 @@
 <meta name="theme-color" content="#18181a" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="vendor/fonts/rubik/index.css">
 <link rel="stylesheet" href="vendor/fonts/frank-ruhl-libre/index.css">
+<link rel="stylesheet" href="vendor/fonts/heebo/index.css">
+<link rel="stylesheet" href="vendor/fonts/assistant/index.css">
+<link rel="stylesheet" href="vendor/fonts/open-sans/index.css">
+<link rel="stylesheet" href="vendor/fonts/noto-serif-hebrew/index.css">
+<link rel="stylesheet" href="vendor/fonts/david-libre/index.css">
+<link rel="stylesheet" href="vendor/fonts/alef/index.css">
+<link rel="stylesheet" href="vendor/fonts/varela-round/index.css">
+<link rel="stylesheet" href="vendor/fonts/amatic-sc/index.css">
 <link rel="stylesheet" href="app.css">
 <link rel="stylesheet" href="figures.css">
 <script src="i18n.js"></script>
 <script>
   // Apply the saved theme before anything draws, so there is no flash.
-  (function () { var t = 'system', w = 'paper'; try { t = localStorage.getItem('sn-theme') || 'system'; w = localStorage.getItem('sn-warmth') || 'paper'; } catch (e) {} document.documentElement.setAttribute('data-theme', t); document.documentElement.setAttribute('data-warmth', w); try { if (localStorage.getItem('sn-shelf') === 'folded') document.documentElement.setAttribute('data-shelf', 'folded'); } catch (e) {} try { var nf = localStorage.getItem('sn-notefont'); if (nf) document.documentElement.setAttribute('data-notefont', nf); } catch (e) {} if (window.desktop && window.desktop.isDesktop && window.desktop.platform !== 'darwin') document.documentElement.classList.add('frameless'); })();
+  (function () { var t = 'system', w = 'paper'; try { t = localStorage.getItem('sn-theme') || 'system'; w = localStorage.getItem('sn-warmth') || 'paper'; } catch (e) {} document.documentElement.setAttribute('data-theme', t); document.documentElement.setAttribute('data-warmth', w); try { if (localStorage.getItem('sn-shelf') === 'folded') document.documentElement.setAttribute('data-shelf', 'folded'); } catch (e) {} try { var nf = localStorage.getItem('sn-notefont'); if (nf) document.documentElement.setAttribute('data-notefont', nf); } catch (e) {} try { if (localStorage.getItem('sn-hide-contents') === '1') document.documentElement.setAttribute('data-hide-contents', ''); if (localStorage.getItem('sn-hide-slip') === '1') document.documentElement.setAttribute('data-hide-slip', ''); } catch (e) {} if (window.desktop && window.desktop.isDesktop && window.desktop.platform !== 'darwin') document.documentElement.classList.add('frameless'); })();
 </script>
 </head>
 <body>

@@ -96,6 +96,10 @@
     showBadge();
     clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { localStorage.setItem(ZKEY, String(noteZoom)); } catch (e) {} }, 400);
   }
+  function setNoteZoom(z) {
+    noteZoom = Math.min(ZMAX, Math.max(ZMIN, Number(z) || 1)); applyZoom(); showBadge();
+    try { localStorage.setItem(ZKEY, String(noteZoom)); } catch (e) {}
+  }
   const overNotes = (x, y) => document.elementsFromPoint(x, y).some(n => n.id === 'sheet' || n.id === 'sheetWrap');
 
   document.addEventListener('wheel', e => {
@@ -140,5 +144,5 @@
   const lift = e => { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; };
   document.addEventListener('pointerup', lift); document.addEventListener('pointercancel', lift);
 
-  window.SNGestures = { zoomAt, reset, notesZoomAt, noteZoom: () => noteZoom };
+  window.SNGestures = { zoomAt, reset, notesZoomAt, setNoteZoom, noteZoom: () => noteZoom };
 })();
