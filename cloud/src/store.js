@@ -1,3 +1,4 @@
+import Ops from './notebook-ops.js';
 /* Storage on D1. Every note belongs to one student (uid) and every query is
    scoped to that student, so one student can never read or change another's notes. */
 
@@ -136,11 +137,19 @@ export async function applyPush(env, uid, incoming) {
   for (const ch of incoming) {
     if (!ch || typeof ch.path !== 'string' || !DOC_PATH.test(ch.path)) throw Object.assign(new Error('bad_path'), { code: 'bad_path', path: ch && ch.path });
     if (ch.data !== null && (typeof ch.data !== 'object' || Array.isArray(ch.data) || JSON.stringify(ch.data).length > MAX_DOC)) throw Object.assign(new Error('bad_data'), { code: 'bad_data', path: ch.path });
-    if (ch.data && ch.data.updatedAt) {
-      let cur = null; try { cur = stored.get(ch.path) ? JSON.parse(stored.get(ch.path)) : null; } catch (e) {}
-      if (cur && cur.updatedAt && cur.updatedAt > ch.data.updatedAt) { kept.push({ path: ch.path, data: cur }); continue; }
+    let cur = null;
+    if (ch.data) { try { cur = stored.get(ch.path) ? JSON.parse(stored.get(ch.path)) : null; } catch (e) {} }
+    if (ch.data && ch.data.updatedAt && cur && cur.updatedAt && cur.updatedAt > ch.data.updatedAt) {
+      // The copy here has newer text (e.g. Claude just changed it): keep it, but with the student's
+      // newer highlights and drawings if those came in with this change.
+      const merged = Ops.keepMarks(cur, ch.data);
+      if (merged !== cur) writes.push({ path: ch.path, data: merged });
+      kept.push({ path: ch.path, data: merged }); continue;
     }
-    writes.push({ path: ch.path, data: ch.data });
+    // The incoming text wins; highlights made here more recently are kept.
+    const data = ch.data && cur && ch.path.includes('/sections/') ? Ops.keepMarks(ch.data, cur) : ch.data;
+    writes.push({ path: ch.path, data });
+    if (data !== ch.data) kept.push({ path: ch.path, data });
   }
   const rev = await writeDocs(env, uid, writes);
   return { rev, applied: writes.length, kept };

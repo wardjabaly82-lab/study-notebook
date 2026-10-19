@@ -18,6 +18,8 @@ const hashOf = v => v === undefined || v === null ? null : crypto.createHash('sh
 
 class SyncError extends Error { constructor(code, message) { super(message || code); this.code = code; } }
 
+const { keepMarks } = require('../renderer/notebook-ops.js');
+
 function create({ dataDir, loadData, applyChanges, log, onStatus, fetchImpl }) {
   const doFetch = fetchImpl || fetch;
   const stateFile = () => path.join(dataDir(), 'sync-state.json');
@@ -62,7 +64,13 @@ function create({ dataDir, loadData, applyChanges, log, onStatus, fetchImpl }) {
           const l = docs[ch.path], o = ch.data;
           if (!l) takeRemote = !!o;                                   // gone here, but changed online: bring it back
           else if (!o) takeRemote = false;                            // changed here, deleted online: keep it
-          else takeRemote = (o.updatedAt || 0) > (l.updatedAt || 0);  // both changed: newer wins
+          else {
+            // both changed: the newer text wins, and highlights/drawings come from the copy marked last
+            const newer = (o.updatedAt || 0) > (l.updatedAt || 0);
+            const merged = newer ? keepMarks(o, l) : keepMarks(l, o), mh = hashOf(merged);
+            if (mh === remoteHash) takeRemote = true;
+            else { if (mh !== localHash) incoming.push({ path: ch.path, data: merged }); continue; }   // pushed below
+          }
         }
         if (takeRemote) { incoming.push({ path: ch.path, data: ch.data }); if (remoteHash) st.hashes[ch.path] = remoteHash; else delete st.hashes[ch.path]; }
       }

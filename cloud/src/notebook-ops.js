@@ -332,6 +332,7 @@
         // The student's own highlights and drawings stay (a highlight whose words are gone just doesn't show).
         if (Array.isArray(s.marks) && s.marks.length) updated.marks = s.marks;
         if (Array.isArray(s.ink) && s.ink.length) updated.ink = s.ink;
+        if (s.marksAt) updated.marksAt = s.marksAt;
         return { result: { action: 'updated', course: c.name, section_id: s.id, title: t, path: pathOf({ ...secs, [s.id]: { ...s, title: t } }, s.id), revision: updated.rev }, writes: [{ path: base + s.id, data: updated }] };
       }
 
@@ -355,5 +356,20 @@
     return OPS[op](docs || {}, args && typeof args === 'object' ? args : {}, now);
   }
 
-  return { run, OpError, OPS: Object.keys(OPS), BASE };
+  // The student's highlights, comments and drawings ("marks", "ink") can change on one device
+  // while the text changes elsewhere (Claude updating the topic). When two copies of a topic meet,
+  // the text comes from `doc` and the marks from whichever copy was marked last (marksAt), so a
+  // fresh highlight isn't lost to a newer text from Claude, and vice versa.
+  function keepMarks(doc, other) {
+    if (!doc || !other || typeof doc !== 'object' || typeof other !== 'object') return doc;
+    const at = d => Number(d.marksAt) || 0;
+    const has = d => (Array.isArray(d.marks) && d.marks.length > 0) || (Array.isArray(d.ink) && d.ink.length > 0);
+    const a = at(doc), b = at(other);
+    if (!(b > a || (!a && !b && !has(doc) && has(other)))) return doc;
+    const out = Object.assign({}, doc);
+    for (const k of ['marks', 'ink', 'marksAt']) { if (other[k] !== undefined) out[k] = other[k]; else delete out[k]; }
+    return out;
+  }
+
+  return { run, OpError, OPS: Object.keys(OPS), BASE, keepMarks };
 });

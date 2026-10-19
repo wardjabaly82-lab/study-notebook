@@ -1412,7 +1412,7 @@
       for (const c of changes) {
         if (!c || !DOC_RX.test(c.path) || (c.data !== null && (typeof c.data !== 'object' || Array.isArray(c.data)))) continue;
         const isNew = c.data && !docs[c.path] && c.data.source === 'claude' && c.path.includes('/sections/');
-        if (c.data === null) delete docs[c.path]; else docs[c.path] = c.data;
+        if (c.data === null) delete docs[c.path]; else docs[c.path] = c.path.includes('/sections/') && docs[c.path] && window.NotebookOps ? NotebookOps.keepMarks(c.data, docs[c.path]) : c.data;
         if (isNew) { const parts = c.path.split('/'); (fresh[parts[3]] = fresh[parts[3]] || []).push(parts[5]); }
         if (c.path.includes('/sections/') || c.path.includes('/cards/')) notes++;
       }
@@ -1606,7 +1606,7 @@
     t: (k, v) => t(k, v),
     section: id => { const c = course(); const d = c && docs[secPath(c.id, id)]; return d ? { id, ...d } : null; },
     // Highlights and drawings are saved with the topic; they don't count as editing its text.
-    save: (id, patch) => { const c = course(); const p = c && secPath(c.id, id); if (!p || !docs[p]) return null; docs[p] = { ...docs[p], ...patch }; save(); return { id, ...docs[p] }; },
+    save: (id, patch) => { const c = course(); const p = c && secPath(c.id, id); if (!p || !docs[p]) return null; docs[p] = { ...docs[p], ...patch, marksAt: Date.now() }; save(); return { id, ...docs[p] }; },
     onDrawingChange: () => { const b = $('drawBtn'); if (b) { const on = SNMarkup.isDrawing(); b.setAttribute('aria-pressed', String(on)); b.classList.toggle('on', on); } }
   });
 

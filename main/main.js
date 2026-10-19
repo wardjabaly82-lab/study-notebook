@@ -184,7 +184,7 @@ ipcMain.handle('store:save', async (ev, text) => {
     await waitForConnectorSave();
     const outside = outsideChanges();
     if (outside.length && data && data.docs) {
-      for (const c of outside) { if (c.data === null) delete data.docs[c.path]; else data.docs[c.path] = c.data; }
+      for (const c of outside) { if (c.data === null) delete data.docs[c.path]; else data.docs[c.path] = Ops.keepMarks(c.data, data.docs[c.path]); }
       text = JSON.stringify(data);
       showOutsideChanges(outside);
     }

@@ -137,6 +137,27 @@ ok((await bob.go('/api/me')).status === 401, 'Bob’s browser is signed out');
 const dead = await cb.callTool({ name: 'list_courses', arguments: {} }).then(() => 'worked', e => 'refused'); ok(dead === 'refused', 'Bob’s Claude connection stops working');
 ok(Object.keys((await api(alice, 'docs')).docs).length === 12, 'Alice’s notes untouched');
 
+console.log('Highlights survive Claude’s changes');
+{
+  const P = `${BASE}/c1/sections/hl1`;
+  await api(alice, 'push', { changes: [{ path: P, data: { title: 'T', content: 'old text', updatedAt: 100 } }] });
+  // the student highlights (on this device) ...
+  await api(alice, 'push', { changes: [{ path: P, data: { title: 'T', content: 'old text', updatedAt: 100, marks: [{ id: 'h1', q: 'old', c: 'yellow' }], marksAt: 200 } }] });
+  // ... while another copy without the highlight but with newer text arrives (Claude updated it elsewhere)
+  const r1 = await api(alice, 'push', { changes: [{ path: P, data: { title: 'T', content: 'new text from Claude', updatedAt: 300 } }] });
+  let d = (await api(alice, 'docs')).docs[P];
+  ok(d.content === 'new text from Claude' && d.marks && d.marks.length === 1 && r1.kept && r1.kept.length === 1, 'newer text from Claude keeps the student’s newer highlight');
+  // an older copy with a fresher highlight: text stays, highlight is taken
+  const r2 = await api(alice, 'push', { changes: [{ path: P, data: { title: 'T', content: 'old text', updatedAt: 100, marks: [{ id: 'h1', q: 'old', c: 'yellow' }, { id: 'h2', q: 'text', c: 'green' }], marksAt: 400 } }] });
+  d = (await api(alice, 'docs')).docs[P];
+  ok(d.content === 'new text from Claude' && d.marks.length === 2 && r2.kept[0].data.marks.length === 2, 'a fresh highlight from an older copy is added to the newer text');
+  // removing all highlights later also syncs
+  await api(alice, 'push', { changes: [{ path: P, data: { ...d, marks: [], marksAt: 500 } }] });
+  d = (await api(alice, 'docs')).docs[P];
+  ok(d.marks.length === 0, 'removing highlights syncs too');
+  await api(alice, 'push', { changes: [{ path: P, data: null }] });
+}
+
 console.log('Rate limits');
 let codes = []; for (let i = 0; i < 33; i++) codes.push(...await Promise.all(Array.from({ length: 10 }, () => fetch(O + '/sync/ping', { headers: H }).then(r => r.status))));
 ok(codes.filter(c => c === 200).length >= 250 && codes.includes(429), `one account flooding the server is slowed down (${codes.filter(c => c === 429).length} of 330 refused)`);

@@ -45,7 +45,32 @@
       const score = sameEnd(idx.text.slice(Math.max(0, i - pre.length), i), pre) + sameStart(idx.text.slice(i + q.length, i + q.length + suf.length), suf);
       if (score > bestScore) { best = [i, i + q.length]; bestScore = score; }
     }
-    return best;
+    return best || near(idx.text, h);
+  }
+  // When the exact words aren't there any more (Claude reworded the topic a little, spacing or
+  // punctuation changed), look for the same words with any spacing/punctuation between them, then
+  // for the longest part of the highlight that is still there, near its old neighbours.
+  const RX = c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  function near(text, h) {
+    const words = String(h.q || '').split(/[\s.,;:!?()"'“”׳״\-–—]+/).filter(Boolean);
+    if (!words.length) return null;
+    const ctx = (i, j) => sameEnd(text.slice(Math.max(0, i - 64), i), String(h.pre || '')) + sameStart(text.slice(j, j + 64), String(h.suf || ''));
+    const find = ws => {
+      const rx = new RegExp(ws.map(RX).join('[\\s.,;:!?()"\'“”׳״\\-–—]+'), 'g');
+      let m, best = null, bs = -1, guard = 0;
+      while ((m = rx.exec(text)) && guard++ < 200) { const sc = ctx(m.index, m.index + m[0].length); if (sc > bs) { bs = sc; best = [m.index, m.index + m[0].length]; } if (!m[0].length) rx.lastIndex++; }
+      return best;
+    };
+    const all = find(words); if (all) return all;
+    // the longest run of the highlighted words still in the text (at least 2 words, or 1 long word)
+    for (let len = words.length - 1; len >= 1; len--) {
+      for (let st = 0; st + len <= words.length; st++) {
+        const part = words.slice(st, st + len);
+        if (len === 1 && part[0].length < 5) continue;
+        const r = find(part); if (r) return r;
+      }
+    }
+    return null;
   }
   function wrap(idx, start, end, h) {
     const color = HL.includes(h.c) || h.c === 'note' ? h.c : 'yellow';
