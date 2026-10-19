@@ -307,7 +307,7 @@
 
   window.openPrint = what => {
     if (typeof what === 'string') opts.what = what;
-    if (!dlg) { dlg = document.createElement('dialog'); dlg.className = 'pr-dlg'; document.body.appendChild(dlg); dlg.addEventListener('close', () => { reqId++; }); }
+    if (!dlg) { dlg = document.createElement('dialog'); dlg.className = 'pr-dlg'; document.body.appendChild(dlg); if (window.SNCloseOutside) window.SNCloseOutside(dlg); dlg.addEventListener('close', () => { reqId++; }); }
     src = null; lastInfo = '';
     if (opts.what && opts.what !== '__formulas' && opts.what !== '__pick' && !(source() || { topics: [] }).topics.some(t => t.id === opts.what)) opts.what = '';
     src = null; source();

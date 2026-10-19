@@ -1093,8 +1093,16 @@
 
   /* ================= dialogs ================= */
   let dlg = null, dlgKind = '';
+  // Clicking anywhere outside a pop-up closes it (a drag that starts inside, e.g. selecting text, doesn't).
+  function closeOutside(d) {
+    const out = e => { const r = d.getBoundingClientRect(); return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom; };
+    let downOut = false;
+    d.addEventListener('mousedown', e => { downOut = e.target === d && out(e); });
+    d.addEventListener('click', e => { if (downOut && e.target === d && out(e)) d.close(); downOut = false; });
+  }
+  window.SNCloseOutside = closeOutside;
   function openDlg(kind, html, onOpen) {
-    if (!dlg) { dlg = document.createElement('dialog'); dlg.className = 'dlg'; document.body.appendChild(dlg); dlg.addEventListener('scroll', e => { if (e.target.classList && e.target.classList.contains('dlg-in')) dlg.classList.toggle('scrolled', e.target.scrollTop > 4); }, true); dlg.addEventListener('close', () => { dlg.classList.remove('scrolled'); if (dlgKind === 'welcome') store('sn-welcomed', '1'); dlgKind = ''; D.getSettings().then(st => { S.settings = st; renderClaudePill(); if (S.view === 'notes') renderSheet(); }); }); }
+    if (!dlg) { dlg = document.createElement('dialog'); dlg.className = 'dlg'; document.body.appendChild(dlg); closeOutside(dlg); dlg.addEventListener('scroll', e => { if (e.target.classList && e.target.classList.contains('dlg-in')) dlg.classList.toggle('scrolled', e.target.scrollTop > 4); }, true); dlg.addEventListener('close', () => { dlg.classList.remove('scrolled'); if (dlgKind === 'welcome') store('sn-welcomed', '1'); dlgKind = ''; D.getSettings().then(st => { S.settings = st; renderClaudePill(); if (S.view === 'notes') renderSheet(); }); }); }
     dlgKind = kind; dlg.innerHTML = html; dlg.classList.toggle('wide', kind === 'search'); dlg.classList.remove('scrolled');
     // Move the title and × out of the scrolling area.
     const top = dlg.querySelector('.dlg-in > .dlg-head:first-child'); if (top) { top.classList.add('dlg-top'); dlg.prepend(top); }
@@ -1674,13 +1682,18 @@
   const NEWS = Array.isArray(window.SNWhatsNew) ? window.SNWhatsNew : [];
   const vcmp = (a, b) => { const x = String(a || '').split('.').map(n => parseInt(n, 10) || 0), y = String(b || '').split('.').map(n => parseInt(n, 10) || 0); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
   // since: the version the student had before (shows only what came after it); none = the latest few.
+  // In its own small window on top of whatever is open (Settings stays open underneath).
+  let newsDlg = null;
   function openNews(since) {
     const list = NEWS.filter(n => !since || vcmp(n.v, since) > 0).slice(0, since ? 40 : 12);
     if (!list.length) return false;
     const day = d => { try { return new Date(d + 'T12:00').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' }); } catch (e) { return d; } };
-    openDlg('news', `<div class="dlg-in news" dir="${UIDIR}">${head(t('What’s new'), since ? t('Study Notebook was updated to version {v}.', { v: list[0].v }) : '')}
+    if (!newsDlg) { newsDlg = document.createElement('dialog'); newsDlg.className = 'dlg news-dlg'; document.body.appendChild(newsDlg); closeOutside(newsDlg); }
+    newsDlg.innerHTML = `<div class="dlg-in news" dir="${UIDIR}">${head(t('What’s new'), since ? t('Study Notebook was updated to version {v}.', { v: list[0].v }) : '')}
       ${list.map(n => `<section class="news-v"><h3>${esc(t('Version {v}', { v: n.v }))} <span>${esc(day(n.date))}</span></h3><ul>${((uiLang === 'he' && n.he) || n.en || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>`).join('')}
-      <div class="row"><button class="btn primary" type="button" data-close>${t('Got it')}</button></div></div>`);
+      <div class="row"><button class="btn primary" type="button" data-close>${t('Got it')}</button></div></div>`;
+    newsDlg.querySelectorAll('[data-close]').forEach(x => x.onclick = () => newsDlg.close());
+    if (!newsDlg.open) newsDlg.showModal();
     return true;
   }
   // Once after an update: what changed since the version the student had.
