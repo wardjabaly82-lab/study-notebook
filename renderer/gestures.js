@@ -2,14 +2,14 @@
    - Pinch on a graph or diagram: zoom into it (up to 5x), around the fingers. It keeps its place on
      the page; two-finger scroll moves around inside it, and at its edges the page scrolls on.
      Double-click (or the "100%" chip) puts it back.
-   - Pinch anywhere else on the notes (desktop app): bigger or smaller text, like Ctrl + / Ctrl −.
+   - Pinch anywhere else on the notes: only the notes text gets bigger or smaller, around the mouse
+     (the rest of the app keeps its size). Ctrl + / Ctrl − still size the whole app.
    - Touch screens: two-finger pinch and drag on a graph or diagram do the same.
    A trackpad pinch reaches the page as a wheel event with Ctrl held, on Windows and Mac alike. */
 (function () {
   'use strict';
   const MIN = 1, MAX = 5;
   const state = new WeakMap();   // figure → { s, x, y }
-  const D = window.desktop || {};
   const drawing = () => !!(window.SNMarkup && SNMarkup.isDrawing && SNMarkup.isDrawing());
 
   function figureAt(x, y) {
@@ -70,22 +70,39 @@
     st.s = 1; paint(f, st);
   }
 
-  // Pinch on the rest of the page: text size, one step per pinch movement.
-  let pinchAcc = 0, lastWheel = 0, lastStep = 0;
-  function pageZoom(dy) {
-    if (!D.textSize) return false;                         // the website leaves pinch to the browser
-    const now = Date.now();
-    if (now - lastWheel > 350) pinchAcc = 0;
-    lastWheel = now; pinchAcc += dy;
-    if (Math.abs(pinchAcc) >= 50 && now - lastStep > 250) { D.textSize(pinchAcc < 0 ? 1 : -1); pinchAcc = 0; lastStep = now; }
-    return true;
+  // Pinch on the notes: only the notes text gets bigger or smaller (not the sidebar, toolbar or
+  // buttons), and the line under the mouse stays under the mouse. Remembered on this device.
+  const ZKEY = 'sn-note-zoom', ZMIN = 0.75, ZMAX = 2.5;
+  let noteZoom = 1;
+  try { noteZoom = Math.min(ZMAX, Math.max(ZMIN, Number(localStorage.getItem(ZKEY)) || 1)); } catch (e) {}
+  const applyZoom = () => document.documentElement.style.setProperty('--note-zoom', String(noteZoom));
+  applyZoom();
+  let badge = null, badgeTimer = 0, saveTimer = 0;
+  function showBadge() {
+    if (!badge) { badge = document.createElement('div'); badge.className = 'zoom-badge'; badge.setAttribute('role', 'status'); document.body.appendChild(badge); }
+    badge.textContent = Math.round(noteZoom * 100) + '%';
+    badge.classList.add('on'); clearTimeout(badgeTimer);
+    badgeTimer = setTimeout(() => badge.classList.remove('on'), 900);
   }
+  function notesZoomAt(factor, cx, cy) {
+    const wrap = document.getElementById('sheetWrap');
+    const z2 = Math.min(ZMAX, Math.max(ZMIN, noteZoom * factor));
+    if (Math.abs(z2 - noteZoom) < 0.001) { showBadge(); return; }
+    // the block under the mouse, and how far down it the mouse is
+    const el = (document.elementsFromPoint(cx, cy).find(n => n.closest && n.closest('#sheet') && n.id !== 'sheet') || null);
+    const r0 = el && el.getBoundingClientRect(), f = r0 && r0.height ? (cy - r0.top) / r0.height : 0;
+    noteZoom = z2; applyZoom();
+    if (el && wrap && el.isConnected) { const r1 = el.getBoundingClientRect(); wrap.scrollTop += (r1.top + f * r1.height) - cy; }
+    showBadge();
+    clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { localStorage.setItem(ZKEY, String(noteZoom)); } catch (e) {} }, 400);
+  }
+  const overNotes = (x, y) => document.elementsFromPoint(x, y).some(n => n.id === 'sheet' || n.id === 'sheetWrap');
 
   document.addEventListener('wheel', e => {
     if (e.ctrlKey) {
       const f = !drawing() && figureAt(e.clientX, e.clientY);
       if (f) { e.preventDefault(); zoomAt(f, Math.min(1.25, Math.max(0.8, Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : 0.01)))), e.clientX, e.clientY); return; }
-      if (pageZoom(e.deltaY)) e.preventDefault();
+      if (overNotes(e.clientX, e.clientY)) { e.preventDefault(); notesZoomAt(Math.min(1.12, Math.max(0.9, Math.exp(-e.deltaY * (e.deltaMode ? 0.03 : 0.006)))), e.clientX, e.clientY); }
       return;
     }
   }, { passive: false, capture: true });
@@ -123,5 +140,5 @@
   const lift = e => { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; };
   document.addEventListener('pointerup', lift); document.addEventListener('pointercancel', lift);
 
-  window.SNGestures = { zoomAt, reset };
+  window.SNGestures = { zoomAt, reset, notesZoomAt, noteZoom: () => noteZoom };
 })();
