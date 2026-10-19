@@ -86,6 +86,13 @@ mark.hl.blue, mark.uh-blue { background: var(--hl-blue); }
 mark.hl.pink, mark.uh-pink { background: var(--hl-pink); }
 mark.hl.orange, mark.uh-orange { background: var(--hl-orange); }
 mark.uh { cursor: pointer; }
+/* comments the student leaves on words: a dotted underline (or their highlight) and a small bubble */
+mark.uh-note { background: none; padding: 0; border-radius: 0; text-decoration: underline dotted color-mix(in srgb, var(--fig-orange) 85%, transparent); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+mark.note-end::after { content: ""; display: inline-block; width: .82em; height: .82em; margin-inline-start: .18em; vertical-align: super; font-size: .62em;
+  background: var(--fig-orange); border-radius: 50% 50% 50% 2px; -webkit-mask: none; opacity: .9; }
+@media print {
+  mark.note-end::after { content: " (" attr(data-note-text) ")"; display: inline; width: auto; height: auto; background: none; vertical-align: baseline; font-size: .78em; font-style: italic; color: var(--fig-muted); border-radius: 0; }
+}
 
 /* ---------- callout boxes:  > [!tip] Title ---------- */
 blockquote.callout, .callout { --co: var(--fig-blue); margin: 1em 0; padding: .65em .95em; border: 0; border-inline-start: 4px solid var(--co);

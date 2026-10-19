@@ -1,7 +1,8 @@
 /* The student's highlighter and drawing tools on the notes page.
 
-   - Select text in a note → a small bar with highlighter colors appears. Click a highlight to
-     change its color or remove it.
+   - Select text in a note → a small bar with highlighter colors and "Comment" appears. Click a
+     highlight to change its color, comment on it or remove it. Click commented words to read or
+     edit the comment.
    - "Draw" on a topic → a toolbar with pen, marker, line, arrow, box, circle and eraser, colors,
      sizes and undo. Drawings are pinned to the paragraph they're on (see marks.js).
 
@@ -50,7 +51,8 @@
     const over = range ? [...note.querySelectorAll('mark.uh')].filter(m => range.intersectsNode(m)).map(m => m.dataset.hl) : [];
     const ids = hlId ? [hlId] : [...new Set(over)];
     bar.innerHTML = SNMarks.HL.map(c => `<button type="button" class="mb-c uh-${c}" data-c="${c}" title="${esc(T(hlId ? 'Change to {color}' : 'Highlight {color}', { color: T(HLNAME[c]) }))}" aria-label="${esc(T(hlId ? 'Change to {color}' : 'Highlight {color}', { color: T(HLNAME[c]) }))}"></button>`).join('')
-      + (ids.length ? `<span class="mb-sep"></span><button type="button" class="mb-x" data-remove>${esc(T('Remove highlight'))}</button>` : '');
+      + `<span class="mb-sep"></span><button type="button" class="mb-x mb-note" data-comment title="${esc(T('Add a comment'))}"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-8l-4 3.5V16H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>${esc(T(noteOfMark(s, hlId) ? 'Edit comment' : 'Comment'))}</button>`
+      + (ids.length ? `<button type="button" class="mb-x" data-remove>${esc(T('Remove highlight'))}</button>` : '');
     bar.querySelectorAll('[data-c]').forEach(b => b.onclick = () => {
       const c = b.dataset.c;
       if (hlId) save(note.dataset.note, { marks: (s.marks || []).map(m => (m.id === hlId ? { ...m, c } : m)) });
@@ -61,16 +63,28 @@
       }
       hideBar();
     });
+    bar.querySelector('[data-comment]').onclick = () => {
+      // a comment goes on the highlight it's on; on plain text it gets its own dotted underline
+      const target = hlId || (ids.length === 1 ? ids[0] : null);
+      let q = null;
+      if (!target) { q = SNMarks.quoteFromRange(note, range); if (!q) return hideBar(); }
+      const r = bar.getBoundingClientRect(); hideBar();
+      if (range) getSelection().removeAllRanges();
+      openComment(note, target, q, r);
+    };
     const x = bar.querySelector('[data-remove]');
     if (x) x.onclick = () => { save(note.dataset.note, { marks: (s.marks || []).filter(m => !ids.includes(m.id)) }); if (range) getSelection().removeAllRanges(); hideBar(); };
     place(bar, rect);
   }
   function onPointerUp(e) {
-    if (drawing || (e && e.target && e.target.closest && e.target.closest('.mark-bar, .draw-bar, input, textarea, button, a, select'))) return;
+    if (drawing || (e && e.target && e.target.closest && e.target.closest('.mark-bar, .draw-bar, .note-pop, input, textarea, button, a, select'))) return;
     const sel = getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) {
       const m = e && e.target && e.target.closest && e.target.closest('mark.uh');
-      if (m && noteOf(m) && api.section(noteOf(m).dataset.note)) return showBar(m.getBoundingClientRect(), noteOf(m), null, m.dataset.hl);
+      if (m && noteOf(m) && api.section(noteOf(m).dataset.note)) {
+        if (m.classList.contains('uh-note')) { hideBar(); return openComment(noteOf(m), m.dataset.hl, null, m.getBoundingClientRect()); }
+        return showBar(m.getBoundingClientRect(), noteOf(m), null, m.dataset.hl);
+      }
       return hideBar();
     }
     const range = sel.getRangeAt(0), note = noteOf(range.startContainer);
@@ -78,6 +92,42 @@
     const r = range.getBoundingClientRect(); if (!r.width && !r.height) return hideBar();
     showBar(r, note, range, null);
   }
+
+  /* ---------- comments on words ---------- */
+  let pop = null;
+  const noteOfMark = (s, id) => { const m = id && (s.marks || []).find(x => x.id === id); return m && m.n ? m.n : ''; };
+  function closeComment() { if (pop) pop.hidden = true; }
+  function openComment(note, hlId, quote, rect) {
+    const id = note.dataset.note, s = api.section(id); if (!s) return;
+    if (!pop) {
+      pop = document.createElement('div'); pop.className = 'note-pop'; pop.setAttribute('role', 'dialog'); pop.hidden = true;
+      document.body.appendChild(pop);
+    }
+    const cur = noteOfMark(s, hlId);
+    pop.innerHTML = `<label class="np-label">${esc(T('Your comment'))}</label>
+      <textarea dir="auto" maxlength="2000" rows="3" placeholder="${esc(T('Write a short note…'))}">${esc(cur)}</textarea>
+      <div class="np-row">${cur ? `<button type="button" class="np-del">${esc(T('Delete comment'))}</button>` : '<span></span>'}
+        <span class="np-btns"><button type="button" class="btn ghost np-cancel">${esc(T('Cancel'))}</button><button type="button" class="btn primary np-save">${esc(T('Save'))}</button></span></div>`;
+    const ta = pop.querySelector('textarea');
+    const done = text => {
+      const now = api.section(id); if (!now) return closeComment();
+      const marks = now.marks || [];
+      text = String(text || '').trim().slice(0, 2000);
+      let next;
+      if (hlId) next = marks.flatMap(m => m.id !== hlId ? [m] : m.c === 'note' && !text ? [] : [Object.assign({}, m, { n: text || undefined })]);
+      else if (text && quote) next = marks.concat({ id: rid('h'), ...quote, c: 'note', n: text });
+      else next = marks;
+      save(id, { marks: JSON.parse(JSON.stringify(next)) });
+      closeComment();
+    };
+    pop.querySelector('.np-save').onclick = () => done(ta.value);
+    pop.querySelector('.np-cancel').onclick = closeComment;
+    const del = pop.querySelector('.np-del'); if (del) del.onclick = () => done('');
+    ta.onkeydown = e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); done(ta.value); } if (e.key === 'Escape') { e.preventDefault(); closeComment(); } };
+    place(pop, rect);
+    setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 0);
+  }
+  document.addEventListener('mousedown', e => { if (pop && !pop.hidden && !e.target.closest('.note-pop, .mark-bar')) closeComment(); });
 
   /* ---------- saving ---------- */
   function save(id, patch) { const s = api.save(id, patch); if (s) refreshNote(id); return s; }

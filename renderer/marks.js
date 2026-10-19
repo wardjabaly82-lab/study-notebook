@@ -48,7 +48,9 @@
     return best;
   }
   function wrap(idx, start, end, h) {
-    const color = HL.includes(h.c) ? h.c : 'yellow';
+    const color = HL.includes(h.c) || h.c === 'note' ? h.c : 'yellow';
+    const note = typeof h.n === 'string' && h.n.trim() ? h.n.trim() : '';
+    let last = null;
     for (const seg of idx.nodes) {
       if (seg.end <= start || seg.start >= end) continue;
       let node = seg.node;
@@ -59,9 +61,12 @@
       if (s > 0) node = node.splitText(s);
       if (e - s < node.nodeValue.length) node.splitText(e - s);
       const m = document.createElement('mark');
-      m.className = 'uh uh-' + color; m.dataset.hl = h.id || '';
-      node.parentNode.insertBefore(m, node); m.appendChild(node);
+      m.className = 'uh uh-' + color + (note ? ' has-note' : ''); m.dataset.hl = h.id || '';
+      if (note) m.title = note;
+      node.parentNode.insertBefore(m, node); m.appendChild(node); last = m;
     }
+    // a comment shows as a small bubble after the marked words (and as the text itself when printed)
+    if (last && note) { last.classList.add('note-end'); last.dataset.noteText = note; }
   }
   function clearHighlights(root) {
     root.querySelectorAll('mark.uh').forEach(m => m.replaceWith(...m.childNodes));
