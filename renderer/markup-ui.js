@@ -63,7 +63,13 @@
       if (hlId) save(note.dataset.note, { marks: (s.marks || []).map(m => (m.id === hlId ? { ...m, c } : m)) });
       else {
         const q = SNMarks.quoteFromRange(note, range); if (!q) return hideBar();
-        save(note.dataset.note, { marks: (s.marks || []).filter(m => !ids.includes(m.id)).concat({ id: rid('h'), ...q, c }) });
+        // Only highlights the new one covers completely are replaced. A word marked inside a highlighted
+        // sentence goes on top of it in its own colour, and the rest of the sentence keeps its colour.
+        const inside = new Set(ids.filter(id => {
+          const els = [...note.querySelectorAll('mark.uh')].filter(m => m.dataset.hl === id && !m.classList.contains('uh-note'));
+          return els.length && els.every(el => { const r = document.createRange(); r.selectNodeContents(el); return range.compareBoundaryPoints(Range.START_TO_START, r) <= 0 && range.compareBoundaryPoints(Range.END_TO_END, r) >= 0; });
+        }));
+        save(note.dataset.note, { marks: (s.marks || []).filter(m => !inside.has(m.id)).concat({ id: rid('h'), ...q, c }) });
         getSelection().removeAllRanges();
       }
       hideBar();

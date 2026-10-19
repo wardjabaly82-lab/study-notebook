@@ -57,7 +57,7 @@
 
   /* ================= state ================= */
   // view: 'notes' | 'lecture' | 'practice'
-  const S = { claudeSeen: 0, view: 'notes', lecture: null, lecAt: null, confirmLec: false, renamingLec: false, courseId: store('sn-course') || '', search: '', editing: null, confirmDel: null, collapsed: new Set(), flash: new Set(), menu: false, settings: null, lastClaude: 0, prac: null, pracTopic: '', pracMode: 'due', genType: 'mixed' };
+  const S = { home: true, claudeSeen: 0, view: 'notes', lecture: null, lecAt: null, confirmLec: false, renamingLec: false, courseId: store('sn-course') || '', search: '', editing: null, confirmDel: null, collapsed: new Set(), flash: new Set(), menu: false, settings: null, lastClaude: 0, prac: null, pracTopic: '', pracMode: 'due', genType: 'mixed' };
   const course = () => courses().find(c => c.id === S.courseId) || null;
   /* ---------- each notebook's own look: font, text size, page width, side panels, drawing tools ---------- */
   // Kept on this device, per course; changing one notebook never changes another. When this
@@ -93,7 +93,7 @@
     if (window.SNGestures) SNGestures.setNoteZoom(v.zoom, true); else root.style.setProperty('--note-zoom', String(v.zoom || 1));
     if (window.SNMarkup && SNMarkup.setOptions) SNMarkup.setOptions(v.draw);
   }
-  function selectCourse(id) { S.courseId = id || ''; store('sn-course', S.courseId); S.view = 'notes'; S.lecture = null; S.prac = null; S.editing = S.confirmDel = null; S.search = ''; render(); const w = $('sheetWrap'); if (w) w.scrollTop = 0; restorePos(); }
+  function selectCourse(id) { S.home = false; S.courseId = id || ''; store('sn-course', S.courseId); S.view = 'notes'; S.lecture = null; S.prac = null; S.editing = S.confirmDel = null; S.search = ''; render(); const w = $('sheetWrap'); if (w) w.scrollTop = 0; restorePos(); }
   // Remembers, per course, which section you were reading and where in it, and goes back there.
   let posTimer = null;
   function savePos() {
@@ -101,6 +101,7 @@
     const w = $('sheetWrap'), top = w.getBoundingClientRect().top;
     const sec = [...$('sheet').querySelectorAll(':scope > .sec')].find(el => el.getBoundingClientRect().bottom > top + 8);
     store('sn-pos-' + S.courseId, sec ? JSON.stringify({ id: sec.id, off: Math.round(top - sec.getBoundingClientRect().top) }) : '');
+    if (sec && !S.home) store('sn-last-read', JSON.stringify({ cid: S.courseId, sid: sec.id.replace(/^sec-/, ''), at: Date.now() }));   // for "continue" on the home screen
   }
   function restorePos() {
     let p = null; try { p = JSON.parse(store('sn-pos-' + S.courseId) || 'null'); } catch (e) {}
@@ -232,7 +233,11 @@
   }
 
   /* ================= rendering ================= */
-  function render() { renderSide(); applyView(); renderTop(); renderContents(); renderSheet(); if (window.SNMarkup) SNMarkup.refresh(); requestAnimationFrame(markReading); }
+  function render() {
+    document.documentElement.toggleAttribute('data-home', !!S.home);
+    $('home').hidden = !S.home;
+    if (S.home) { renderSide(); renderHome(); return; }
+    renderSide(); applyView(); renderTop(); renderContents(); renderSheet(); if (window.SNMarkup) SNMarkup.refresh(); requestAnimationFrame(markReading); }
 
   function renderSide() {
     const list = courses();
@@ -250,8 +255,9 @@
       const call = num || title.split(/\s+/).filter(Boolean).slice(0, 3).map(w => w[0]).join('').toUpperCase();
       const ex = daysTo(c.examDate), soon = ex != null && ex >= 0 && ex <= 7;
       if (soon) parts.push(ex === 0 ? t('Exam today') : ex === 1 ? t('Exam tomorrow') : t('Exam in {n} days', { n: ex }));
-      return `<button class="course${soon ? ' exam-soon' : ''}${c.photo ? ' has-photo' : ''}" type="button" data-course="${esc(c.id)}" aria-current="${c.id === S.courseId}" style="--c:${COVERS[(c.color ?? made.indexOf(c.id)) % COVERS.length]}${c.photo ? `;--photo:url(${c.photo})` : ''}" title="${esc(c.name + ' · ' + parts.join(t(', ')) + '\n' + t('Drag to move it on the shelf · right-click to edit'))}"><b class="sp-t" dir="auto">${esc(title)}</b><span class="cn" dir="auto">${esc(call)}</span>${soon ? `<span class="sp-exam" aria-hidden="true">${ex === 0 ? '!' : ex}</span>` : ''}${due ? `<span class="due-pill" aria-hidden="true">${due}</span>` : ''}</button>`;
+      return `<button class="course${soon ? ' exam-soon' : ''}${c.photo ? ' has-photo' : ''}" type="button" data-course="${esc(c.id)}" aria-current="${!S.home && c.id === S.courseId}" style="--c:${COVERS[(c.color ?? made.indexOf(c.id)) % COVERS.length]}${c.photo ? `;--photo:url(${c.photo})` : ''}" title="${esc(c.name + ' · ' + parts.join(t(', ')) + '\n' + t('Drag to move it on the shelf · right-click to edit'))}"><b class="sp-t" dir="auto">${esc(title)}</b><span class="cn" dir="auto">${esc(call)}</span>${soon ? `<span class="sp-exam" aria-hidden="true">${ex === 0 ? '!' : ex}</span>` : ''}${due ? `<span class="due-pill" aria-hidden="true">${due}</span>` : ''}</button>`;
     }).join('') || `<p class="small" style="padding:6px 10px">${t('No courses yet.')}</p>`;
+    $('homeBtn').setAttribute('aria-current', String(!!S.home));
     renderClaudePill(); renderSlip();
     const th = theme();
     $('themeBtn').innerHTML = THEME_ICON[th];
@@ -882,6 +888,8 @@
   const showView = v => { S.view = v; S.editing = S.confirmDel = null; S.confirmLec = S.renamingLec = false; renderTop(); renderContents(); renderSheet(); $('sheetWrap').scrollTop = 0; };
 
   document.addEventListener('click', e => {
+    if (e.target.closest('#homeBtn')) { openHome(); return; }
+    const ha = e.target.closest('[data-home-act]'); if (ha) { homeAct(ha.dataset.homeAct, ha.dataset.cid, ha.dataset.id); return; }
     const courseBtn = e.target.closest('[data-course]'); if (courseBtn) { selectCourse(courseBtn.dataset.course); return; }
     const lec = e.target.closest('[data-lecture]'); if (lec) { S.lecture = lec.dataset.lecture; showView('lecture'); return; }
     const gs = e.target.closest('[data-go-sec]'); if (gs) { showView('notes'); goTo(gs.dataset.goSec); return; }
@@ -1037,9 +1045,9 @@
   scrim.addEventListener('click', () => phonePanel(null));
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && (document.body.classList.contains('nav-open') || document.body.classList.contains('toc-open'))) phonePanel(null); });
   document.addEventListener('click', e => {
-    if (e.target.closest('#navBtn')) { phonePanel(document.body.classList.contains('nav-open') ? null : 'nav'); return; }
+    if (e.target.closest('#navBtn, #navBtnHome')) { phonePanel(document.body.classList.contains('nav-open') ? null : 'nav'); return; }
     if (e.target.closest('#tocBtn')) { phonePanel(document.body.classList.contains('toc-open') ? null : 'toc'); return; }
-    if (e.target.closest('.side .course, .side .new-course, .side .claude-pill, .side #settingsBtn, .side #searchAllBtn, .contents .toc-link')) setTimeout(() => phonePanel(null), 0);
+    if (e.target.closest('.side .course, .side .home-btn, .side .new-course, .side .claude-pill, .side #settingsBtn, .side #searchAllBtn, .contents .toc-link')) setTimeout(() => phonePanel(null), 0);
   });
   $('newCourseBtn').addEventListener('click', openNewCourse);
   // Fold the shelf down to a strip of thin spines, and back.
@@ -1238,6 +1246,145 @@
       d => { d.querySelector('#dcYes').onclick = () => { dlg.close(); deleteCourse(c.id); }; });
   }
 
+  /* ---------- the home screen ("Today"): all courses on one page ---------- */
+  // Tonight's plan across every course, continue where you stopped, what Claude or Gemini saved today,
+  // how ready each course is, and the study time this week. Everything comes from the notebook itself.
+  const madeOrder = list => list.slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)).map(c => c.id);
+  const coverOf = (c, made) => COVERS[(c.color ?? made.indexOf(c.id)) % COVERS.length];
+  // How ready a course is: the share of its topics practiced with at least 70% right.
+  function readiness(c, secs) {
+    const roots = kids(secs, null); if (!roots.length) return null;
+    const all = cards(c.id); let ok = 0;
+    for (const r of roots) {
+      const hist = all.filter(k => k.topicId && rootOf(secs, k.topicId) && rootOf(secs, k.topicId).id === r.id).flatMap(k => k.hist || []);
+      if (hist.length && hist.filter(h => h.ok).length / hist.length >= 0.7) ok++;
+    }
+    return Math.round(100 * ok / roots.length);
+  }
+  // Tonight: due cards in every course, plus the topics each exam plan gives today. Nearest exam first.
+  function tonight(list) {
+    const rows = [];
+    const sorted = list.slice().sort((a, b) => { const x = daysTo(a.examDate), y = daysTo(b.examDate); return (x == null || x < 0 ? 1e9 : x) - (y == null || y < 0 ? 1e9 : y); });
+    for (const c of sorted) {
+      const secs = sections(c.id), due = dueCount(c.id), p = todayPlan(c, secs);
+      if (due) rows.push({ c, act: 'due', what: tn(due, '1 card to review', '{n} cards to review'), min: Math.max(1, Math.round(due * 0.75)) });
+      if (p) for (const x of p.today) rows.push({ c, act: 'topic', id: x.r.id, what: x.r.title, sub: x.status === 'new' ? t('New topic') : t('{p}% right so far', { p: Math.round(x.acc * 100) }), min: 10 });
+      if (p && p.final) rows.push({ c, act: 'all', what: t('Final review'), min: 30 });
+    }
+    return rows.slice(0, 6);
+  }
+  function lastRead() {
+    let r = null; try { r = JSON.parse(store('sn-last-read') || 'null'); } catch (e) {}
+    if (r && docs[secPath(r.cid, r.sid)] && docs[coursePath(r.cid)]) return r;
+    // nothing read yet on this device: the topic saved most recently
+    let best = null;
+    for (const c of courses()) for (const s of children(c.id, 'sections')) if (!best || (s.updatedAt || 0) > best.at) best = { cid: c.id, sid: s.id, at: s.updatedAt || 0 };
+    return best;
+  }
+  function excerpt(s) {
+    const body = noteBody(s);
+    const f = body.match(/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]/);
+    const para = body.split(/\n\s*\n/).map(x => x.trim()).find(x => x.length > 24 && !/^(#|\$\$|\\\[|```|\||>|[-*] |\d+\. )/.test(x));
+    return { formula: f ? f[0] : '', para: para || '' };
+  }
+  function greeting() {
+    const h = new Date().getHours();
+    return h < 5 ? t('Good night') : h < 12 ? t('Good morning') : h < 17 ? t('Good afternoon') : h < 21 ? t('Good evening') : t('Good night');
+  }
+  let homeAsked = false;
+  function renderHome() {
+    const el = $('home'); if (!el) return;
+    if (!S.loaded) { el.innerHTML = ''; return; }
+    if (!cloudState && D.cloudStatus && !homeAsked) { homeAsked = true; D.cloudStatus().then(st => { cloudState = st; if (S.home) renderHome(); }).catch(() => {}); }
+    const list = courses(), made = madeOrder(list), dot = c => `<span class="h-dot" style="--c:${coverOf(c, made)}" aria-hidden="true"></span>`;
+    const navBtn = `<button class="icon-btn nav-btn" id="navBtnHome" type="button" aria-label="${esc(t('Courses'))}"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></button>`;
+    const day = new Date().toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' });
+    const header = `<header class="h-head">${navBtn}<div class="h-title"><div class="h-date">${esc(day)}</div><h1>${esc(greeting())}</h1></div>
+      <button class="btn" type="button" data-home-act="search"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${t('Search all courses')}</button></header>`;
+    if (!list.length) {
+      el.innerHTML = `<div class="h-wrap" dir="${UIDIR}">${header}<section class="h-card h-empty"><h2>${t('Start with your first course')}</h2><p>${t('Make a course for each subject. Claude saves your notes into it, and this page shows what to study each day.')}</p><button class="btn primary" type="button" data-home-act="new-course">${t('New course')}</button></section></div>`;
+      return;
+    }
+
+    // tonight's plan
+    const rows = tonight(list), total = rows.reduce((a, r) => a + r.min, 0);
+    const plan = `<section class="h-card h-plan" aria-label="${esc(t('Tonight’s plan'))}">
+      <div class="h-row"><h2>${t('Tonight’s plan')}</h2>${rows.length ? `<span class="h-sub">${esc(t('about {m} min', { m: total }))}</span>` : ''}</div>
+      ${rows.length ? `<ol class="h-list">${rows.map(r => `<li><button type="button" data-home-act="${r.act}" data-cid="${esc(r.c.id)}" data-id="${esc(r.id || '')}">${dot(r.c)}<span class="h-what"><b dir="auto">${esc(r.c.name)}</b> · <span dir="auto">${esc(r.what)}</span>${r.sub ? `<small>${esc(r.sub)}</small>` : ''}</span><span class="h-min">${esc(t('{m} min', { m: r.min }))}</span></button></li>`).join('')}</ol>
+        <button class="h-go" type="button" data-home-act="${rows[0].act}" data-cid="${esc(rows[0].c.id)}" data-id="${esc(rows[0].id || '')}">${t('Start')}</button>`
+        : `<p class="h-calm">${t('Nothing due tonight. Every card is reviewed and no exam plan needs anything today.')}</p>${list.some(c => daysTo(c.examDate) == null || daysTo(c.examDate) < 0) ? `<p class="h-calm small">${t('Set an exam date in a course and the plan fills in by itself.')}</p>` : ''}`}
+    </section>`;
+
+    // continue where you stopped
+    const lr = lastRead(); let cont;
+    if (lr) {
+      const c = list.find(x => x.id === lr.cid), secs = sections(lr.cid), s = secs[lr.sid], ex = excerpt(s), path = crumbs(secs, s.id);
+      cont = `<section class="h-card h-cont" aria-label="${esc(t('Continue where you stopped'))}">
+        <div class="h-sub">${t('Continue where you stopped')}</div>
+        <h2 dir="auto">${esc(s.title)}</h2>
+        <div class="h-sub">${dot(c)}<span dir="auto">${esc([c.name, ...path].join(' · '))}</span></div>
+        ${ex.formula ? `<div class="h-formula">${esc(ex.formula)}</div>` : ''}
+        ${ex.para ? `<div class="h-para" dir="auto">${mdToHtml(ex.para)}</div>` : ''}
+        <button class="btn primary h-open" type="button" data-home-act="open" data-cid="${esc(lr.cid)}" data-id="${esc(lr.sid)}">${t('Continue reading')}</button>
+      </section>`;
+    } else cont = `<section class="h-card h-cont"><div class="h-sub">${t('Continue where you stopped')}</div><p class="h-calm">${t('Nothing read yet. Open a course to start.')}</p></section>`;
+
+    // saved today by Claude or Gemini
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const today = [];
+    for (const c of list) for (const s of children(c.id, 'sections')) if (s.source === 'claude' && (s.updatedAt || 0) >= +start) today.push({ c, s });
+    today.sort((a, b) => b.s.updatedAt - a.s.updatedAt);
+    const time = ts => new Date(ts).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
+    const claudeOn = !!lastClaude(), gemOn = !!(cloudState && cloudState.gemini);
+    const conn = claudeOn || gemOn
+      ? `<div class="h-conn on"><span class="dot on"></span>${esc(claudeOn && gemOn ? t('Claude and Gemini are connected') : claudeOn ? t('Claude is connected') : t('Gemini is connected'))}</div>`
+      : `<button class="h-conn" type="button" data-home-act="connect"><span class="dot"></span>${t('Connect to Claude')}</button>`;
+    const added = `<section class="h-card h-added" aria-label="${esc(t('Saved today'))}">
+      <div class="h-row"><h2>${t('Saved today')}</h2>${today.length ? `<span class="h-sub">${today.length}</span>` : ''}</div>
+      ${today.length ? `<ul class="h-saved">${today.slice(0, 5).map(({ c, s }) => `<li><button type="button" data-home-act="open" data-cid="${esc(c.id)}" data-id="${esc(s.id)}"><b dir="auto">${esc(s.title)}</b><small><span dir="auto">${esc(c.name)}</span> · ${s.by === 'gemini' ? 'Gemini' : 'Claude'} · ${esc(time(s.updatedAt))}</small></button></li>`).join('')}</ul>${today.length > 5 ? `<p class="h-sub">${esc(t('and {n} more', { n: today.length - 5 }))}</p>` : ''}`
+        : `<p class="h-calm">${t('Nothing new yet today. Notes Claude or Gemini save show up here.')}</p>`}
+      ${conn}</section>`;
+
+    // the notebooks, with how ready each one is
+    const books = `<section class="h-card h-books" aria-label="${esc(t('Your courses'))}">
+      <div class="h-row"><h2>${t('Your courses')}</h2><button class="sn-link" type="button" data-home-act="new-course">+ ${t('New course')}</button></div>
+      <div class="h-grid">${list.map(c => {
+        const secs = sections(c.id), n = Object.keys(secs).length, r = readiness(c, secs), d = daysTo(c.examDate);
+        const exam = d == null || d < 0 ? t('No exam date') : d === 0 ? t('Exam today') : d === 1 ? t('Exam tomorrow') : t('Exam in {n} days', { n: d });
+        return `<button class="h-book" type="button" data-course="${esc(c.id)}" title="${esc(t('Ready = topics you practiced with at least 70% right'))}"><span class="h-bar-c" style="--c:${coverOf(c, made)}" aria-hidden="true"></span><b dir="auto">${esc(c.name)}</b>
+          <span class="h-sub${d != null && d >= 0 && d <= 7 ? ' soon' : ''}">${esc(exam)}</span>
+          ${r == null ? `<span class="h-sub">${t('No topics yet')}</span>` : `<span class="h-meter" role="img" aria-label="${esc(t('{p}% ready', { p: r }))}"><i style="width:${r}%"></i></span><span class="h-sub">${esc(t('{p}% ready', { p: r }))} · ${esc(tn(n, '1 section', '{n} sections'))}</span>`}</button>`;
+      }).join('')}</div></section>`;
+
+    // study time this week (from the study timer on this device)
+    const week = window.StudyTimer && StudyTimer.days ? StudyTimer.days() : [];
+    const sum = week.reduce((a, d) => a + d.ms, 0), max = Math.max(1, ...week.map(d => d.ms)), mins = Math.round(sum / 60000);
+    const hm = `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}`;
+    const study = `<section class="h-card h-week" aria-label="${esc(t('Study time this week'))}">
+      <div class="h-row"><h2>${t('This week')}</h2><span class="h-big">${esc(hm)} <small>${t('hours')}</small></span></div>
+      <div class="h-bars" role="img" aria-label="${esc(t('Study time this week'))}">${week.map((d, i) => `<span class="${i === 6 ? 'today' : ''}" style="height:${d.ms ? Math.max(6, Math.round(100 * d.ms / max)) : 3}%" title="${esc(Math.round(d.ms / 60000) + ' ' + t('min'))}"></span>`).join('')}</div>
+      <div class="h-days">${week.map((d, i) => `<span>${esc(i === 6 ? t('Today') : d.date.toLocaleDateString(LOCALE, { weekday: 'short' }))}</span>`).join('')}</div>
+      ${sum ? '' : `<p class="h-calm small">${t('Start the study timer in a course’s toolbar and your time shows up here.')}</p>`}</section>`;
+
+    el.innerHTML = `<div class="h-wrap" dir="${UIDIR}">${header}<div class="h-layout">${plan}${cont}${added}${books}${study}</div></div>`;
+    const f = el.querySelector('.h-cont'); if (f && /\\\(|\\\[|\$\$/.test(f.textContent)) typeset(f);
+  }
+  function openHome() { savePos(); S.home = true; S.menu = S.editMenu = false; render(); $('home').scrollTop = 0; }
+  // A button on the home screen: open the course it belongs to, then do the thing.
+  function homeAct(act, cid, id) {
+    if (act === 'search') { openSearchAll(); return; }
+    if (act === 'new-course') { openNewCourse(); return; }
+    if (act === 'connect') { $('claudePill').click(); return; }
+    const c = courses().find(x => x.id === cid); if (!c) return;
+    if (act === 'open') { store('sn-pos-' + cid, JSON.stringify({ id: 'sec-' + id, off: 0 })); selectCourse(cid); return; }
+    selectCourse(cid);
+    const secs = sections(cid);
+    S.prac = null; S.view = 'practice'; S.editing = S.confirmDel = null; renderTop(); renderContents(); renderSheet();
+    if (act === 'due') { S.pracTopic = ''; S.pracMode = 'due'; startPractice(c, secs); }
+    else if (act === 'topic') planTopic(c, secs, id);
+    else if (act === 'all') { S.pracTopic = ''; S.pracMode = 'all'; startPractice(c, secs); }
+  }
+
   /* ---------- search all courses ---------- */
   function openSearchAll() {
     openDlg('search', `<div class="dlg-in">${head(t('Search all courses'))}
@@ -1249,7 +1396,7 @@
       out.onclick = e => {
         const r = e.target.closest('[data-hit]'); if (!r) return;
         const [kind, cid, id, at] = r.dataset.hit.split('|');
-        dlg.close();
+        dlg.close(); S.home = false;
         if (S.courseId !== cid) { S.courseId = cid; store('sn-course', cid); }
         if (kind === 'sec') { S.search = ''; S.view = 'notes'; render(); goTo(id); }
         else if (kind === 'lec') { S.view = 'lecture'; S.lecture = id; S.lecAt = at ? +at : null; render(); }
@@ -1756,7 +1903,7 @@
     docs = (data && data.docs) || {};
     // A recording that was still running when the app closed is kept, marked as stopped early.
     for (const [p, d] of Object.entries(docs)) if (p.includes('/lectures/') && d && d.status === 'recording') docs[p] = { ...d, status: 'stopped' };
-    S.settings = settings;
+    S.settings = settings; S.loaded = true;
     splitViews(); applyView(true);
     D.setTheme(theme());
     render(); restorePos();

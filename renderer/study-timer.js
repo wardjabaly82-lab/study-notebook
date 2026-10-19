@@ -168,5 +168,11 @@
     addEventListener('resize', place);
     title();
   }
-  window.StudyTimer = { init, button, place: () => place(), today: () => A ? fmtLong(totals().today) : '' };
+  // The last 7 days, oldest first: minutes of study counted on this device (for the home screen).
+  function days() {
+    const l = logGet(), now = new Date(), out = [];
+    for (let i = 6; i >= 0; i--) { const d = new Date(now); d.setDate(now.getDate() - i); out.push({ date: d, ms: l[dayKey(d)] || 0 }); }
+    return out;
+  }
+  window.StudyTimer = { init, button, place: () => place(), today: () => A ? fmtLong(totals().today) : '', days };
 })();

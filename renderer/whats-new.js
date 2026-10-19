@@ -2,6 +2,9 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.19.0', date: '2026-10-19',
+    en: ['A new home screen, “Today”, for all your courses: tonight’s study plan across every course, a button to continue the topic you were reading, what Claude or Gemini saved today, how ready each course is for its exam, and your study time this week. The app opens on it; click Today at the top of the shelf to come back.', 'Highlighting a word inside a highlighted sentence now colours just that word; the rest of the sentence keeps its highlight.'],
+    he: ['מסך בית חדש, ”היום”, לכל הקורסים: התוכנית להערב בכל הקורסים, כפתור להמשיך את הנושא שקראתם, מה ש־Claude או Gemini שמרו היום, כמה כל קורס מוכן למבחן, וזמן הלימוד השבוע. האפליקציה נפתחת בו; לוחצים ”היום” בראש המדף כדי לחזור אליו.', 'סימון מילה בתוך משפט מסומן צובע עכשיו רק את המילה; שאר המשפט נשאר מסומן.'] },
   { v: '1.18.0', date: '2026-10-19',
     en: ['Each notebook now has its own look: font, text size, page width, hidden side panels and drawing tools. Changing one notebook doesn’t change the others.', 'The app reopens the notebook you were last using.'],
     he: ['לכל מחברת יש עכשיו מראה משלה: גופן, גודל טקסט, רוחב הדף, פאנלים מוסתרים וכלי הציור. שינוי במחברת אחת לא משנה את האחרות.', 'האפליקציה נפתחת במחברת שהייתם בה לאחרונה.'] },
