@@ -110,22 +110,19 @@
   let pop = null;
   const noteOfMark = (s, id) => { const m = id && (s.marks || []).find(x => x.id === id); return m && m.n ? m.n : ''; };
   function closeComment() { if (pop) pop.hidden = true; }
-  function openComment(note, hlId, quote, rect) {
+  const MAX_COMMENT = 10000;
+  // An existing comment opens to read first (long ones scroll); a new one, or Edit, opens the editor.
+  function openComment(note, hlId, quote, rect, editing) {
     const id = note.dataset.note, s = api.section(id); if (!s) return;
     if (!pop) {
       pop = document.createElement('div'); pop.className = 'note-pop'; pop.setAttribute('role', 'dialog'); pop.hidden = true;
       document.body.appendChild(pop);
     }
     const cur = noteOfMark(s, hlId);
-    pop.innerHTML = `<label class="np-label">${esc(T('Your comment'))}</label>
-      <textarea dir="auto" maxlength="2000" rows="3" placeholder="${esc(T('Write a short note…'))}">${esc(cur)}</textarea>
-      <div class="np-row">${cur ? `<button type="button" class="np-del">${esc(T('Delete comment'))}</button>` : '<span></span>'}
-        <span class="np-btns"><button type="button" class="btn ghost np-cancel">${esc(T('Cancel'))}</button><button type="button" class="btn primary np-save">${esc(T('Save'))}</button></span></div>`;
-    const ta = pop.querySelector('textarea');
     const done = text => {
       const now = api.section(id); if (!now) return closeComment();
       const marks = now.marks || [];
-      text = String(text || '').trim().slice(0, 2000);
+      text = String(text || '').trim().slice(0, MAX_COMMENT);
       let next;
       if (hlId) next = marks.flatMap(m => m.id !== hlId ? [m] : m.c === 'note' && !text ? [] : [Object.assign({}, m, { n: text || undefined })]);
       else if (text && quote) next = marks.concat({ id: rid('h'), ...quote, c: 'note', n: text });
@@ -133,11 +130,28 @@
       save(id, { marks: JSON.parse(JSON.stringify(next)) });
       closeComment();
     };
-    pop.querySelector('.np-save').onclick = () => done(ta.value);
+    const del = `<button type="button" class="np-del">${esc(T('Delete comment'))}</button>`;
+    if (cur && !editing) {
+      pop.innerHTML = `<div class="np-label">${esc(T('Your comment'))}</div>
+        <div class="np-read" dir="auto" tabindex="0">${esc(cur)}</div>
+        <div class="np-row">${del}<span class="np-btns"><button type="button" class="btn ghost np-cancel">${esc(T('Close'))}</button><button type="button" class="btn np-edit">${esc(T('Edit'))}</button></span></div>`;
+      pop.querySelector('.np-edit').onclick = () => openComment(note, hlId, quote, rect, true);
+    } else {
+      pop.innerHTML = `<label class="np-label">${esc(T('Your comment'))}</label>
+        <textarea dir="auto" maxlength="${MAX_COMMENT}" rows="4" placeholder="${esc(T('Write your comment…'))}">${esc(cur)}</textarea>
+        <div class="np-row">${cur ? del : `<span class="np-hint">${esc(T('Ctrl+Enter saves'))}</span>`}
+          <span class="np-btns"><button type="button" class="btn ghost np-cancel">${esc(T('Cancel'))}</button><button type="button" class="btn primary np-save">${esc(T('Save'))}</button></span></div>`;
+    }
     pop.querySelector('.np-cancel').onclick = closeComment;
-    const del = pop.querySelector('.np-del'); if (del) del.onclick = () => done('');
-    ta.onkeydown = e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); done(ta.value); } if (e.key === 'Escape') { e.preventDefault(); closeComment(); } };
-    place(pop, rect);
+    const delBtn = pop.querySelector('.np-del'); if (delBtn) delBtn.onclick = () => done('');
+    pop.onkeydown = e => { if (e.key === 'Escape') { e.preventDefault(); closeComment(); } };
+    const ta = pop.querySelector('textarea');
+    if (!ta) { place(pop, rect); setTimeout(() => pop.querySelector('.np-edit').focus(), 0); return; }
+    pop.querySelector('.np-save').onclick = () => done(ta.value);
+    const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 2, innerHeight * 0.5) + 'px'; };
+    ta.addEventListener('input', grow);
+    ta.onkeydown = e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); done(ta.value); } };
+    place(pop, rect); grow(); place(pop, rect);
     setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 0);
   }
   document.addEventListener('mousedown', e => { if (pop && !pop.hidden && !e.target.closest('.note-pop, .mark-bar')) closeComment(); });

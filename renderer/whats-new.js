@@ -2,6 +2,13 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.20.5', date: '2026-10-20',
+    en: ['Comments work for long notes now: clicking commented words opens the comment to read (with your line breaks, scrolling if it’s long), with Edit and Delete. The writing box is wider, grows as you type, and holds up to 10,000 letters. Ctrl+Enter saves.',
+      'Printing: comments come out as numbered notes under their topic instead of inside the sentence.',
+      'Printing: every print starts with all pages ticked. Click a page to leave it out; that choice is no longer carried over to the next print.'],
+    he: ['הערות עובדות עכשיו גם כשהן ארוכות: לחיצה על מילים עם הערה פותחת את ההערה לקריאה (עם ירידות השורה שלכם, וגלילה אם היא ארוכה), עם כפתורי עריכה ומחיקה. תיבת הכתיבה רחבה יותר, גדלה תוך כדי כתיבה, ומכילה עד 10,000 תווים. Ctrl+Enter שומר.',
+      'בהדפסה: ההערות מופיעות כהערות ממוספרות מתחת לנושא, ולא באמצע המשפט.',
+      'בהדפסה: כל הדפסה מתחילה כשכל העמודים מסומנים. לוחצים על עמוד כדי להוציא אותו, והבחירה כבר לא עוברת להדפסה הבאה.'] },
   { v: '1.20.4', date: '2026-10-20',
     en: ['Formulas written as $x$ (the way Gemini often writes them) now show as real math, also inside tables. Prices like $5 stay as they are.',
       'Search results show readable text from your notes, not the code behind diagrams and formatting.',

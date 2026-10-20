@@ -54,7 +54,7 @@ function cleanOpts(o) {
 // The student's highlights and drawings on a section (see renderer/marks.js), kept to known fields.
 const str = (v, n) => String(v ?? '').slice(0, n);
 const cleanMarks = list => (Array.isArray(list) ? list : []).slice(0, 1000).filter(isObj)
-  .map(m => ({ q: str(m.q, 3000), pre: str(m.pre, 64), suf: str(m.suf, 64), c: str(m.c, 12), n: str(m.n, 2000) })).filter(m => m.q);
+  .map(m => ({ q: str(m.q, 3000), pre: str(m.pre, 64), suf: str(m.suf, 64), c: str(m.c, 12), n: str(m.n, 10000) })).filter(m => m.q);
 const cleanInk = list => (Array.isArray(list) ? list : []).slice(0, 3000).filter(isObj).map(s => ({
   t: str(s.t, 10), c: str(s.c, 12), s: Math.max(1, Math.min(3, parseInt(s.s, 10) || 2)), b: Math.max(0, Math.min(5000, parseInt(s.b, 10) || 0)),
   p: (Array.isArray(s.p) ? s.p : []).slice(0, 5000).filter(q => Array.isArray(q)).map(q => [Number(q[0]) || 0, Number(q[1]) || 0])

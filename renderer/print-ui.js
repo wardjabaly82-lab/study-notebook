@@ -19,7 +19,8 @@
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   let opts = { ...DEFAULTS };
   try { opts = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('sn-print') || '{}') }; } catch (e) {}
-  const remember = () => { try { const { what, ...keep } = opts; localStorage.setItem('sn-print', JSON.stringify(keep)); } catch (e) {} };
+  // Which pages to print isn't kept: every print starts with all pages ticked, and you untick what you don't want.
+  const remember = () => { try { const { what, pages, ...keep } = opts; localStorage.setItem('sn-print', JSON.stringify(keep)); } catch (e) {} };
   // Section ids ticked in "Choose sections" (kept only while the app runs). null = the whole course.
   let picked = null;
   const pickIsEmpty = () => opts.what === '__pick' && !!picked && picked.length === 0;
@@ -157,7 +158,7 @@
       el.onchange = () => {
         const k = el.dataset.k;
         opts[k] = el.type === 'checkbox' ? el.checked : el.value;
-        if (k === 'what') src = null;
+        if (k === 'what') { src = null; opts.pages = ''; }   // something else to print: all its pages start ticked
         remember();
         if (k === 'paper' || k === 'what') { render(); }
         schedule();
@@ -306,6 +307,7 @@
   }
 
   window.openPrint = what => {
+    opts.pages = '';
     if (typeof what === 'string') opts.what = what;
     if (!dlg) { dlg = document.createElement('dialog'); dlg.className = 'pr-dlg'; document.body.appendChild(dlg); if (window.SNCloseOutside) window.SNCloseOutside(dlg); dlg.addEventListener('close', () => { reqId++; }); }
     src = null; lastInfo = '';

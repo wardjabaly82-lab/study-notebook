@@ -28,9 +28,30 @@ check(m && m.text === 'בלתי תלויות' && /משפיעה/.test(m.title) &&
 await shot(win, '92-commented');
 const mr = await win.evaluate(() => { const r = document.querySelector('mark.uh-note').getBoundingClientRect(); return { x: r.left + 5, y: r.top + r.height / 2 }; });
 await win.mouse.click(mr.x, mr.y); await win.waitForTimeout(250);
- await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });check(await win.inputValue('.note-pop textarea') === 'כלומר כל הטלה לא משפיעה על האחרות', 'clicking the commented words opens the comment to read or edit');
+ await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });check(await win.evaluate(() => (document.querySelector('.note-pop .np-read') || {}).textContent) === 'כלומר כל הטלה לא משפיעה על האחרות' && !(await win.isVisible('.note-pop textarea')), 'clicking the commented words opens the comment to read, with Edit and Delete');
+await win.click('.note-pop .np-edit'); await win.waitForTimeout(150);
+check(await win.inputValue('.note-pop textarea') === 'כלומר כל הטלה לא משפיעה על האחרות', 'Edit opens it in the editor');
 await win.fill('.note-pop textarea', 'הטלות בלתי תלויות: כל הטלה לא משפיעה על האחרות'); await win.click('.note-pop .np-save'); await win.waitForTimeout(250);
  await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });check(/הטלות בלתי תלויות:/.test(await win.evaluate(() => document.querySelector('mark.uh-note').title)), 'editing the comment saves the new text');
+// a long comment: the editor grows, the whole text is kept, and it reads in a scrolling card
+const long = Array.from({ length: 40 }, (_, i) => `שורה ${i + 1}: הסבר ארוך על הטלות בלתי תלויות ועל המשמעות שלהן לבחינה.`).join('\n');
+const mr1 = await win.evaluate(() => { const r = document.querySelector('mark.uh-note').getBoundingClientRect(); return { x: r.left + 5, y: r.top + r.height / 2 }; });
+await win.mouse.click(mr1.x, mr1.y); await win.waitForTimeout(250); await win.click('.note-pop .np-edit'); await win.waitForTimeout(150);
+const h0 = await win.evaluate(() => document.querySelector('.note-pop textarea').offsetHeight);
+await win.fill('.note-pop textarea', long); await win.waitForTimeout(100);
+const ed = await win.evaluate(() => { const p = document.querySelector('.note-pop'), t = p.querySelector('textarea'); const r = p.getBoundingClientRect(); return { h: t.offsetHeight, w: r.width, inView: r.top >= 0 && r.bottom <= innerHeight + 1 }; });
+check(ed.h > h0 && ed.h <= 900 * 0.5 + 4 && ed.w >= 400 && ed.inView, `the editor is wide and grows with the text, up to half the window (${Math.round(ed.w)}px wide, ${h0}→${ed.h}px tall, on screen: ${ed.inView})`);
+await shot(win, '94-long-comment-edit');
+await win.keyboard.press('Control+Enter'); await win.waitForTimeout(300);
+check(await win.evaluate(() => document.querySelector('mark.uh-note').dataset.noteText.length) === long.length, `Ctrl+Enter saves the whole long comment (${long.length} letters)`);
+await win.mouse.click(mr1.x, mr1.y); await win.waitForTimeout(250);
+const rd = await win.evaluate(() => { const r = document.querySelector('.note-pop .np-read'); return { scroll: r.scrollHeight > r.clientHeight, lines: r.textContent.split('\n').length }; });
+check(rd.scroll && rd.lines === 40, `it reads with its line breaks, and scrolls inside the card (${rd.lines} lines)`);
+await shot(win, '95-long-comment-read');
+await win.keyboard.press('Escape'); await win.waitForTimeout(150);
+check(!(await win.isVisible('.note-pop')), 'Esc closes the comment card');
+await win.mouse.click(mr1.x, mr1.y); await win.waitForTimeout(250); await win.click('.note-pop .np-edit');
+await win.fill('.note-pop textarea', 'הטלות בלתי תלויות: כל הטלה לא משפיעה על האחרות'); await win.click('.note-pop .np-save'); await win.waitForTimeout(250);
 // a comment on an existing highlight
 at = await selectWords(1, 'מכפלה'); await win.evaluate(() => document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))); await win.waitForTimeout(250);
  await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });await win.click('.mark-bar [data-c="green"]'); await win.waitForTimeout(250);

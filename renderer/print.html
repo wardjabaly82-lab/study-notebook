@@ -47,6 +47,9 @@ body.topic-breaks .sec.d0.not-first{break-before:page;page-break-before:always;m
 .body p{margin:.45em 0;orphans:3;widows:3}
 .body ul,.body ol{margin:.4em 0;padding-inline-start:1.4em}
 .body li{margin:.15em 0}
+.body sup.cm-ref{font-family:Rubik,"Segoe UI",Arial,sans-serif;font-size:.7em;font-weight:600;color:var(--muted);margin-inline-start:.1em}
+.body ol.sec-comments{margin:1em 0 0;padding:.5em 0 0;padding-inline-start:1.4em;border-top:1px solid var(--rule);font-size:.88em;font-style:italic;color:var(--muted)}
+.body ol.sec-comments li{white-space:pre-wrap;margin:.25em 0}
 .body table{border-collapse:collapse;margin:.6em 0;font-size:.93em;break-inside:avoid;max-width:100%}
 .body th,.body td{border:1px solid var(--rule);padding:4px 8px;text-align:start;vertical-align:top}
 .body th{background:var(--soft);font-family:Rubik,"Segoe UI",Arial,sans-serif;font-weight:600}
@@ -96,6 +99,17 @@ window.MathJax = {
 
   // payload: { course, lang, date, sections:[{id,title,depth,html}] }
   // opts:    { style, fontSize, contents, topicBreaks, ink, titlePage }
+  // Comments print as numbered notes under their topic, so a long one doesn't break the sentence it's on.
+  const notesBelow = body => {
+    const ms = body.querySelectorAll('mark.note-end'); if (!ms.length) return;
+    const ol = document.createElement('ol'); ol.className = 'sec-comments';
+    ms.forEach((m, k) => {
+      const sup = document.createElement('sup'); sup.className = 'cm-ref'; sup.textContent = k + 1; m.after(sup);
+      const li = document.createElement('li'); li.setAttribute('dir', 'auto'); li.textContent = m.dataset.noteText; ol.appendChild(li);
+      m.classList.remove('note-end');
+    });
+    body.appendChild(ol);
+  };
   window.renderPrint = async ({ payload, opts }) => {
     const doc = document.getElementById('doc');
     const body = document.body;
@@ -137,7 +151,7 @@ window.MathJax = {
     // The student's own highlights and drawings, last (they sit on the finished text).
     if (opts.marks !== false && window.SNMarks) {
       const bodies = doc.querySelectorAll('section.sec > .body');
-      numbered.forEach((s, i) => { const b = bodies[i]; if (!b) return; try { SNMarks.applyHighlights(b, s.marks); SNMarks.drawInk(b, s.ink); } catch (e) {} });
+      numbered.forEach((s, i) => { const b = bodies[i]; if (!b) return; try { SNMarks.applyHighlights(b, s.marks); SNMarks.drawInk(b, s.ink); notesBelow(b); } catch (e) {} });
     }
     return { ok: true, sections: numbered.length };
   };
