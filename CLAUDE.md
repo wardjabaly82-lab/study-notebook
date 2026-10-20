@@ -41,7 +41,7 @@ A change only to `cloud/` deploys on push without a version bump. Still add a wh
   - `launch.mjs` passes `SN_USER_DATA`, which `main/main.js` uses as the notes folder. That keeps tests off the real notes on Windows (where `APPDATA` alone doesn't redirect Electron) and lets them run while the real app is open.
   - Screenshots go to `tests/app/shots/`. Look at them.
   - Every test starts from a fresh profile and opens a course with `openCourse(win)` from `launch.mjs`. A full run is clean as of 1.20.7, so any ✗ is new.
-  - `tests/cloud.sh` needs port 8787 free (stop the `web` preview first), and on Windows stop `workerd` afterwards, since `pkill` doesn't exist in Git Bash.
+  - `tests/cloud.sh` needs port 8787 free (stop the `web` preview first). It stops its own server afterwards, on Windows too.
   - Tests set `localStorage['sn-seen-version']='9.9.9'` so the What's new window doesn't get in the way.
   - The app opens on the Home ("Today") screen. Click a course (`.side .course`) to get into its notes.
 
