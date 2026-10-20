@@ -7,7 +7,7 @@
   if (lang !== 'he') lang = 'en';
 
   const HE = {
-    'Hold still (or hold Shift) for a straight line': 'עוצרים במקום (או מחזיקים Shift) לקו ישר',
+    'Hold still at the end to tidy your shape (circle, box, line or smooth curve). Shift draws a straight line.': 'עוצרים במקום בסוף כדי לסדר את הצורה (עיגול, מלבן, קו או עקומה חלקה). Shift מצייר קו ישר.',
     'Paste from Claude': 'הדבקה מ־Claude',
     'Pasted from Claude': 'הודבק מ־Claude',
     'Copy Claude’s explanation first (the copy button under its answer), then press Paste from Claude.': 'קודם מעתיקים את ההסבר של Claude (כפתור ההעתקה מתחת לתשובה), ואז לוחצים ”הדבקה מ־Claude”.',

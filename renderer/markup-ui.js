@@ -175,7 +175,7 @@
     if (!tools) { tools = document.createElement('div'); tools.className = 'draw-bar'; tools.setAttribute('role', 'toolbar'); document.body.appendChild(tools); }
     const cur = opt.color;
     tools.setAttribute('aria-label', T('Drawing tools'));
-    tools.innerHTML = `<div class="db-group">${TOOLS.map(([k, name, d]) => `<button type="button" data-tool="${k}" aria-pressed="${opt.tool === k}" title="${esc(k === 'eraser' ? T(name) + ': ' + T('Drag over a drawing to erase it') : k === 'pen' || k === 'marker' ? T(name) + ': ' + T('Hold still (or hold Shift) for a straight line') : T(name))}" aria-label="${esc(T(name))}">${icon(d)}</button>`).join('')}</div>
+    tools.innerHTML = `<div class="db-group">${TOOLS.map(([k, name, d]) => `<button type="button" data-tool="${k}" aria-pressed="${opt.tool === k}" title="${esc(k === 'eraser' ? T(name) + ': ' + T('Drag over a drawing to erase it') : k === 'pen' || k === 'marker' ? T(name) + ': ' + T('Hold still at the end to tidy your shape (circle, box, line or smooth curve). Shift draws a straight line.') : T(name))}" aria-label="${esc(T(name))}">${icon(d)}</button>`).join('')}</div>
       <div class="db-group">${COLORS.map(c => `<button type="button" class="db-c s-${c}" data-color="${c}" aria-pressed="${cur === c}" title="${esc(T(INKNAME[c]))}" aria-label="${esc(T(INKNAME[c]))}"><i class="f-${c}"></i></button>`).join('')}</div>
       <div class="db-group">${[1, 2, 3].map(z => `<button type="button" data-size="${z}" aria-pressed="${opt.size === z}" title="${esc(T(['Thin', 'Medium', 'Thick'][z - 1]))}" aria-label="${esc(T(['Thin', 'Medium', 'Thick'][z - 1]))}"><i class="db-dot" style="width:${3 + z * 3}px;height:${3 + z * 3}px"></i></button>`).join('')}</div>
       <div class="db-group"><button type="button" data-undo title="${esc(T('Undo (Ctrl+Z)'))}" aria-label="${esc(T('Undo'))}">${icon('<path d="M9 7H4V2"/><path d="M4.5 7A8 8 0 1 1 6 17"/>')}</button>
@@ -260,16 +260,52 @@
     else { const { b, el } = blockAt(note, e.clientY); live = { ...base, b, el, pts: [[e.clientX, e.clientY]] }; }
     ov.onpointermove = move; ov.onpointerup = ov.onpointercancel = up;
   }
-  // Pen and marker: hold still for a moment and the stroke snaps to a straight line from where it started
-  // (then the end follows the pointer); with Shift it's straight from the start, at neat 45° steps.
+  // Pen and marker: hold still for a moment and the stroke is tidied: a near-straight stroke becomes a straight
+  // line (whose end then follows the pointer), a rough circle or oval a clean one, a rough triangle or box clean
+  // straight sides, and anything else a smooth curve along the same path. With Shift it's straight from the start.
   const HOLD_MS = 450;
+  const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+  const densify = (corners, step = 3) => corners.slice(1).reduce((out, q, i) => { const p = corners[i], n = Math.max(1, Math.ceil(dist(p, q) / step));
+    for (let k = 1; k <= n; k++) out.push([p[0] + (q[0] - p[0]) * k / n, p[1] + (q[1] - p[1]) * k / n]); return out; }, [corners[0]]);
+  const chaikin = (p, times) => { for (let t = 0; t < times; t++) { const o = [p[0]]; for (let i = 0; i < p.length - 1; i++) { const a = p[i], b = p[i + 1]; o.push([a[0] * .75 + b[0] * .25, a[1] * .75 + b[1] * .25], [a[0] * .25 + b[0] * .75, a[1] * .25 + b[1] * .75]); } o.push(p[p.length - 1]); p = o; } return p; };
+  // Returns { kind: 'line' | 'ellipse' | 'polygon' | 'smooth', pts } in screen points, or null when the stroke is too small.
+  function tidy(pts) {
+    if (pts.length < 3) return null;
+    let len = 0; for (let i = 1; i < pts.length; i++) len += dist(pts[i - 1], pts[i]);
+    const a = pts[0], z = pts[pts.length - 1];
+    if (len < 24) return null;
+    if (dist(a, z) / len > 0.9) return { kind: 'line', pts: [a, z] };
+    if (dist(a, z) < Math.max(18, 0.18 * len)) {          // a closed shape
+      const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+      const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2; let rx = (x1 - x0) / 2, ry = (y1 - y0) / 2;
+      // corners: split the loop at the point farthest from the start, simplify both halves
+      const far = pts.reduce((m, p, i) => dist(p, a) > dist(pts[m], a) ? i : m, 0);
+      const eps = 0.08 * Math.hypot(x1 - x0, y1 - y0);
+      const corners = simplify(pts.slice(0, far + 1), eps).concat(simplify(pts.slice(far).concat([a]), eps).slice(1));
+      const n = corners.length - 1;   // the last corner repeats the first
+      const ellErr = rx && ry ? pts.reduce((s, [x, y]) => s + Math.abs(Math.hypot((x - cx) / rx, (y - cy) / ry) - 1), 0) / pts.length : 1;
+      if (n >= 3 && n <= 4 && ellErr > 0.09) {
+        let cs = corners.slice(0, n);
+        const square = n === 4 && cs.every((p, i) => { const q = cs[(i + 1) % 4], ang = Math.abs(Math.atan2(q[1] - p[1], q[0] - p[0])) % (Math.PI / 2); return Math.min(ang, Math.PI / 2 - ang) < 0.21; });
+        if (square) cs = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+        return { kind: 'polygon', pts: densify(cs.concat([cs[0]])) };
+      }
+      if (ellErr < 0.16) {
+        if (Math.max(rx, ry) / Math.max(1, Math.min(rx, ry)) < 1.2) rx = ry = (rx + ry) / 2;   // nearly round: a circle
+        const k = 72; return { kind: 'ellipse', pts: Array.from({ length: k + 1 }, (_, i) => [cx + rx * Math.cos(i / k * 2 * Math.PI), cy + ry * Math.sin(i / k * 2 * Math.PI)]) };
+      }
+    }
+    return { kind: 'smooth', pts: chaikin(simplify(pts, 3), 3) };
+  }
   const snap45 = (a, x, y) => { const dx = x - a[0], dy = y - a[1], L = Math.hypot(dx, dy), ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4); return [a[0] + L * Math.cos(ang), a[1] + L * Math.sin(ang)]; };
   function move(e) {
     if (!live) return;
     if (live.erase) return erase(e);
     const free = opt.tool === 'pen' || opt.tool === 'marker';
-    if (free && (live.straight || e.shiftKey)) {
-      live.straight = true; clearTimeout(live.hold);
+    if (live.tidied && live.tidied !== 'line') return;   // a tidied shape stays as it is until the pointer lifts
+    if (free && (live.tidied === 'line' || e.shiftKey)) {
+      live.tidied = 'line'; clearTimeout(live.hold);
       live.pts = [live.pts[0], e.shiftKey ? snap45(live.pts[0], e.clientX, e.clientY) : [e.clientX, e.clientY]];
       return preview();
     }
@@ -279,9 +315,8 @@
       live.pts.push([e.clientX, e.clientY]);
       const L = live; clearTimeout(L.hold);
       L.hold = setTimeout(() => {
-        const a = L.pts[0], b = L.pts[L.pts.length - 1];
-        if (live !== L || Math.hypot(b[0] - a[0], b[1] - a[1]) < 12) return;
-        L.straight = true; L.pts = [a, b]; preview();
+        const r = live === L && tidy(L.pts); if (!r) return;
+        L.tidied = r.kind; L.pts = r.pts; preview();
       }, HOLD_MS);
     } else live.pts[1] = [e.clientX, e.clientY];
     preview();
@@ -306,7 +341,7 @@
     let pts = L.pts.map(([x, y]) => toUnits(L.el, x, y));
     const shape = !(opt.tool === 'pen' || opt.tool === 'marker');
     if (shape) { if (pts.length < 2 || Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]) < 6) return; pts = [pts[0], pts[1]]; }
-    else if (!L.straight) pts = simplify(pts, 1.2);
+    else if (!L.tidied) pts = simplify(pts, 1.2);
     const st = { id: rid('k'), t: opt.tool, c: opt.color, s: opt.size, b: L.b, p: pts };
     drawing.undo.push({ id: L.id, remove: st.id });
     save(L.id, { ink: (s.ink || []).concat(st) });
