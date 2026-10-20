@@ -1,0 +1,25 @@
+import { launch, shot } from './launch.mjs';
+const bad = []; const check = (c, s) => { console.log((c ? '✓ ' : '✗ ') + s); if (!c) bad.push(s); };
+const { app, win, logs } = await launch({ fresh: true });
+await win.waitForTimeout(1800); await win.getByRole('button', { name: 'Later' }).click(); await win.waitForTimeout(300);
+check(!(await win.evaluate(() => document.querySelector('dialog[open] .news'))), 'a brand-new install doesn’t pop up update notes');
+// pretend the student had version 1.14.0 before this update
+await win.evaluate(() => { localStorage.setItem('sn-seen-version', '1.14.0'); localStorage.setItem('sn-welcomed', '1'); });
+await win.reload(); await win.waitForTimeout(2500);
+const v = await win.evaluate(() => [...document.querySelectorAll('dialog[open] .news-v h3')].map(h => h.firstChild.textContent.trim()));
+console.log('shown:', v.join(', '));
+check(v[0] === 'Version ' + (await app.evaluate(({ app }) => app.getVersion())) && v.includes('Version 1.14.1') && !v.includes('Version 1.14.0'), 'after updating, “What’s new” shows every version since the one the student had');
+await shot(win, '97-whats-new');
+await win.click('dialog[open] [data-close]'); await win.reload(); await win.waitForTimeout(2500);
+check(!(await win.evaluate(() => document.querySelector('dialog[open] .news'))), 'it shows only once');
+await win.click('#settingsBtn'); await win.waitForTimeout(600);
+check(!(await win.evaluate(() => document.querySelector('dialog[open] .font-grid'))), 'Settings no longer has the fonts (they’re in the Edit button)');
+await win.click('dialog[open] [data-act="whats-new"]'); await win.waitForTimeout(400);
+check(await win.evaluate(() => document.querySelectorAll('dialog[open] .news-v').length) >= 10, 'Settings → What’s new opens the notes any time');
+await win.evaluate(() => { localStorage.setItem('sn-ui-lang', 'he'); localStorage.setItem('sn-seen-version', '1.15.0'); }); await win.reload(); await win.waitForTimeout(2500);
+const he = await win.evaluate(() => document.querySelector('dialog[open] .news') && document.querySelector('dialog[open] .news').textContent);
+check(!!he && /מה חדש/.test(he) && /החיבורים של Claude/.test(he), 'in Hebrew the notes are in Hebrew');
+await shot(win, '98-whats-new-he');
+await win.evaluate(() => localStorage.setItem('sn-ui-lang', 'en'));
+console.log('errors:', logs.join('\n') || 'none'); console.log(bad.length ? `${bad.length} PROBLEM(S)` : 'ALL GOOD');
+await app.close();

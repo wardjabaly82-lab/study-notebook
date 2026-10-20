@@ -1,0 +1,42 @@
+import { launch, shot, REPO, CFG } from './launch.mjs';
+import path from 'path';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+const bad = []; const check = (c, s) => { console.log((c ? '✓ ' : '✗ ') + s); if (!c) bad.push(s); };
+const { app, win, logs } = await launch({ fresh: true });
+await win.setViewportSize({ width: 1440, height: 880 });
+await win.waitForTimeout(1800); await win.getByRole('button', { name: 'Later' }).click();
+const claude = new Client({ name: 't', version: '1' });
+await claude.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(REPO, 'connector/src/server.js')], env: { ...process.env, STUDY_NOTEBOOK_DATA_DIR: path.join(CFG, 'Study Notebook') } }));
+for (const n of ['מאקרו', 'הסתברות']) { await claude.callTool({ name: 'create_course', arguments: { name: n, notes_language: 'Hebrew' } }); await claude.callTool({ name: 'save_section', arguments: { course: n, title: 'נושא ב' + n, content: 'הסבר '.repeat(80) } }); }
+await win.waitForTimeout(1500);
+// before this version: one shared setting (David font) → every existing notebook keeps it
+await win.evaluate(() => { localStorage.setItem('sn-notefont', 'david'); localStorage.setItem('sn-note-zoom', '1.2'); localStorage.removeItem('sn-views'); for (const k of Object.keys(localStorage)) if (k.startsWith('sn-view:')) localStorage.removeItem(k); localStorage.setItem('sn-seen-version', '9.9.9'); });
+await win.reload(); await win.waitForTimeout(2500);
+const pick = name => win.evaluate(n => { const b = [...document.querySelectorAll('.side .course')].find(x => x.textContent.includes(n)); b.click(); }, name);
+const look = () => win.evaluate(() => ({ font: document.documentElement.getAttribute('data-notefont'), zoom: SNGestures.noteZoom(), pagew: document.documentElement.dataset.pagew || '', hide: document.documentElement.hasAttribute('data-hide-contents'), draw: JSON.stringify(SNView.get().draw) }));
+await pick('מאקרו'); await win.waitForTimeout(400); const a0 = await look();
+await pick('הסתברות'); await win.waitForTimeout(400); const b0 = await look();
+check(a0.font === 'david' && b0.font === 'david' && Math.abs(a0.zoom - 1.2) < 0.01, 'after updating, every notebook keeps the look it had (nothing jumps)');
+// change everything in מאקרו only
+await pick('מאקרו'); await win.waitForTimeout(400);
+await win.click('#editBtn'); await win.click('.edit-panel [data-notefont-pick="heebo"]'); await win.click('.edit-panel [data-dir="1"]');
+await win.evaluate(() => { const r = document.getElementById('pageWidth'); r.value = 700; r.dispatchEvent(new Event('input', { bubbles: true })); });
+await win.click('.edit-panel [data-act="toggle-panel"][data-panel="contents"]'); await win.mouse.click(700, 820); await win.waitForTimeout(200);
+await win.click('#drawBtn'); await win.click('.draw-bar [data-tool="marker"]'); await win.click('.draw-bar [data-color="red"]'); await win.click('.draw-bar [data-done]');
+const a1 = await look();
+await pick('הסתברות'); await win.waitForTimeout(500); const b1 = await look();
+console.log(JSON.stringify({ a1, b1 }));
+check(a1.font === 'heebo' && a1.zoom > 1.25 && a1.pagew === '700' && a1.hide && /marker/.test(a1.draw) && /red/.test(a1.draw), 'font, text size, page width, hidden panel and drawing tools all changed in מאקרו');
+check(b1.font === 'david' && Math.abs(b1.zoom - 1.2) < 0.01 && b1.pagew === '' && !b1.hide && !/marker|red/.test(b1.draw), 'הסתברות didn’t change at all');
+await pick('מאקרו'); await win.waitForTimeout(500);
+check(JSON.stringify(await look()) === JSON.stringify(a1), 'going back to מאקרו brings its own look back');
+await win.click('#drawBtn'); const tool = await win.evaluate(() => document.querySelector('.draw-bar [data-tool="marker"]').getAttribute('aria-pressed')); await win.click('.draw-bar [data-done]');
+check(tool === 'true', 'its drawing toolbar opens with its own marker');
+await win.reload(); await win.waitForTimeout(2500);
+check((await look()).font === 'heebo' && (await look()).pagew === '700', 'still separate after reopening the app');
+await win.click('.side .new-course'); await win.waitForTimeout(400); await win.fill('#cfName', 'קורס חדש'); await win.click('#cfForm button[type=submit]'); await win.waitForTimeout(500);
+const n = await look();
+check(n.font === 'book' && n.zoom === 1 && !n.hide && n.pagew === '', 'a new notebook starts with the normal look, not another notebook’s');
+console.log('errors:', logs.join('\n') || 'none'); console.log(bad.length ? `${bad.length} PROBLEM(S)` : 'ALL GOOD');
+await claude.close(); await app.close();

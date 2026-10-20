@@ -1,0 +1,53 @@
+import { launch, shot, REPO, CFG } from './launch.mjs';
+import path from 'path';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+const bad = []; const check = (c, s) => { console.log((c ? '✓ ' : '✗ ') + s); if (!c) bad.push(s); };
+const { app, win, logs } = await launch({ fresh: true });
+await win.waitForTimeout(1800);  await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });await win.getByRole('button', { name: 'Later' }).click();
+const claude = new Client({ name: 't', version: '1' });
+await claude.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(REPO, 'connector/src/server.js')], env: { ...process.env, STUDY_NOTEBOOK_DATA_DIR: path.join(CFG, 'Study Notebook') } }));
+await claude.callTool({ name: 'create_course', arguments: { name: 'הסתברות', notes_language: 'Hebrew' } });
+await claude.callTool({ name: 'save_section', arguments: { course: 'הסתברות', title: 'התפלגות ברנולי', content: 'הטלות בלתי תלויות של מטבע מוטה נותנות התפלגות ברנולי עם פרמטר q.\n\nההסתברות של רצף היא מכפלה של גורמים נפרדים לכל הטלה.' } });
+await win.waitForTimeout(2000);
+ await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });const selectWords = (n, word) => win.evaluate(({ n, word }) => {
+  const p = document.querySelectorAll('.note p')[n]; const tw = document.createTreeWalker(p, NodeFilter.SHOW_TEXT); let t;
+  while ((t = tw.nextNode())) { const i = t.nodeValue.indexOf(word); if (i >= 0) { const r = document.createRange(); r.setStart(t, i); r.setEnd(t, i + word.length); getSelection().removeAllRanges(); getSelection().addRange(r); const b = r.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; } }
+}, { n, word });
+let at = await selectWords(0, 'בלתי תלויות');
+await win.mouse.move(at.x, at.y); await win.mouse.up(); await win.evaluate(() => document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })));
+await win.waitForTimeout(300);
+ await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });check(await win.isVisible('.mark-bar [data-comment]'), 'selecting text shows a Comment button next to the highlight colors');
+await shot(win, '91-bar-with-comment');
+await win.click('.mark-bar [data-comment]'); await win.waitForTimeout(200);
+ await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });check(await win.isVisible('.note-pop textarea'), 'it opens a small comment box');
+await win.fill('.note-pop textarea', 'כלומר כל הטלה לא משפיעה על האחרות');
+await win.click('.note-pop .np-save'); await win.waitForTimeout(300);
+ await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });let m = await win.evaluate(() => { const e = document.querySelector('mark.uh-note'); return e && { text: e.textContent, title: e.title, end: e.classList.contains('note-end') }; });
+check(m && m.text === 'בלתי תלויות' && /משפיעה/.test(m.title) && m.end, 'the words get a dotted underline and a bubble; hovering shows the comment');
+await shot(win, '92-commented');
+const mr = await win.evaluate(() => { const r = document.querySelector('mark.uh-note').getBoundingClientRect(); return { x: r.left + 5, y: r.top + r.height / 2 }; });
+await win.mouse.click(mr.x, mr.y); await win.waitForTimeout(250);
+ await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });check(await win.inputValue('.note-pop textarea') === 'כלומר כל הטלה לא משפיעה על האחרות', 'clicking the commented words opens the comment to read or edit');
+await win.fill('.note-pop textarea', 'הטלות בלתי תלויות: כל הטלה לא משפיעה על האחרות'); await win.click('.note-pop .np-save'); await win.waitForTimeout(250);
+ await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });check(/הטלות בלתי תלויות:/.test(await win.evaluate(() => document.querySelector('mark.uh-note').title)), 'editing the comment saves the new text');
+// a comment on an existing highlight
+at = await selectWords(1, 'מכפלה'); await win.evaluate(() => document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))); await win.waitForTimeout(250);
+ await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });await win.click('.mark-bar [data-c="green"]'); await win.waitForTimeout(250);
+ await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });const g = await win.evaluate(() => { const r = document.querySelector('mark.uh-green').getBoundingClientRect(); return { x: r.left + 4, y: r.top + r.height / 2 }; });
+await win.mouse.click(g.x, g.y); await win.waitForTimeout(250);
+ await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });check(await win.isVisible('.mark-bar [data-comment]'), 'clicking a highlight also offers Comment');
+await win.click('.mark-bar [data-comment]'); await win.fill('.note-pop textarea', 'לזכור לבחינה'); await win.click('.note-pop .np-save'); await win.waitForTimeout(300);
+ await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });check(await win.evaluate(() => { const e = document.querySelector('mark.uh-green'); return e && e.classList.contains('has-note') && e.title === 'לזכור לבחינה'; }), 'the comment goes on the highlight and it keeps its color');
+await shot(win, '93-highlight-comment');
+// Claude rewords the paragraph a little (through the connector): the highlight finds its words again
+await claude.callTool({ name: 'edit_part', arguments: { course: 'הסתברות', section_id: (await win.evaluate(() => document.querySelector('.note[data-note]').dataset.note)), find: 'ההסתברות של רצף היא מכפלה של גורמים נפרדים לכל הטלה.', replace: 'לכן, ההסתברות של רצף שלם היא מכפלה, של גורמים נפרדים לכל הטלה בנפרד.' } });
+await win.waitForTimeout(2500);
+ await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });check(await win.evaluate(() => { const e = document.querySelector('mark.uh-green'); return !!e && /מכפלה/.test(e.textContent) && e.title === 'לזכור לבחינה'; }), 'after Claude rewords the sentence, the highlight and its comment are still there');
+await win.evaluate(() => localStorage.setItem('sn-seen-version', '9.9.9')); await win.reload(); await win.waitForTimeout(2500); await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });
+check(await win.evaluate(() => document.querySelectorAll('mark.has-note').length === 2), 'comments are still there after reopening');
+const mr2 = await win.evaluate(() => { const r = document.querySelector('mark.uh-note').getBoundingClientRect(); return { x: r.left + 5, y: r.top + r.height / 2 }; });
+await win.mouse.click(mr2.x, mr2.y); await win.waitForTimeout(250);  await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });await win.click('.note-pop .np-del'); await win.waitForTimeout(300);
+ await win.evaluate(() => { if (document.documentElement.hasAttribute('data-home')) { const b = document.querySelector('.side .course[data-course]'); if (b) b.click(); } });check(await win.evaluate(() => !document.querySelector('mark.uh-note') && document.querySelectorAll('mark.has-note').length === 1), 'Delete comment removes it (the other one stays)');
+console.log('errors:', logs.join('\n') || 'none'); console.log(bad.length ? `${bad.length} PROBLEM(S)` : 'ALL GOOD');
+await claude.close(); await app.close();

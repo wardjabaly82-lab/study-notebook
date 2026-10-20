@@ -1,0 +1,50 @@
+import { launch, shot, REPO, CFG, OUT } from './launch.mjs';
+import path from 'path';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+const bad = []; const check = (c, s) => { console.log((c ? '✓ ' : '✗ ') + s); if (!c) bad.push(s); };
+const { app, win, logs } = await launch({ fresh: true });
+await win.setViewportSize({ width: 1400, height: 880 });
+await win.waitForTimeout(1800); await win.getByRole('button', { name: 'Later' }).click();
+await win.evaluate(() => localStorage.setItem('sn-seen-version', '9.9.9'));
+const claude = new Client({ name: 't', version: '1' });
+await claude.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(REPO, 'connector/src/server.js')], env: { ...process.env, STUDY_NOTEBOOK_DATA_DIR: path.join(CFG, 'Study Notebook') } }));
+await claude.callTool({ name: 'create_course', arguments: { name: 'Econometrics', notes_language: 'English' } });
+const r = await claude.callTool({ name: 'save_section', arguments: { course: 'Econometrics', title: 'Omitted variable bias', content: 'When a relevant variable is left out, the estimate of the slope absorbs part of its effect.\n\n$$\\tilde\\beta_1 = \\hat\\beta_1 + \\hat\\beta_2 \\tilde\\delta_1$$\n\nThe **bias** is zero only in two cases. This matters a lot in practice.' } });
+const sid = r.content[0].text.match(/"section_id": *"([^"]+)"/)[1];
+await win.waitForTimeout(1500); await win.click('.side .course >> nth=0'); await win.waitForTimeout(1000);
+check(await win.evaluate(() => !document.querySelector('mark.uh-fresh') && !document.querySelector('.fresh-tag')), 'a brand-new topic has nothing marked as changed');
+// the student highlights a sentence that stays
+await win.evaluate(() => { const p = [...document.querySelectorAll('#sheet .note p')].find(x => x.textContent.includes('When a relevant')); const r = document.createRange(); r.selectNodeContents(p); const s = getSelection(); s.removeAllRanges(); s.addRange(r); p.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); });
+await win.waitForTimeout(300); await win.click('.mark-bar [data-c="yellow"]'); await win.waitForTimeout(300);
+// "go deeper" on one part: Claude replaces it with edit_part
+await claude.callTool({ name: 'edit_part', arguments: { course: 'Econometrics', section_id: sid, find: 'The **bias** is zero only in two cases. This matters a lot in practice.', replace: 'The **bias** is zero only in two cases: when $\\hat\\beta_2 = 0$, meaning the left-out variable has no effect on y, or when $\\tilde\\delta_1 = 0$, meaning it is uncorrelated with x.\n\n```mermaid\nflowchart LR\n  A[x] --> B[y]\n  C[left-out z] --> B\n  C -.-> A\n```\n\nThis matters a lot in practice.' } });
+await win.waitForTimeout(2500);
+const st = await win.evaluate(() => ({ fresh: [...document.querySelectorAll('mark.uh-fresh')].map(m => m.textContent).join(' | '), fig: document.querySelectorAll('.fresh-fig').length, tag: (document.querySelector('.fresh-tag') || {}).textContent, yellow: [...document.querySelectorAll('mark.uh-yellow')].map(m => m.textContent).join('') }));
+console.log(JSON.stringify(st, null, 1));
+console.log(await win.evaluate(() => { const n = document.querySelector('#sheet .note'); return JSON.stringify({ figs: n.querySelectorAll('figure.fig').length, pres: n.querySelectorAll('pre').length, html: n.innerHTML.slice(-600) }); }));
+check(/no effect on y/.test(st.fresh) && /uncorrelated with x/.test(st.fresh), 'the new explanation is marked');
+check(!/relevant variable|matters a lot/.test(st.fresh), 'the parts that didn’t change aren’t marked');
+check(st.fig === 1, 'the new diagram is marked too');
+check(/What Claude changed is marked/.test(st.tag || ''), 'the topic says what Claude changed is marked');
+check(/When a relevant variable/.test(st.yellow), 'the student’s own highlight is still there');
+const el = await win.evaluate(() => { const m = document.querySelector('mark.uh-fresh'); m.scrollIntoView({ block: 'center' }); const s = m.closest('.sec').getBoundingClientRect(); return { x: s.x, y: Math.max(0, s.y), width: s.width, height: Math.min(560, s.height) }; });
+await win.waitForTimeout(800); await win.screenshot({ path: path.join(OUT, 'fresh.png'), clip: el });
+// clicking a changed part doesn't open the highlighter
+await win.click('mark.uh-fresh >> nth=0'); await win.waitForTimeout(300);
+check(await win.evaluate(() => { const b = document.querySelector('.mark-bar'); return !b || b.hidden; }), 'clicking a changed part doesn’t open the highlight bar');
+await win.reload(); await win.waitForTimeout(2500); await win.click('.side .course >> nth=0'); await win.waitForTimeout(1200);
+check(await win.evaluate(() => document.querySelectorAll('mark.uh-fresh').length > 0), 'still marked after reopening the app');
+await win.click('.fresh-tag'); await win.waitForTimeout(600);
+check(await win.evaluate(() => !document.querySelector('mark.uh-fresh') && !document.querySelector('.fresh-fig') && !document.querySelector('.fresh-tag') && !!document.querySelector('mark.uh-yellow')), 'Got it removes the marks and keeps the student’s highlight');
+await win.reload(); await win.waitForTimeout(2500); await win.click('.side .course >> nth=0'); await win.waitForTimeout(1200);
+check(await win.evaluate(() => !document.querySelector('mark.uh-fresh')), 'and they stay gone');
+// a second change marks only what's new this time
+await claude.callTool({ name: 'edit_part', arguments: { course: 'Econometrics', section_id: sid, find: 'This matters a lot in practice.', replace: 'This matters a lot in practice. For example, leaving out ability biases the return to schooling upward.' } });
+await win.waitForTimeout(2500);
+const f2 = await win.evaluate(() => [...document.querySelectorAll('mark.uh-fresh')].map(m => m.textContent).join(' | '));
+console.log(f2);
+console.log(await win.evaluate(() => { const t = document.querySelector('.fresh-tag'); return JSON.stringify({ tag: !!t, ls: Object.keys(localStorage).filter(k => k.includes('fresh')) }); }));
+check(/ability biases/.test(f2) && !/no effect on y/.test(f2), 'the next change marks only its own new part');
+console.log('errors:', logs.join('\n') || 'none'); console.log(bad.length ? `${bad.length} PROBLEM(S)` : 'ALL GOOD');
+await claude.close(); await app.close();

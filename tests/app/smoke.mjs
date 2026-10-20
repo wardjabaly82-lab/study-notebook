@@ -1,0 +1,14 @@
+import { launch, shot } from './launch.mjs';
+const { app, win, logs } = await launch({ fresh: true });
+await win.waitForTimeout(1800);
+await win.getByRole('button', { name: 'Later' }).click();
+await win.keyboard.press('?'); await win.waitForTimeout(500);
+const keys = await win.evaluate(() => [...document.querySelectorAll('dialog[open] kbd')].slice(0, 3).map(k => k.textContent).join(' | '));
+console.log('shortcuts (this machine is Linux, so Ctrl):', keys);
+await win.keyboard.press('Escape'); await win.waitForTimeout(300);
+await win.click('#settingsBtn'); await win.waitForTimeout(800);
+const upd = await win.evaluate(() => document.querySelector('#updBox')?.innerText || '(none)');
+console.log('updates box:', upd.replace(/\s+/g, ' '));
+await shot(win, '40-settings');
+console.log('errors:', logs.join('\n') || 'none');
+await app.close();

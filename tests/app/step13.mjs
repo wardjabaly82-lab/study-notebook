@@ -1,0 +1,26 @@
+import { launch, shot } from './launch.mjs';
+const bad = []; const check = (c, s) => { console.log((c ? '✓ ' : '✗ ') + s); if (!c) bad.push(s); };
+const { app, win, logs } = await launch({ fresh: true });
+await win.waitForTimeout(1800);
+const open = () => win.evaluate(() => [...document.querySelectorAll('dialog[open]')].map(d => d.classList.contains('news-dlg') ? 'news' : 'dlg'));
+await win.mouse.click(15, 450); await win.waitForTimeout(300);
+check((await open()).length === 0, 'clicking outside the welcome window closes it');
+await win.click('#settingsBtn'); await win.waitForTimeout(600);
+// a drag that starts inside (selecting text) and ends outside must not close it
+const box = await win.evaluate(() => { const r = document.querySelector('dialog.dlg[open]').getBoundingClientRect(); return { x: r.left + 60, y: r.top + 120, l: r.left }; });
+await win.mouse.move(box.x, box.y); await win.mouse.down(); await win.mouse.move(box.l - 40, box.y, { steps: 5 }); await win.mouse.up(); await win.waitForTimeout(200);
+check((await open()).length === 1, 'selecting text inside and letting go outside keeps Settings open');
+await win.click('dialog.dlg[open] [data-act="whats-new"]'); await win.waitForTimeout(400);
+check(JSON.stringify(await open()) === JSON.stringify(['dlg', 'news']), 'What’s new opens as a small window on top of Settings');
+await shot(win, '99-news-over-settings');
+await win.click('dialog.news-dlg [data-close].btn'); await win.waitForTimeout(250);
+check(JSON.stringify(await open()) === JSON.stringify(['dlg']), 'closing What’s new goes back to Settings');
+await win.click('dialog.dlg[open] [data-act="whats-new"]'); await win.waitForTimeout(400);
+await win.mouse.click(15, 450); await win.waitForTimeout(250);
+check(JSON.stringify(await open()) === JSON.stringify(['dlg']), 'clicking outside What’s new closes only it; Settings stays');
+await win.mouse.click(15, 450); await win.waitForTimeout(250);
+check((await open()).length === 0, 'clicking outside Settings closes Settings');
+await win.click('#settingsBtn'); await win.waitForTimeout(500); await win.keyboard.press('Escape'); await win.waitForTimeout(200);
+check((await open()).length === 0, 'Esc still closes it too');
+console.log('errors:', logs.join('\n') || 'none'); console.log(bad.length ? `${bad.length} PROBLEM(S)` : 'ALL GOOD');
+await app.close();
