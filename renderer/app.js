@@ -146,9 +146,16 @@
     if (!c) return 'ltr';
     const text = children(c.id, 'sections').slice(0, 40).map(s => s.title + ' ' + (s.content || '').slice(0, 600)).join(' ')
       .replace(/\$\$[\s\S]*?\$\$|\\\([\s\S]*?\\\)|\\[a-zA-Z]+/g, ' ');
-    const he = (text.match(/[\u0590-\u05FF]/g) || []).length, la = (text.match(/[A-Za-z]/g) || []).length;
+    const he = (text.match(/[\u0590-\u05FF\u0600-\u06FF]/g) || []).length, la = (text.match(/[A-Za-z]/g) || []).length;   // Hebrew or Arabic letters
     if (he + la >= 40) return he > la ? 'rtl' : 'ltr';
-    return c.lang === 'he' ? 'rtl' : c.lang === 'en' ? 'ltr' : /[\u0590-\u05FF]/.test(c.name) ? 'rtl' : 'ltr';
+    return c.lang === 'he' || c.lang === 'ar' ? 'rtl' : c.lang === 'en' ? 'ltr' : /[\u0590-\u05FF\u0600-\u06FF]/.test(c.name) ? 'rtl' : 'ltr';
+  }
+  // The language the notes are written in: the course's setting, or else what the notes look like.
+  function notesLang(c) {
+    if (c && (c.lang === 'he' || c.lang === 'ar' || c.lang === 'en')) return c.lang;
+    if (dirOf(c) !== 'rtl') return 'en';
+    const text = children(c.id, 'sections').slice(0, 40).map(s => s.title + ' ' + (s.content || '').slice(0, 600)).join(' ') + ' ' + c.name;
+    return (text.match(/[\u0600-\u06FF]/g) || []).length > (text.match(/[\u0590-\u05FF]/g) || []).length ? 'ar' : 'he';
   }
   const dirFor = lang => (lang === 'he' || lang === 'ar') ? 'rtl' : 'ltr';
   const courseNum = c => (c && c.num) || ((c && String(c.name || "").match(/\d{4,6}/)) || [])[0];
@@ -158,10 +165,12 @@
     const c = courses().find(x => x.id === cid); const l = lectures(cid).find(x => x.id === lid);
     const nb = c ? (courseNum(c) || c.name) : 'my';
     const title = l ? l.title : 'this lecture';
+    if (c && c.lang === 'ar') return `اكتب ملخصًا كاملًا من المحاضرة "${title}" واحفظه في Study Notebook، في مقرر ${nb}`;
     return c && c.lang === 'he' ? `תכין סיכום מלא מההרצאה "${title}" ותשמור אותו ב-Study Notebook, בקורס ${nb}` : `Make notes from my lecture "${title}" and save them in Study Notebook, course ${nb}`;
   }
   function askPractice(c, topic) {
     const nb = courseNum(c) || c.name;
+    if (c.lang === 'ar') return topic ? `اكتب لي أسئلة تدريب وبطاقات عن "${topic}" في Study Notebook، في مقرر ${nb}` : `اكتب لي أسئلة تدريب للامتحان في Study Notebook، في مقرر ${nb}، وركّز على المواضيع التي أنا ضعيف فيها`;
     if (c.lang === 'he') return topic ? `תכין לי שאלות תרגול וכרטיסיות על "${topic}" ב-Study Notebook, בקורס ${nb}` : `תכין לי שאלות תרגול לקראת המבחן ב-Study Notebook, בקורס ${nb}, ותתמקד בנושאים שאני חלש בהם`;
     return topic ? `Make practice questions and flashcards on "${topic}" in Study Notebook, course ${nb}` : `Make exam practice questions in Study Notebook, course ${nb}, focusing on my weak topics`;
   }
@@ -279,13 +288,16 @@
     if (syncProblem()) openSettings(); else toast(t('Synced. Your notes are up to date.'));
   }
   addEventListener('online', () => { if (cloudState && cloudState.enabled) fixSync(); });   // back online: don't wait for the next sync
+  // Which assistant saves to this notebook, so the app talks about the one the student actually uses.
+  const AI = () => { const c = !!lastClaude(), g = !!(cloudState && cloudState.gemini); return c && g ? 'both' : c ? 'claude' : g ? 'gemini' : 'none'; };
   function renderClaudePill() {
     const why = syncProblem();
     if (why) { $('claudePill').innerHTML = `<span class="dot warn"></span><span><b>${t('Notes aren’t syncing')}</b>${esc(why)}</span>`; return; }
     const ts = lastClaude();
     $('claudePill').innerHTML = ts
       ? `<span class="dot on"></span><span><b>${t('Connected to Claude')}</b>${esc((S.settings && S.settings.connectorLastUse) || S.lastClaude ? t('Last saved {when}', { when: ago(Math.max(S.lastClaude, (S.settings && S.settings.connectorLastUse) || 0)) }) : t('Ready to save notes'))}</span>`
-      : `<span class="dot"></span><span><b>${t('Connect to Claude')}</b>${t('So Claude can save your notes')}</span>`;
+      : AI() === 'gemini' ? `<span class="dot on"></span><span><b>${t('Connected to Gemini')}</b>${esc(cloudState.geminiLast ? t('Last saved {when}', { when: ago(cloudState.geminiLast) }) : t('Ready to save notes'))}</span>`
+      : `<span class="dot"></span><span><b>${t('Connect Claude or Gemini')}</b>${t('So it can save your notes')}</span>`;
   }
 
   function recButton() {
@@ -390,8 +402,8 @@
           ${S.menu ? `<div class="menu" role="menu">
             <button type="button" role="menuitem" data-act="formulas" ${has ? '' : 'disabled'}>${t('Formula sheet')}</button>
             <button type="button" role="menuitem" data-act="exam-date">${c.examDate ? t('Change exam date') : t('Set exam date')}</button>
-            <button type="button" role="menuitem" data-act="auto-save">${t('Auto-save Claude chats to this course')}</button>
-            <button type="button" role="menuitem" data-act="paste-topic">${t('Paste from Claude')}</button>
+            <button type="button" role="menuitem" data-act="auto-save">${t('Auto-save chats to this course')}</button>
+            <button type="button" role="menuitem" data-act="paste-topic">${t('Paste from chat')}</button>
             <button type="button" role="menuitem" data-act="add-topic">${t('Add a topic by hand')}</button>
             <button type="button" role="menuitem" data-act="export-md" ${has ? '' : 'disabled'}>${t('Export as Markdown')}</button>
             <button type="button" role="menuitem" data-act="course-settings">${t('Edit course details')}</button>
@@ -412,7 +424,7 @@
     const lecs = lectures(c.id);
     el.setAttribute('dir', dirOf(c));
     const he = dirOf(c) === 'rtl';
-    const lecHtml = lecs.length ? `<h2 class="lec-h">${he ? 'הרצאות מוקלטות' : 'Recorded lectures'}</h2><ul class="lec-list">${lecs.map(l => `<li><button type="button" class="lec-link${S.view === 'lecture' && S.lecture === l.id ? ' on' : ''}" data-lecture="${esc(l.id)}"><span class="lec-state ${l.status === 'recording' ? 'live' : l.notesAt ? 'done' : ''}" aria-hidden="true"></span><span dir="auto">${esc(l.title)}</span><small>${esc(new Date(l.startedAt || 0).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' }))}${l.notesAt ? esc(t(', notes made')) : ''}</small></button></li>`).join('')}</ul>` : '';
+    const lecHtml = lecs.length ? `<h2 class="lec-h">${notesLang(c) === 'ar' ? 'المحاضرات المسجلة' : he ? 'הרצאות מוקלטות' : 'Recorded lectures'}</h2><ul class="lec-list">${lecs.map(l => `<li><button type="button" class="lec-link${S.view === 'lecture' && S.lecture === l.id ? ' on' : ''}" data-lecture="${esc(l.id)}"><span class="lec-state ${l.status === 'recording' ? 'live' : l.notesAt ? 'done' : ''}" aria-hidden="true"></span><span dir="auto">${esc(l.title)}</span><small>${esc(new Date(l.startedAt || 0).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' }))}${l.notesAt ? esc(t(', notes made')) : ''}</small></button></li>`).join('')}</ul>` : '';
     if (!roots.length) { el.innerHTML = lecHtml; return; }
     const dayAgo = Date.now() - 86400000;
     // Each topic shows how far you are with it: sub-topics, practice questions and how many you got right.
@@ -492,7 +504,7 @@
     sheet.dataset.paper = (c && S.view === 'notes' && c.paper) || 'plain'; sheet.dataset.width = (c && c.width) || 'normal';
     if (!c) {
       sheet.setAttribute('dir', UIDIR);
-      sheet.innerHTML = `<div class="empty"><h2>${t('Start your first notebook')}</h2><p>${t('Create a course, then study it with Claude. Claude saves the final explanations here, topic by topic.')}</p><button class="btn primary" type="button" data-act="new-course">${t('Create a course')}</button></div>`;
+      sheet.innerHTML = `<div class="empty"><h2>${t('Start your first notebook')}</h2><p>${t('Create a course, then study it with Claude or Gemini. The final explanations are saved here, topic by topic.')}</p><button class="btn primary" type="button" data-act="new-course">${t('Create a course')}</button></div>`;
       return;
     }
     const secs = sections(c.id);
@@ -508,13 +520,13 @@
     const list = []; walk(secs, (s, d) => list.push([s, d]));
     if (!list.length) {
       const num = courseNum(c);
-      const say = c.lang === 'he' ? `“תשמור את מה שלמדנו ב-Study Notebook, בקורס ${num || c.name}”` : `“Save what we covered in Study Notebook, course ${num || c.name}”`;
+      const say = c.lang === 'ar' ? `“احفظ ما تعلمناه في Study Notebook، في مقرر ${num || c.name}”` : c.lang === 'he' ? `“תשמור את מה שלמדנו ב-Study Notebook, בקורס ${num || c.name}”` : `“Save what we covered in Study Notebook, course ${num || c.name}”`;
       sheet.setAttribute('dir', UIDIR);
       sheet.innerHTML = `<div class="empty"><h2>${t('This notebook is empty')}</h2>
-        <p>${esc(t('Open Claude (any chat: web, phone or the desktop app) and study a topic from {course}: ask questions until it makes sense. Then say:', { course: c.name }))}</p>
+        <p>${esc(t(AI() === 'gemini' ? 'Open Gemini, start the chat with @Study Notebook, and study a topic from {course}: ask questions until it makes sense. Then say:' : AI() === 'both' ? 'Open Claude or Gemini (in Gemini, start the chat with @Study Notebook) and study a topic from {course}: ask questions until it makes sense. Then say:' : 'Open Claude (any chat: web, phone or the desktop app) and study a topic from {course}: ask questions until it makes sense. Then say:', { course: c.name }))}</p>
         <p class="say" dir="auto">${esc(say)}</p>
-        <p class="small">${esc(t('Claude saves the final explanation here, under the right topic.'))}</p>
-        <div class="row" style="justify-content:center">${lastClaude() ? `<button class="btn primary" type="button" data-act="auto-save">${t('Set up auto-saving for this course')}</button>` : `<button class="btn primary" type="button" data-act="settings">${t('Connect to Claude')}</button>`}<button class="btn" type="button" data-act="paste-topic">${t('Paste from Claude')}</button></div></div>`;
+        <p class="small">${esc(t(AI() === 'gemini' ? 'Gemini saves the final explanation here, under the right topic.' : AI() === 'both' ? 'The final explanation is saved here, under the right topic.' : 'Claude saves the final explanation here, under the right topic.'))}</p>
+        <div class="row" style="justify-content:center">${AI() !== 'none' ? `<button class="btn primary" type="button" data-act="auto-save">${t('Set up auto-saving for this course')}</button>` : `<button class="btn primary" type="button" data-act="settings">${t('Connect Claude or Gemini')}</button>`}<button class="btn" type="button" data-act="paste-topic">${t('Paste from chat')}</button></div></div>`;
       return;
     }
     const q = norm(S.search);
@@ -693,7 +705,7 @@
   /* ---------- formula sheet ---------- */
   function formulaItems(c, secs) {
     const list = []; walk(secs, (s, d) => list.push({ id: s.id, title: s.title, depth: d, content: s.content }));
-    return window.PracticeGen ? window.PracticeGen.formulaSheet(list, dirOf(c) === 'rtl' ? 'he' : 'en') : [];
+    return window.PracticeGen ? window.PracticeGen.formulaSheet(list, notesLang(c)) : [];
   }
   function renderFormulas(sheet, c, secs) {
     const items = formulaItems(c, secs);
@@ -739,7 +751,7 @@
     const items = [];
     for (const id of new Set(sectionIds)) {
       if (!secs[id] || has.has(id)) continue;
-      items.push(...window.PracticeGen.generate({ sections: [secs[id]], lang: dirOf(c) === 'rtl' ? 'he' : 'en', type: 'mixed', limit: 3, existing }));
+      items.push(...window.PracticeGen.generate({ sections: [secs[id]], lang: notesLang(c), type: 'mixed', limit: 3, existing }));
     }
     return items.length ? addGenerated(c, items).length : 0;
   }
@@ -749,7 +761,7 @@
     const inTopic = S.pracTopic && secs[S.pracTopic] ? new Set(subtree(secs, S.pracTopic)) : null;
     const list = Object.values(secs).filter(s => !inTopic || inTopic.has(s.id));
     const existing = new Set(cards(c.id).map(k => String(k.q || '').toLowerCase().replace(/[*_`>#]/g, '').replace(/\s+/g, ' ').trim()));
-    const items = window.PracticeGen.generate({ sections: list, lang: dirOf(c) === 'rtl' ? 'he' : 'en', type: S.genType, limit: 15, existing });
+    const items = window.PracticeGen.generate({ sections: list, lang: notesLang(c), type: S.genType, limit: 15, existing });
     if (!items.length) { toast(t('No new questions to make from these notes. Ask Claude for more, or add notes with definitions and key terms in bold.')); return; }
     const ids = addGenerated(c, items);
     if (!ids.length) { toast(t('No new questions to make from these notes. Ask Claude for more, or add notes with definitions and key terms in bold.')); return; }
@@ -903,9 +915,9 @@
   async function pasteTopic() {
     const c = course(); if (!c) return;
     let text = ''; try { text = String((await D.readText()) || '').trim(); } catch (e) {}
-    if (!text) { toast(t('Copy Claude’s explanation first (the copy button under its answer), then press Paste from Claude.')); return; }
+    if (!text) { toast(t('Copy the explanation in Claude or Gemini first (the copy button under the answer), then press Paste from chat.')); return; }
     const m = text.match(/^\s*(?:#{1,6}[ \t]+)?\**([^\n*]{1,140}?)\**[ \t]*\n+([\s\S]*\S[\s\S]*)$/);
-    addSection(null, m ? { title: m[1].trim(), content: m[2].trim() } : { title: t('Pasted from Claude'), content: text });
+    addSection(null, m ? { title: m[1].trim(), content: m[2].trim() } : { title: t('Pasted from chat'), content: text });
     toast(t('Pasted as a new topic. Check the title, then save.'));
   }
   function addSection(parentId, from) {
@@ -1196,7 +1208,7 @@
     if (onOpen) onOpen(dlg);
   }
   const head = (title, sub) => `<div class="dlg-head"><div style="flex:1"><h2>${title}</h2>${sub ? `<p>${sub}</p>` : ''}</div><button type="button" class="sn-x" data-close aria-label="${esc(t('Close'))}"><svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true" style="display:block;margin:auto"><path d="M5 5l14 14M19 5 5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button></div>`;
-  const langSelect = (id, v) => `<select id="${id}"><option value="he"${v === 'he' ? ' selected' : ''}>${t('Hebrew')}</option><option value="en"${v === 'en' ? ' selected' : ''}>${t('English')}</option><option value="auto"${!v || v === 'auto' ? ' selected' : ''}>${t('Same as the course material')}</option></select>`;
+  const langSelect = (id, v) => `<select id="${id}"><option value="he"${v === 'he' ? ' selected' : ''}>${t('Hebrew')}</option><option value="en"${v === 'en' ? ' selected' : ''}>${t('English')}</option><option value="ar"${v === 'ar' ? ' selected' : ''}>${t('Arabic')}</option><option value="auto"${!v || v === 'auto' ? ' selected' : ''}>${t('Same as the course material')}</option></select>`;
 
   // The course form (new course and course details): name, number, language, exam, book colour, photo, page.
   const PAPERS = ['plain', 'lined', 'dotted', 'grid'], WIDTHS = ['narrow', 'normal', 'wide'];
@@ -1234,14 +1246,14 @@
     };
   }
   function openNewCourse() {
-    openDlg('new', courseForm({}, t('New course'), t('Claude will save this course’s notes in the language you choose.'), t('Create course')), d => wireCourseForm(d, {}, v => {
+    openDlg('new', courseForm({}, t('New course'), t('Claude or Gemini will write this course’s notes in the language you choose.'), t('Create course')), d => wireCourseForm(d, {}, v => {
       const id = rid('c'); docs[coursePath(id)] = JSON.parse(JSON.stringify({ ...v, createdAt: Date.now(), chat: [], files: [], sourceParts: 0 })); save(); selectCourse(id); toast(t('Course created'));
     }));
   }
   // One-time setup per course: a Claude Project whose instructions send every chat's notes here.
   // The same instructions for Claude (a project) or for Gemini (where each chat starts with @Study Notebook).
   function autoSaveText(c, app = 'claude') {
-    const he = c.lang === 'he', gem = app === 'gemini';
+    const he = c.lang === 'he', ar = c.lang === 'ar', gem = app === 'gemini';
     return [
       `Study Notebook course: "${c.name}"`,
       gem ? `Start each Gemini chat with @Study Notebook.` : '',
@@ -1258,7 +1270,7 @@
       `- Save notes from a PDF, slides or a lecture in one go (save_sections). The app makes the practice questions itself; write them only when I ask.`,
       `- Don't save anything I say not to save.`,
       `- After each save, tell me in one short line what was saved and where.`,
-      he ? `- Write the notes in Hebrew, with formulas in Latin form.` : ''
+      he ? `- Write the notes in Hebrew, with formulas in Latin form.` : ar ? `- Write the notes in Arabic, with formulas in Latin form.` : ''
     ].filter((x, i) => x !== '' || i === 2).join('\n');
   }
   function openAutoSave(c) {
@@ -1349,7 +1361,7 @@
     const header = `<header class="h-head">${navBtn}<div class="h-title"><div class="h-date">${esc(day)}</div><h1>${esc(greeting())}</h1></div>
       <button class="btn" type="button" data-home-act="search"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${t('Search all courses')}</button></header>`;
     if (!list.length) {
-      el.innerHTML = `<div class="h-wrap" dir="${UIDIR}">${header}<section class="h-card h-empty"><h2>${t('Start with your first course')}</h2><p>${t('Make a course for each subject. Claude saves your notes into it, and this page shows what to study each day.')}</p><button class="btn primary" type="button" data-home-act="new-course">${t('New course')}</button></section></div>`;
+      el.innerHTML = `<div class="h-wrap" dir="${UIDIR}">${header}<section class="h-card h-empty"><h2>${t('Start with your first course')}</h2><p>${t('Make a course for each subject. Claude or Gemini saves your notes into it, and this page shows what to study each day.')}</p><button class="btn primary" type="button" data-home-act="new-course">${t('New course')}</button></section></div>`;
       return;
     }
 
@@ -1386,7 +1398,7 @@
     const conn = syncProblem() ? `<button class="h-conn warn" type="button" data-home-act="sync"><span class="dot warn"></span>${esc(t('Notes aren’t syncing: {why}', { why: syncProblem() }))}</button>`
       : claudeOn || gemOn
       ? `<div class="h-conn on"><span class="dot on"></span>${esc(claudeOn && gemOn ? t('Claude and Gemini are connected') : claudeOn ? t('Claude is connected') : t('Gemini is connected'))}</div>`
-      : `<button class="h-conn" type="button" data-home-act="connect"><span class="dot"></span>${t('Connect to Claude')}</button>`;
+      : `<button class="h-conn" type="button" data-home-act="connect"><span class="dot"></span>${t('Connect Claude or Gemini')}</button>`;
     const added = `<section class="h-card h-added" aria-label="${esc(t('Saved today'))}">
       <div class="h-row"><h2>${t('Saved today')}</h2>${today.length ? `<span class="h-sub">${today.length}</span>` : ''}</div>
       ${today.length ? `<ul class="h-saved">${today.slice(0, 5).map(({ c, s }) => `<li><button type="button" data-home-act="open" data-cid="${esc(c.id)}" data-id="${esc(s.id)}"><b dir="auto">${esc(s.title)}</b><small><span dir="auto">${esc(c.name)}</span> · ${s.by === 'gemini' ? 'Gemini' : 'Claude'} · ${esc(time(s.updatedAt))}</small></button></li>`).join('')}</ul>${today.length > 5 ? `<p class="h-sub">${esc(t('and {n} more', { n: today.length - 5 }))}</p>` : ''}`
@@ -1918,7 +1930,7 @@
     else walk(secs, add);
     const tree = []; walk(secs, (s, d) => tree.push({ id: s.id, title: s.title, depth: d }));
     const exIn = daysTo(c.examDate);
-    return { tree, course: c.name, num: courseNum(c) || '', exam: exIn != null && exIn >= 0 ? fmtDay(c.examDate) : '', lang: c.lang === 'he' || c.lang === 'en' ? c.lang : (dirOf(c) === 'rtl' ? 'he' : 'auto'), sections: out, topics: kids(secs, null).map(s => ({ id: s.id, title: s.title })), subtitle: topicId && secs[topicId] ? secs[topicId].title : '' };
+    return { tree, course: c.name, num: courseNum(c) || '', exam: exIn != null && exIn >= 0 ? fmtDay(c.examDate) : '', lang: notesLang(c) === 'en' && c.lang !== 'en' ? 'auto' : notesLang(c), sections: out, topics: kids(secs, null).map(s => ({ id: s.id, title: s.title })), subtitle: topicId && secs[topicId] ? secs[topicId].title : '' };
   };
 
   /* ================= what's new ================= */

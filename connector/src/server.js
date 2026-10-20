@@ -275,7 +275,7 @@ tool('create_course', {
   description: 'Create a new course notebook.',
   inputSchema: {
     name: z.string().min(1).max(80).describe('Course name, e.g. "52324 - Probability for Statistics students".'),
-    notes_language: z.enum(['Hebrew', 'English', 'Same as the material']).optional().describe('Language to write this course’s notes in.')
+    notes_language: z.enum(['Hebrew', 'English', 'Arabic', 'Same as the material']).optional().describe('Language to write this course’s notes in.')
   },
   annotations: WRITE
 });

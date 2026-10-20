@@ -93,7 +93,7 @@
       return {
         result: courses(docs).map(c => {
           const n = Object.keys(sections(docs, c.id)).length;
-          return { course_id: c.id, name: c.name, notes_language: c.lang === 'he' ? 'Hebrew' : c.lang === 'en' ? 'English' : 'same as the course material', sections: n };
+          return { course_id: c.id, name: c.name, notes_language: c.lang === 'he' ? 'Hebrew' : c.lang === 'en' ? 'English' : c.lang === 'ar' ? 'Arabic' : 'same as the course material', sections: n };
         }),
         writes: []
       };
@@ -135,7 +135,7 @@
       const n = cleanText(name, 80, 'Course name').trim();
       const existing = courses(docs).find(c => norm(c.name) === norm(n));
       if (existing) return { result: { course_id: existing.id, name: existing.name, created: false, note: 'A course with this name already exists; use it.' }, writes: [] };
-      const lang = notes_language === 'Hebrew' ? 'he' : notes_language === 'English' ? 'en' : 'auto';
+      const lang = notes_language === 'Hebrew' ? 'he' : notes_language === 'English' ? 'en' : notes_language === 'Arabic' ? 'ar' : 'auto';
       const id = rid('c');
       return { result: { course_id: id, name: n, created: true }, writes: [{ path: `${BASE}/${id}`, data: { name: n, lang, createdAt: now, chat: [], files: [], sourceParts: 0 } }] };
     },

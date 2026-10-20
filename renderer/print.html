@@ -127,9 +127,13 @@ window.MathJax = {
     const body = document.body;
     body.className = [opts.style || 'plain', opts.ink ? 'ink' : '', opts.topicBreaks ? 'topic-breaks' : ''].join(' ');
     body.style.setProperty('--fs', (Number(opts.fontSize) || 11.5) + 'pt');
-    const rtl = payload.lang === 'he';
+    const rtl = payload.lang === 'he' || payload.lang === 'ar', ar = payload.lang === 'ar';
+    // the few words the print page writes itself, in the notes language
+    const W = ar ? { contents: 'المحتويات', topic: 'موضوع', topics: 'مواضيع', subs: 'مواضيع فرعية', exam: 'الامتحان:' }
+      : rtl ? { contents: 'תוכן עניינים', topic: 'נושא', topics: 'נושאים', subs: 'תתי־נושאים', exam: 'מבחן:' }
+      : { contents: 'Contents', topic: 'topic', topics: 'topics', subs: 'sub-topics', exam: 'Exam:' };
     document.documentElement.setAttribute('dir', rtl ? 'rtl' : 'ltr');
-    document.documentElement.setAttribute('lang', rtl ? 'he' : 'en');
+    document.documentElement.setAttribute('lang', ar ? 'ar' : rtl ? 'he' : 'en');
 
     // Number the sections like 1, 1.2, 1.2.1 so the contents page matches.
     const counters = []; const numbered = payload.sections.map(s => {
@@ -142,14 +146,14 @@ window.MathJax = {
     if (opts.titlePage) {
       const tops = numbered.filter(s => s.depth === 0).length, subs = numbered.length - tops;
       const facts = [payload.date && esc(payload.date),
-        tops && `<b>${tops}</b> ${rtl ? (tops === 1 ? 'נושא' : 'נושאים') : (tops === 1 ? 'topic' : 'topics')}${subs ? ` · <b>${subs}</b> ${rtl ? 'תתי־נושאים' : 'sub-topics'}` : ''}`,
-        payload.exam && `${rtl ? 'מבחן:' : 'Exam:'} <b>${esc(payload.exam)}</b>`].filter(Boolean);
+        tops && `<b>${tops}</b> ${tops === 1 ? W.topic : W.topics}${subs ? ` · <b>${subs}</b> ${W.subs}` : ''}`,
+        payload.exam && `${W.exam} <b>${esc(payload.exam)}</b>`].filter(Boolean);
       html += `<header class="cover"><div class="band"><div class="kicker" dir="${rtl ? 'rtl' : 'ltr'}">${esc(payload.num && !String(payload.course).includes(payload.num) ? payload.num : 'Study Notebook')}</div><h1 dir="auto">${esc(payload.course)}</h1>${payload.subtitle ? `<p class="sub" dir="auto">${esc(payload.subtitle)}</p>` : ''}</div>`
         + `<ul class="facts">${facts.map(f => `<li>${f}</li>`).join('')}</ul></header>`;
     }
     if (opts.contents && numbered.length > 1) {
       const listed = numbered.filter(s => s.depth <= 2).length;
-      html += `<section class="toc${listed > 14 ? ' cols' : ''}"><h2>${rtl ? 'תוכן עניינים' : 'Contents'}</h2><ol>` +
+      html += `<section class="toc${listed > 14 ? ' cols' : ''}"><h2>${W.contents}</h2><ol>` +
         numbered.filter(s => s.depth <= 2).map(s => `<li class="d${s.depth}" dir="auto"><span class="num">${esc(s.num)}</span>${esc(s.title)}</li>`).join('') + '</ol></section>';
     }
     let first = true;

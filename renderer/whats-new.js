@@ -2,6 +2,13 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.20.9', date: '2026-10-20',
+    en: ['Arabic notes: choose Arabic as a course’s notes language. Claude and Gemini write the notes in Arabic, the page reads right to left, and practice questions and printing are in Arabic too.',
+      'If you use Gemini, the app now says so: new and empty courses explain how to study with Gemini (start the chat with @Study Notebook), and the shelf shows “Connected to Gemini” instead of asking you to connect Claude.',
+      '“Paste from Claude” is now “Paste from chat”, for explanations copied from Claude or Gemini.'],
+    he: ['סיכומים בערבית: אפשר לבחור ערבית כשפת הסיכומים של קורס. Claude ו־Gemini כותבים את הסיכומים בערבית, הדף נקרא מימין לשמאל, וגם שאלות התרגול וההדפסה בערבית.',
+      'אם אתם משתמשים ב־Gemini, האפליקציה אומרת זאת עכשיו: קורס חדש או ריק מסביר איך ללמוד עם Gemini (מתחילים את הצ׳אט עם ‎@Study Notebook), והמדף מציג ”מחובר ל־Gemini” במקום לבקש לחבר את Claude.',
+      '”הדבקה מ־Claude” נקראת עכשיו ”הדבקה מהצ׳אט”, להסברים שהועתקו מ־Claude או מ־Gemini.'] },
   { v: '1.20.8', date: '2026-10-20',
     en: ['Drawing tidies your shapes: draw, then hold the pen still for a moment. A rough circle becomes a clean circle, a rough box or triangle gets straight sides, a nearly straight stroke becomes a straight line, and a wobbly line becomes a smooth curve along the same path. A quick stroke stays exactly as you drew it.'],
     he: ['הציור מסדר את הצורות: מציירים ועוצרים את העט לרגע במקום. עיגול לא מדויק הופך לעיגול נקי, מלבן או משולש מקבלים צלעות ישרות, קו כמעט ישר הופך לקו ישר, וקו מתפתל הופך לעקומה חלקה באותו מסלול. קו מהיר נשאר בדיוק כמו שציירתם.'] },

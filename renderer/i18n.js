@@ -7,6 +7,20 @@
   if (lang !== 'he') lang = 'en';
 
   const HE = {
+    'Connected to Gemini': 'מחובר ל־Gemini',
+    'Connect Claude or Gemini': 'חיבור Claude או Gemini',
+    'So it can save your notes': 'כדי שיוכל לשמור את הסיכומים',
+    'Create a course, then study it with Claude or Gemini. The final explanations are saved here, topic by topic.': 'יוצרים קורס ולומדים אותו עם Claude או Gemini. ההסברים הסופיים נשמרים כאן, נושא אחרי נושא.',
+    'Make a course for each subject. Claude or Gemini saves your notes into it, and this page shows what to study each day.': 'יוצרים קורס לכל מקצוע. Claude או Gemini שומרים אליו את הסיכומים, והדף הזה מראה מה ללמוד בכל יום.',
+    'Claude or Gemini will write this course’s notes in the language you choose.': 'Claude או Gemini יכתבו את הסיכומים של הקורס בשפה שתבחרו.',
+    'Auto-save chats to this course': 'שמירה אוטומטית של צ׳אטים לקורס הזה',
+    'Paste from chat': 'הדבקה מהצ׳אט',
+    'Pasted from chat': 'הודבק מהצ׳אט',
+    'Copy the explanation in Claude or Gemini first (the copy button under the answer), then press Paste from chat.': 'קודם מעתיקים את ההסבר ב־Claude או ב־Gemini (כפתור ההעתקה מתחת לתשובה), ואז לוחצים ”הדבקה מהצ׳אט”.',
+    'Open Gemini, start the chat with @Study Notebook, and study a topic from {course}: ask questions until it makes sense. Then say:': 'פותחים את Gemini, מתחילים את הצ׳אט עם ‎@Study Notebook, ולומדים נושא מ־{course}: שואלים עד שמבינים. ואז אומרים:',
+    'Open Claude or Gemini (in Gemini, start the chat with @Study Notebook) and study a topic from {course}: ask questions until it makes sense. Then say:': 'פותחים את Claude או Gemini (ב־Gemini מתחילים את הצ׳אט עם ‎@Study Notebook) ולומדים נושא מ־{course}: שואלים עד שמבינים. ואז אומרים:',
+    'Gemini saves the final explanation here, under the right topic.': 'Gemini שומר כאן את ההסבר הסופי, תחת הנושא הנכון.',
+    'The final explanation is saved here, under the right topic.': 'ההסבר הסופי נשמר כאן, תחת הנושא הנכון.',
     'Hold still at the end to tidy your shape (circle, box, line or smooth curve). Shift draws a straight line.': 'עוצרים במקום בסוף כדי לסדר את הצורה (עיגול, מלבן, קו או עקומה חלקה). Shift מצייר קו ישר.',
     'Paste from Claude': 'הדבקה מ־Claude',
     'Pasted from Claude': 'הודבק מ־Claude',

@@ -21,6 +21,17 @@
       topicOf: s => `באיזה נושא נאמר המשפט הזה?\n\n${s}`,
       inTopic: (q, title) => `${q} (${title})`
     },
+    ar: {
+      explain: x => `اشرحوا: ${x}`,
+      define: x => `ما هو تعريف ${x}؟`,
+      prove: x => `أثبتوا: ${x}`,
+      mistakes: x => `ما هي الأخطاء الشائعة في موضوع "${x}"؟`,
+      formula: (title, ctx) => `${title}: ${ctx} اكتبوا الصيغة.`,
+      fill: s => `أكملوا الفراغ:\n\n${s}`,
+      which: s => `ما المصطلح الناقص؟\n\n${s}`,
+      topicOf: s => `من أي موضوع هذه الجملة؟\n\n${s}`,
+      inTopic: (q, title) => `${q} (${title})`
+    },
     en: {
       explain: x => `Explain: ${x}`,
       define: x => `What is the definition of ${x}?`,
@@ -35,11 +46,11 @@
   };
 
   const LABEL = {
-    definition: /^(הגדרה|הגדרות|ההגדרה|definition|definitions)(?![\p{L}])/iu,
-    claim: /^(טענה|הטענה|משפט|המשפט|תכונה|theorem|claim|lemma|proposition|property)(?![\p{L}])|^למה\s*\d*\s*$/iu,
-    proof: /^(הוכחה|ההוכחה|proof)(?![\p{L}])/iu,
-    mistakes: /^(טעויות נפוצות|טעויות|שגיאות נפוצות|common mistakes|mistakes|pitfalls)(?![\p{L}])/iu,
-    skip: /^(דוגמה|דוגמא|דוגמאות|example|examples|סיכום|summary|הערה|note|remark)(?![\p{L}])/iu
+    definition: /^(הגדרה|הגדרות|ההגדרה|تعريف|التعريف|تعريفات|definition|definitions)(?![\p{L}])/iu,
+    claim: /^(טענה|הטענה|משפט|המשפט|תכונה|نظرية|مبرهنة|خاصية|ادعاء|theorem|claim|lemma|proposition|property)(?![\p{L}])|^למה\s*\d*\s*$/iu,
+    proof: /^(הוכחה|ההוכחה|برهان|البرهان|إثبات|الإثبات|proof)(?![\p{L}])/iu,
+    mistakes: /^(טעויות נפוצות|טעויות|שגיאות נפוצות|أخطاء شائعة|الأخطاء الشائعة|common mistakes|mistakes|pitfalls)(?![\p{L}])/iu,
+    skip: /^(דוגמה|דוגמא|דוגמאות|مثال|أمثلة|ملخص|ملاحظة|example|examples|סיכום|summary|הערה|note|remark)(?![\p{L}])/iu
   };
 
   const norm = s => String(s || '').toLowerCase().replace(/[*_`>#]/g, '').replace(/\s+/g, ' ').trim();
@@ -102,10 +113,10 @@
     return words.length >= 2 ? { ctx, f: m[3] } : null;
   }
 
-  // sections: [{ id, title, content }], lang 'he' | 'en', type 'mixed' | 'flash' | 'fill' | 'choice'.
+  // sections: [{ id, title, content }], lang 'he' | 'ar' | 'en', type 'mixed' | 'flash' | 'fill' | 'choice'.
   // Returns [{ topic_section_id, kind, question, answer, choices?, correct_choice?, explanation? }].
   function generate({ sections, lang, type = 'mixed', limit = 20, existing = new Set() }) {
-    const T = TEXT[lang === 'he' ? 'he' : 'en'];
+    const T = TEXT[lang] || TEXT.en;
     const perSection = []; const allTerms = new Map(); const fillsAll = [];
     for (const s of sections) {
       const md = tidy(s.content); if (!md) continue;
