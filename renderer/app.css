@@ -153,6 +153,8 @@ button { cursor: default; -webkit-tap-highlight-color: transparent; }
 .side .icon-btn:hover, .side .text-btn:hover { background: var(--shelf-fill); color: var(--shelf-ink); }
 .claude-pill .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
 .claude-pill .dot.on { background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.claude-pill .dot.warn, .h-conn .dot.warn { background: var(--danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 22%, transparent); }
+.h-conn.warn { color: var(--danger); }
 .side-row { display: flex; gap: 4px; }
 .icon-btn, .text-btn { display: inline-flex; align-items: center; gap: 8px; border: 0; background: transparent; border-radius: 8px; padding: 7px 9px; color: var(--muted); font-size: 13.5px; }
 .icon-btn:hover, .text-btn:hover { background: var(--fill); color: var(--ink); }
@@ -983,6 +985,7 @@ kbd { font-family: var(--f-ui); font-size: 12px; font-weight: 500; background: v
 
 /* connecting Claude: numbered steps, then a green state */
 .cc-title { margin: 6px 0 2px; font: 600 14px/1.3 var(--f-ui); color: var(--ink); }
+.gem-tips { margin: 4px 0 0; padding-inline-start: 18px; display: grid; gap: 4px; line-height: 1.45; }
 .cc-steps { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 12px; }
 .cc-steps li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; align-items: start; }
 .cc-steps .n { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font: 700 12.5px/1 var(--f-ui); }

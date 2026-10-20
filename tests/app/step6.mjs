@@ -1,4 +1,4 @@
-import { launch, shot, REPO, CFG } from './launch.mjs';
+import { launch, shot, openCourse, REPO, CFG } from './launch.mjs';
 import path from 'path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -10,7 +10,7 @@ await claude.connect(new StdioClientTransport({ command: process.execPath, args:
 await claude.callTool({ name: 'create_course', arguments: { name: 'מאקרו כלכלה', notes_language: 'Hebrew' } });
 const r = await claude.callTool({ name: 'save_section', arguments: { course: 'מאקרו כלכלה', title: 'שוק תחרותי', content: 'בשוק תחרותי יש הרבה קונים ומוכרים, ואף אחד מהם לא משפיע על המחיר לבד.\n\nהמחיר נקבע בשיווי משקל, כשהכמות המבוקשת שווה לכמות המוצעת.' } });
 const id = JSON.parse(r.content[0].text.slice(0, r.content[0].text.lastIndexOf('}') + 1)).section_id;
-await win.waitForTimeout(1500);
+await win.waitForTimeout(1500); await openCourse(win);
 await win.mouse.move(5, 5);   // pointer away from the topic: buttons must still show
 const vis = await win.evaluate(() => { const t = document.querySelector('.sec-tools'); return t ? getComputedStyle(t).opacity : 'none'; });
 check(vis === '1', `topic buttons visible without hovering (opacity ${vis})`);

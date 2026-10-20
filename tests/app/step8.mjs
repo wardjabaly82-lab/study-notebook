@@ -1,4 +1,4 @@
-import { launch, shot, REPO, CFG } from './launch.mjs';
+import { launch, shot, openCourse, REPO, CFG } from './launch.mjs';
 import path from 'path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -10,7 +10,7 @@ await claude.connect(new StdioClientTransport({ command: process.execPath, args:
 await claude.callTool({ name: 'create_course', arguments: { name: 'אקונומטריקה', notes_language: 'Hebrew' } });
 const dia = '```mermaid\nflowchart TD\n  A["\\( E(u \\mid x) = 0 \\)"] --> B["E(y | x) = beta0 + beta1 x"]\n  B --> C["קו הרגרסיה = התוחלת המותנית"]\n  C --> D["\\beta_1 = השפעה סיבתית"]\n```';
 await claude.callTool({ name: 'save_section', arguments: { course: 'אקונומטריקה', title: 'הנחת התוחלת המותנית', content: 'כאשר \\(E(u\\mid x)=0\\), קו הרגרסיה הוא התוחלת המותנית.\n\n' + dia + '\n\n' + 'הסבר נוסף. '.repeat(80) } });
-await win.waitForTimeout(2500);
+await win.waitForTimeout(2500); await openCourse(win);
 const labels = await win.evaluate(() => [...document.querySelectorAll('figure.fig-dia svg text')].map(t => t.textContent).join(' | '));
 console.log('labels:', labels);
 check(/β₀ \+ β₁ x/.test(labels) && /E\(u \| x\) = 0/.test(labels) && /β₁ = השפעה/.test(labels) && !/beta|\\/.test(labels), 'diagram math shows as symbols (β₀, β₁, E(u | x))');

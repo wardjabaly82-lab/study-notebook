@@ -17,7 +17,24 @@ jobs:
       - name: Build the Claude connector
         run: npm run build:connector
       - name: Build the Windows installer
-        run: npx electron-builder --win nsis --publish never
+        shell: bash
+        # Signed with Azure Trusted Signing once its secrets and variables are set (STORE-AND-UPDATES.md, part 3); unsigned until then.
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          SIGN_ENDPOINT: ${{ vars.AZURE_SIGN_ENDPOINT }}
+          SIGN_ACCOUNT: ${{ vars.AZURE_SIGN_ACCOUNT }}
+          SIGN_PROFILE: ${{ vars.AZURE_SIGN_PROFILE }}
+          SIGN_PUBLISHER: ${{ vars.AZURE_SIGN_PUBLISHER }}
+        run: |
+          if [ -n "$AZURE_CLIENT_SECRET" ]; then
+            npx electron-builder --win nsis --publish never \
+              -c.win.azureSignOptions.endpoint="$SIGN_ENDPOINT" -c.win.azureSignOptions.codeSigningAccountName="$SIGN_ACCOUNT" \
+              -c.win.azureSignOptions.certificateProfileName="$SIGN_PROFILE" -c.win.azureSignOptions.publisherName="$SIGN_PUBLISHER"
+          else
+            npx electron-builder --win nsis --publish never
+          fi
       - name: Publish the release
         shell: bash
         env:
@@ -57,9 +74,19 @@ jobs:
       - name: Build the Claude connector
         run: npm run build:connector
       - name: Build the Mac apps (Apple silicon and Intel)
+        # Signed with your Developer ID and notarized once its secrets are set (STORE-AND-UPDATES.md, part 3); signed ad hoc until then.
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # no Apple developer certificate yet: signed ad hoc
-        run: npx electron-builder --mac dmg zip --arm64 --x64 --publish never
+          CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$CSC_LINK" ]; then
+            npx electron-builder --mac dmg zip --arm64 --x64 --publish never -c.mac.identity="$APPLE_TEAM_ID" -c.mac.notarize=true -c.mac.hardenedRuntime=true
+          else
+            CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac dmg zip --arm64 --x64 --publish never
+          fi
       - name: Add them to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

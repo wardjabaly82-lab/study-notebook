@@ -2,6 +2,17 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.20.7', date: '2026-10-20',
+    en: ['Drawing: hold the pen still for a moment and your line snaps straight. Hold Shift while drawing for a straight line at neat angles.',
+      'New “Paste from Claude”: copy an explanation in Claude and paste it as a topic. It’s in the ⋯ menu and in an empty notebook, for whenever Claude can’t save by itself.',
+      'If your notes can’t sync with your online notebook, the shelf and the Today screen now say so in one sentence. Click it to try again; the app also syncs the moment the internet is back. Nothing is lost while it waits.',
+      'Gemini: Settings now explains what to expect: start each chat with @Study Notebook, the 1–2 minute wait after connecting, and Allow on each save.',
+      'Lecture recording only shows where it works (the Windows app), and the first recording says how much it downloads before it starts.'],
+    he: ['ציור: עוצרים את העט לרגע במקום והקו מתיישר. מחזיקים Shift בזמן הציור לקו ישר בזוויות מסודרות.',
+      'חדש: ”הדבקה מ־Claude”: מעתיקים הסבר ב־Claude ומדביקים אותו כנושא. נמצא בתפריט ⋯ ובמחברת ריקה, לכל מקרה ש־Claude לא מצליח לשמור בעצמו.',
+      'אם הסיכומים לא מצליחים להסתנכרן עם המחברת המקוונת, המדף ומסך ”היום” אומרים זאת עכשיו במשפט אחד. לוחצים כדי לנסות שוב; האפליקציה גם מסתנכרנת מיד כשהאינטרנט חוזר. שום דבר לא הולך לאיבוד בינתיים.',
+      'Gemini: בהגדרות מוסבר עכשיו למה לצפות: מתחילים כל צ׳אט עם ‎@Study Notebook, ההמתנה של 1–2 דקות אחרי החיבור, ואישור Allow לכל שמירה.',
+      'הקלטת הרצאות מופיעה רק איפה שהיא עובדת (האפליקציה ל־Windows), וההקלטה הראשונה אומרת כמה היא מורידה לפני שמתחילים.'] },
   { v: '1.20.6', date: '2026-10-20',
     en: ['A new first page when you print: a colour band with the course name, a line with the date, how many topics there are and your exam date, and the contents right below. The first topic starts on the same page when the contents are short, so printing uses fewer sheets.'],
     he: ['עמוד ראשון חדש בהדפסה: פס צבעוני עם שם הקורס, שורה עם התאריך, מספר הנושאים ותאריך המבחן, ותוכן העניינים מיד מתחת. כשתוכן העניינים קצר, הנושא הראשון מתחיל באותו עמוד, כך שההדפסה חוסכת דפים.'] },

@@ -529,6 +529,7 @@ function textSize(dir) {
 }
 ipcMain.handle('text-size', (ev, dir) => { if ([-1, 0, 1].includes(dir)) textSize(dir); });
 ipcMain.handle('clipboard:write', (ev, text) => { if (typeof text !== 'string' || text.length > 200000) return false; clipboard.writeText(text); return true; });
+ipcMain.handle('clipboard:read', async () => String((await clipboard.readText()) || '').slice(0, 200000));   // only when the student clicks Paste from Claude
 ipcMain.handle('update:status', () => updates ? updates.status() : { enabled: false });
 ipcMain.handle('update:check', () => updates ? updates.check() : { enabled: false });
 ipcMain.handle('update:install', () => { if (updates) updates.install(); });

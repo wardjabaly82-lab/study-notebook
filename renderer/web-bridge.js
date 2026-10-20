@@ -99,6 +99,7 @@
     openDataFolder() {},
     openExternal(url) { window.open(url, '_blank', 'noopener'); },
     async copyText(text) { try { await navigator.clipboard.writeText(String(text)); return true; } catch (e) { return false; } },
+    async readText() { try { return await navigator.clipboard.readText(); } catch (e) { return ''; } },
     async cloudStatus() { if (!me || Date.now() - (me._at || 0) > 4000) { try { me = await req('/api/me'); me._at = Date.now(); } catch (e) {} } return status(); },
     async cloudSync() { await pull(); return status(); },
     async cloudDisconnect() { location.href = '/auth/signout'; },

@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('desktop', {
   showPdfInFolder: p => ipcRenderer.invoke('app:showInFolder', p),
 
   copyText: text => ipcRenderer.invoke('clipboard:write', String(text)),
+  readText: () => ipcRenderer.invoke('clipboard:read'),
   updateStatus: () => ipcRenderer.invoke('update:status'),
   updateCheck: () => ipcRenderer.invoke('update:check'),
   updateInstall: () => ipcRenderer.invoke('update:install'),

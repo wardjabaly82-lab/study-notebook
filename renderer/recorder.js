@@ -50,7 +50,7 @@
         <label class="field">${T('Lecture name')}<input id="recTitle" maxlength="120" value="${esc(R.title)}" dir="auto" required></label>
         <label class="field">${T('Spoken language')}<select id="recLang">${Object.entries(LANG_LABEL).map(([v, l]) => `<option value="${v}"${v === R.lang ? ' selected' : ''}>${T(l)}</option>`).join('')}</select></label>
         <p class="small">${esc(R.status && !R.status.supported ? T('Lecture recording works on Windows for now.') : n ? T('The first recording downloads the speech engine ({size}, once). It runs on your {device}, privately on this computer.', { size: gb(n), device: R.needs.gpu || T('processor') }) : R.needs && R.needs.gpu ? T('Runs on your {device}, privately on this computer.', { device: R.needs.gpu }) : T('Runs privately on this computer.'))}</p>
-        <div class="row"><button class="btn primary" type="submit" ${R.status && !R.status.supported ? 'disabled' : ''}><span class="rec-dot"></span>${T('Start recording')}</button><button class="btn ghost" type="button" data-rec="close">${T('Cancel')}</button></div>
+        <div class="row"><button class="btn primary" type="submit" ${R.status && !R.status.supported ? 'disabled' : ''}><span class="rec-dot"></span>${n ? T('Download {size} and start recording', { size: gb(n) }) : T('Start recording')}</button><button class="btn ghost" type="button" data-rec="close">${T('Cancel')}</button></div>
       </form>`;
     } else if (R.state === 'preparing') {
       const p = R.progress;

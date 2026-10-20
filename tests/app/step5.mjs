@@ -1,5 +1,5 @@
 // Step 5: graphs, diagrams, callouts, highlighter and drawing, as a student. Profile at a short path so the live link works.
-import { launch, shot, REPO, CFG } from './launch.mjs';
+import { launch, shot, openCourse, REPO, CFG } from './launch.mjs';
 import path from 'path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -20,7 +20,7 @@ const topicA = `ה==ביקוש== מתאר כמה צרכנים רוצים לקנ�
 const topicB = 'ההתפלגות הנורמלית הסטנדרטית:\n\n```plot\n{"title": "P(-1 < Z < 1)", "x": {"label": "z", "min": -3.5, "max": 3.5}, "items": [{"fn": "normpdf(x, 0, 1)", "color": "purple"}, {"type": "area", "fn": "normpdf(x, 0, 1)", "from": -1, "to": 1, "color": "purple", "label": "68%"}]}\n```\n\nצמיחה בתמ"ג:\n\n```plot\n{"type": "bar", "title": "צמיחה (%)", "labels": ["2023", "2024", "2025"], "series": [{"name": "ישראל", "values": [2, 0.9, 3.3]}, {"name": "OECD", "values": [1.7, 1.7, 1.8], "color": "gray"}], "show_values": true}\n```\n\nגרף שבור לבדיקה:\n\n```plot\n{"items": [{"fn": "10 - y"}]}\n```';
 const saved = await call('save_sections', { course: 'מאקרו כלכלה', sections: [{ title: 'ביקוש והיצע', content: topicA }, { title: 'התפלגויות ונתונים', content: topicB }] });
 const idA = saved.saved[0].section_id;
-await win.waitForTimeout(2500);
+await win.waitForTimeout(2500); await openCourse(win);
 
 // 1) What the student sees
 const view = await win.evaluate(() => ({

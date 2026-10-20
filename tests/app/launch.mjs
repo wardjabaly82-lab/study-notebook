@@ -39,3 +39,8 @@ export async function shot(win, name) {
   await win.screenshot({ path: f });
   return f;
 }
+// The app opens on the Home ("Today") screen; this opens a course's notes (the first one by default).
+export async function openCourse(win, i = 0) {
+  await win.evaluate(i => { const b = document.querySelectorAll('.side .course[data-course]')[i]; if (b && document.documentElement.hasAttribute('data-home')) b.click(); }, i);
+  await win.waitForTimeout(800);
+}

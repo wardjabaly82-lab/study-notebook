@@ -1,4 +1,4 @@
-import { launch, shot, REPO, CFG } from './launch.mjs';
+import { launch, shot, openCourse, REPO, CFG } from './launch.mjs';
 import path from 'path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -11,7 +11,7 @@ await claude.callTool({ name: 'create_course', arguments: { name: 'מאקרו כ
 await claude.callTool({ name: 'save_sections', arguments: { course: 'מאקרו כלכלה', sections: [
   { title: 'שוק תחרותי', content: 'בשוק תחרותי יש הרבה קונים ומוכרים, ואף אחד מהם לא משפיע על המחיר לבד.' },
   { title: 'מונופול', content: 'במונופול יש מוכר אחד, והוא קובע את המחיר או את הכמות.' } ] } });
-await win.waitForTimeout(1500);
+await win.waitForTimeout(1500); await openCourse(win);
 const top = await win.evaluate(() => [...document.querySelectorAll('#top .btn')].map(b => b.textContent.trim()).filter(Boolean));
 console.log('course toolbar:', top.join(' | '));
 check(top.includes('Draw'), 'Draw is a button in the course toolbar, next to Timer and Practice');

@@ -175,7 +175,7 @@
     if (!tools) { tools = document.createElement('div'); tools.className = 'draw-bar'; tools.setAttribute('role', 'toolbar'); document.body.appendChild(tools); }
     const cur = opt.color;
     tools.setAttribute('aria-label', T('Drawing tools'));
-    tools.innerHTML = `<div class="db-group">${TOOLS.map(([k, name, d]) => `<button type="button" data-tool="${k}" aria-pressed="${opt.tool === k}" title="${esc(k === 'eraser' ? T(name) + ': ' + T('Drag over a drawing to erase it') : T(name))}" aria-label="${esc(T(name))}">${icon(d)}</button>`).join('')}</div>
+    tools.innerHTML = `<div class="db-group">${TOOLS.map(([k, name, d]) => `<button type="button" data-tool="${k}" aria-pressed="${opt.tool === k}" title="${esc(k === 'eraser' ? T(name) + ': ' + T('Drag over a drawing to erase it') : k === 'pen' || k === 'marker' ? T(name) + ': ' + T('Hold still (or hold Shift) for a straight line') : T(name))}" aria-label="${esc(T(name))}">${icon(d)}</button>`).join('')}</div>
       <div class="db-group">${COLORS.map(c => `<button type="button" class="db-c s-${c}" data-color="${c}" aria-pressed="${cur === c}" title="${esc(T(INKNAME[c]))}" aria-label="${esc(T(INKNAME[c]))}"><i class="f-${c}"></i></button>`).join('')}</div>
       <div class="db-group">${[1, 2, 3].map(z => `<button type="button" data-size="${z}" aria-pressed="${opt.size === z}" title="${esc(T(['Thin', 'Medium', 'Thick'][z - 1]))}" aria-label="${esc(T(['Thin', 'Medium', 'Thick'][z - 1]))}"><i class="db-dot" style="width:${3 + z * 3}px;height:${3 + z * 3}px"></i></button>`).join('')}</div>
       <div class="db-group"><button type="button" data-undo title="${esc(T('Undo (Ctrl+Z)'))}" aria-label="${esc(T('Undo'))}">${icon('<path d="M9 7H4V2"/><path d="M4.5 7A8 8 0 1 1 6 17"/>')}</button>
@@ -260,12 +260,30 @@
     else { const { b, el } = blockAt(note, e.clientY); live = { ...base, b, el, pts: [[e.clientX, e.clientY]] }; }
     ov.onpointermove = move; ov.onpointerup = ov.onpointercancel = up;
   }
+  // Pen and marker: hold still for a moment and the stroke snaps to a straight line from where it started
+  // (then the end follows the pointer); with Shift it's straight from the start, at neat 45° steps.
+  const HOLD_MS = 450;
+  const snap45 = (a, x, y) => { const dx = x - a[0], dy = y - a[1], L = Math.hypot(dx, dy), ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4); return [a[0] + L * Math.cos(ang), a[1] + L * Math.sin(ang)]; };
   function move(e) {
     if (!live) return;
     if (live.erase) return erase(e);
+    const free = opt.tool === 'pen' || opt.tool === 'marker';
+    if (free && (live.straight || e.shiftKey)) {
+      live.straight = true; clearTimeout(live.hold);
+      live.pts = [live.pts[0], e.shiftKey ? snap45(live.pts[0], e.clientX, e.clientY) : [e.clientX, e.clientY]];
+      return preview();
+    }
     const last = live.pts[live.pts.length - 1];
     if (Math.hypot(e.clientX - last[0], e.clientY - last[1]) < 1.5) return;
-    if (opt.tool === 'pen' || opt.tool === 'marker') live.pts.push([e.clientX, e.clientY]); else live.pts[1] = [e.clientX, e.clientY];
+    if (free) {
+      live.pts.push([e.clientX, e.clientY]);
+      const L = live; clearTimeout(L.hold);
+      L.hold = setTimeout(() => {
+        const a = L.pts[0], b = L.pts[L.pts.length - 1];
+        if (live !== L || Math.hypot(b[0] - a[0], b[1] - a[1]) < 12) return;
+        L.straight = true; L.pts = [a, b]; preview();
+      }, HOLD_MS);
+    } else live.pts[1] = [e.clientX, e.clientY];
     preview();
   }
   function preview() {
@@ -277,6 +295,7 @@
   }
   function up() {
     const L = live; live = null; if (!L) return;
+    clearTimeout(L.hold);
     L.ov.onpointermove = L.ov.onpointerup = L.ov.onpointercancel = null;
     const pv = L.ov.querySelector('.ink-preview'); if (pv) pv.innerHTML = '';
     const s = api.section(L.id); if (!s || !drawing) return;
@@ -287,7 +306,7 @@
     let pts = L.pts.map(([x, y]) => toUnits(L.el, x, y));
     const shape = !(opt.tool === 'pen' || opt.tool === 'marker');
     if (shape) { if (pts.length < 2 || Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]) < 6) return; pts = [pts[0], pts[1]]; }
-    else pts = simplify(pts, 1.2);
+    else if (!L.straight) pts = simplify(pts, 1.2);
     const st = { id: rid('k'), t: opt.tool, c: opt.color, s: opt.size, b: L.b, p: pts };
     drawing.undo.push({ id: L.id, remove: st.id });
     save(L.id, { ink: (s.ink || []).concat(st) });

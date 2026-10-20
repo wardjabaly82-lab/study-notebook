@@ -1,9 +1,9 @@
 // Step 4: re-test after the fix. MODE=fallback (link can't connect) or MODE=live.
-import { launch, shot, REPO, CFG } from './launch.mjs';
+import { launch, shot, openCourse, REPO, CFG } from './launch.mjs';
 import path from 'path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-const MODE = process.env.MODE;
+const MODE = process.env.MODE || 'live';
 const bad = []; const ok = s => console.log('✓ ' + s); const fail = s => { bad.push(s); console.log('✗ ' + s); };
 const fresh = MODE === 'live';
 const { app, win, logs } = await launch({ fresh });
@@ -18,6 +18,8 @@ const claude = new Client({ name: 't', version: '1' });
 await claude.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(REPO, 'connector/src/server.js')], env: { ...process.env, STUDY_NOTEBOOK_DATA_DIR: path.join(CFG, 'Study Notebook') } }));
 const call = async (name, args) => { const r = await claude.callTool({ name, arguments: args }); const t = r.content.map(c => c.text).join('\n'); if (r.isError) throw new Error(t); return t; };
 if (fresh) { await call('create_course', { name: 'מאקרו כלכלה', notes_language: 'Hebrew' }); await win.waitForTimeout(800); }
+await win.evaluate(() => localStorage.setItem('sn-seen-version', '9.9.9'));   // so What's new doesn't open after the restart
+await openCourse(win);
 const tocHas = async title => (await win.$$eval('.toc-link', a => a.map(x => x.textContent))).some(x => x.includes(title));
 
 // 1) Claude saves a topic while the app is open.
@@ -41,7 +43,7 @@ if (await edit.count()) {
 // 3) Restart the app: both Claude's topic and the student's edit must still be there.
 await claude.close(); await app.close();
 const again = await launch();
-await again.win.waitForTimeout(2500);
+await again.win.waitForTimeout(2500); await openCourse(again.win);
 const toc = await again.win.$$eval('.toc-link', a => a.map(x => x.textContent));
 const text = await again.win.$$eval('.note', n => n.map(x => x.textContent).join('\n'));
 toc.some(x => x.includes(`ריבית ${MODE}`)) ? ok('Claude’s second save survived the student’s edit and a restart') : fail('Claude’s second save was LOST after the student edited');

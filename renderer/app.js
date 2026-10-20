@@ -6,6 +6,7 @@
   'use strict';
   const D = window.desktop;
   const WEB = !!D.web;   // the notebook on the website (no recording, printing or local Claude setup there)
+  const REC = !WEB && D.platform === 'win32';   // lecture recording: the Windows app only
   const Ops = window.NotebookOps;
   const { t, tn, lang: uiLang } = window.I18N;
   const BASE = Ops.BASE;
@@ -269,7 +270,18 @@
   }
 
   function lastClaude() { if (WEB) return cloudState && cloudState.claude ? Math.max(S.lastClaude, 1) : S.lastClaude; return Math.max(S.lastClaude, S.claudeSeen || 0, (S.settings && (S.settings.connectorLastUse || S.settings.connectorSeen)) || 0); }
+  // A sync problem with the online notebook, as one plain sentence ('' when there's none). Local changes wait and go up on the next sync.
+  const syncProblem = () => cloudState && cloudState.enabled && cloudState.error ? String(t(cloudState.error)).split(/(?<=[.!?])\s/)[0] : '';
+  async function fixSync() {
+    toast(t('Trying again…'));
+    try { const s = await D.cloudSync(); if (s) cloudState = s; } catch (e) {}
+    renderClaudePill(); if (S.home) renderHome();
+    if (syncProblem()) openSettings(); else toast(t('Synced. Your notes are up to date.'));
+  }
+  addEventListener('online', () => { if (cloudState && cloudState.enabled) fixSync(); });   // back online: don't wait for the next sync
   function renderClaudePill() {
+    const why = syncProblem();
+    if (why) { $('claudePill').innerHTML = `<span class="dot warn"></span><span><b>${t('Notes aren’t syncing')}</b>${esc(why)}</span>`; return; }
     const ts = lastClaude();
     $('claudePill').innerHTML = ts
       ? `<span class="dot on"></span><span><b>${t('Connected to Claude')}</b>${esc((S.settings && S.settings.connectorLastUse) || S.lastClaude ? t('Last saved {when}', { when: ago(Math.max(S.lastClaude, (S.settings && S.settings.connectorLastUse) || 0)) }) : t('Ready to save notes'))}</span>`
@@ -277,7 +289,7 @@
   }
 
   function recButton() {
-    if (WEB) return '';
+    if (!REC) return '';
     const r = window.recorderState ? window.recorderState() : { active: false };
     return r.active ? `<button class="btn rec-btn live" id="recBtn" type="button"><span class="rec-dot on"></span>${t('Recording')} ${r.state === 'recording' ? fmtTs(r.seconds) : '…'}</button>`
       : `<button class="btn rec-btn" id="recBtn" type="button"><span class="rec-dot"></span>${t('Record lecture')}</button>`;
@@ -379,6 +391,7 @@
             <button type="button" role="menuitem" data-act="formulas" ${has ? '' : 'disabled'}>${t('Formula sheet')}</button>
             <button type="button" role="menuitem" data-act="exam-date">${c.examDate ? t('Change exam date') : t('Set exam date')}</button>
             <button type="button" role="menuitem" data-act="auto-save">${t('Auto-save Claude chats to this course')}</button>
+            <button type="button" role="menuitem" data-act="paste-topic">${t('Paste from Claude')}</button>
             <button type="button" role="menuitem" data-act="add-topic">${t('Add a topic by hand')}</button>
             <button type="button" role="menuitem" data-act="export-md" ${has ? '' : 'disabled'}>${t('Export as Markdown')}</button>
             <button type="button" role="menuitem" data-act="course-settings">${t('Edit course details')}</button>
@@ -501,7 +514,7 @@
         <p>${esc(t('Open Claude (any chat: web, phone or the desktop app) and study a topic from {course}: ask questions until it makes sense. Then say:', { course: c.name }))}</p>
         <p class="say" dir="auto">${esc(say)}</p>
         <p class="small">${esc(t('Claude saves the final explanation here, under the right topic.'))}</p>
-        ${lastClaude() ? `<button class="btn primary" type="button" data-act="auto-save">${t('Set up auto-saving for this course')}</button>` : `<button class="btn primary" type="button" data-act="settings">${t('Connect to Claude')}</button>`}</div>`;
+        <div class="row" style="justify-content:center">${lastClaude() ? `<button class="btn primary" type="button" data-act="auto-save">${t('Set up auto-saving for this course')}</button>` : `<button class="btn primary" type="button" data-act="settings">${t('Connect to Claude')}</button>`}<button class="btn" type="button" data-act="paste-topic">${t('Paste from Claude')}</button></div></div>`;
       return;
     }
     const q = norm(S.search);
@@ -886,10 +899,19 @@
     save(); S.courseId = ''; selectCourse(courses()[0] ? courses()[0].id : '');
     undoable(t('Course deleted'), kept, () => selectCourse(id));
   }
-  function addSection(parentId) {
+  // When Claude can't save by itself: an explanation copied from Claude becomes a topic, its first line the title.
+  async function pasteTopic() {
+    const c = course(); if (!c) return;
+    let text = ''; try { text = String((await D.readText()) || '').trim(); } catch (e) {}
+    if (!text) { toast(t('Copy Claude’s explanation first (the copy button under its answer), then press Paste from Claude.')); return; }
+    const m = text.match(/^\s*(?:#{1,6}[ \t]+)?\**([^\n*]{1,140}?)\**[ \t]*\n+([\s\S]*\S[\s\S]*)$/);
+    addSection(null, m ? { title: m[1].trim(), content: m[2].trim() } : { title: t('Pasted from Claude'), content: text });
+    toast(t('Pasted as a new topic. Check the title, then save.'));
+  }
+  function addSection(parentId, from) {
     const c = course(); if (!c) return;
     const secs = sections(c.id); const sibs = kids(secs, parentId || null); const now = Date.now();
-    const s = { id: rid('s'), title: parentId ? t('New sub-topic') : t('New topic'), content: t('Write your notes here.'), parentId: parentId || null, order: sibs.length ? Math.max(...sibs.map(x => x.order || 0)) + 1 : 1, rev: 1, createdAt: now, updatedAt: now, prevTitle: null, prevContent: null, source: 'me' };
+    const s = { id: rid('s'), title: from ? from.title : parentId ? t('New sub-topic') : t('New topic'), content: from ? from.content : t('Write your notes here.'), parentId: parentId || null, order: sibs.length ? Math.max(...sibs.map(x => x.order || 0)) + 1 : 1, rev: 1, createdAt: now, updatedAt: now, prevTitle: null, prevContent: null, source: 'me' };
     putSection(c.id, s); S.view = 'notes'; S.editing = s.id; S.search = ''; render(); flash(s.id);
     setTimeout(() => { const i = document.querySelector('form.edit input'); if (i) { i.focus(); i.select(); } }, 60);
   }
@@ -950,6 +972,7 @@
       case 'add-sub': addSection(id); break;
       case 'fresh-seen': { const sec = secs[id]; if (sec) store('sn-fresh-seen:' + id, String(sec.updatedAt)); render(); break; }
       case 'add-topic': S.menu = false; addSection(null); break;
+      case 'paste-topic': S.menu = false; renderTop(); pasteTopic(); break;
       case 'export-md': S.menu = false; renderTop(); exportMd(); break;
       case 'course-settings': S.menu = false; renderTop(); openCourseSettings(); break;
       case 'auto-save': S.menu = false; renderTop(); openAutoSave(c); break;
@@ -1076,7 +1099,7 @@
   wirePeek();
   syncTitleBar();
   $('settingsBtn').addEventListener('click', () => openSettings());
-  $('claudePill').addEventListener('click', () => openSettings());
+  $('claudePill').addEventListener('click', () => syncProblem() ? fixSync() : openSettings());
   $('searchAllBtn').addEventListener('click', () => openSearchAll());
   $('themeBtn').addEventListener('click', () => { const order = ['system', 'light', 'dark']; setTheme(order[(order.indexOf(theme()) + 1) % 3]); toast(t('Appearance: {name}', { name: t(THEME_NAME[theme()]) })); });
   document.addEventListener('keydown', e => {
@@ -1360,7 +1383,8 @@
     today.sort((a, b) => b.s.updatedAt - a.s.updatedAt);
     const time = ts => new Date(ts).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
     const claudeOn = !!lastClaude(), gemOn = !!(cloudState && cloudState.gemini);
-    const conn = claudeOn || gemOn
+    const conn = syncProblem() ? `<button class="h-conn warn" type="button" data-home-act="sync"><span class="dot warn"></span>${esc(t('Notes aren’t syncing: {why}', { why: syncProblem() }))}</button>`
+      : claudeOn || gemOn
       ? `<div class="h-conn on"><span class="dot on"></span>${esc(claudeOn && gemOn ? t('Claude and Gemini are connected') : claudeOn ? t('Claude is connected') : t('Gemini is connected'))}</div>`
       : `<button class="h-conn" type="button" data-home-act="connect"><span class="dot"></span>${t('Connect to Claude')}</button>`;
     const added = `<section class="h-card h-added" aria-label="${esc(t('Saved today'))}">
@@ -1399,6 +1423,7 @@
     if (act === 'search') { openSearchAll(); return; }
     if (act === 'new-course') { openNewCourse(); return; }
     if (act === 'connect') { $('claudePill').click(); return; }
+    if (act === 'sync') { fixSync(); return; }
     const c = courses().find(x => x.id === cid); if (!c) return;
     if (act === 'open') { store('sn-pos-' + cid, JSON.stringify({ id: 'sec-' + id, off: 0 })); selectCourse(cid); return; }
     selectCourse(cid);
@@ -1518,6 +1543,11 @@
     };
   }
   function claudeSection() { return `<section class="group"><h3>${t('Claude app')}</h3><div class="box">${claudeBox()}</div></section>`; }
+  // What makes Gemini feel broken when nobody says it in advance (Google's rules, not ours).
+  const geminiTips = () => `<ul class="small gem-tips">${['After connecting, it can take 1–2 minutes before Study Notebook shows up in Gemini.',
+    'Start every Gemini chat with @Study Notebook, or Gemini won’t use your notebook in that chat.',
+    'Gemini asks you to Allow each save. Click Allow; that’s how Google keeps you in control.',
+    'If Gemini says it can’t find Study Notebook, start a new chat with @Study Notebook.'].map(x => `<li>${t(x)}</li>`).join('')}</ul>`;
   function wireClaude(d) { drawClaude(d); }
 
   async function drawSpeech(d) {
@@ -1649,7 +1679,10 @@
     } catch (e) { return { ok: false, error: 'Couldn’t apply the online changes.' }; }
   }
   let cloudState = null;
-  if (D.onCloudStatus) D.onCloudStatus(s => { cloudState = s; const box = document.getElementById('cloudBox'); if (box && !box.dataset.busy) paintCloud(box); });
+  if (D.onCloudStatus) D.onCloudStatus(s => {
+    const was = syncProblem(); cloudState = s; const box = document.getElementById('cloudBox'); if (box && !box.dataset.busy) paintCloud(box);
+    if (syncProblem() !== was) { renderClaudePill(); if (S.home) renderHome(); }   // a sync problem appears or clears
+  });
   async function drawCloud(d) {
     const box = d.querySelector('#cloudBox'); if (!box || !D.cloudStatus) return;
     cloudState = await D.cloudStatus(); paintCloud(box);
@@ -1672,13 +1705,14 @@
               <li><span class="n">3</span><div><b>${t('Click Connect')}</b><p>${t('Next to Study Notebook, click Connect. Choose your Google account ({email}), then click the blue Connect button on the Study Notebook page that opens.', { email: s.email })}</p></div></li>
             </ol>
             <p class="cc-wait" role="status"><span class="spin" aria-hidden="true"></span>${t('Waiting for Claude… this turns green by itself when it’s connected.')}</p>`}
-        ${s.gemini ? `<div class="cs-state ok gemini-ok"><span class="cs-ico">✓</span><div><b>${t('Gemini is connected')}</b><p>${esc(s.geminiLast ? t('Gemini last used your notebook {when}.', { when: ago(s.geminiLast) }) : t('Gemini hasn’t used it yet. In a Gemini chat, type @ and pick Study Notebook.'))}</p></div></div>`
+        ${s.gemini ? `<div class="cs-state ok gemini-ok"><span class="cs-ico">✓</span><div><b>${t('Gemini is connected')}</b><p>${esc(s.geminiLast ? t('Gemini last used your notebook {when}.', { when: ago(s.geminiLast) }) : t('Gemini hasn’t used it yet. In a Gemini chat, type @ and pick Study Notebook.'))}</p><details class="cs-more"><summary>${t('Tips for Gemini')}</summary>${geminiTips()}</details></div></div>`
           : `<details class="cs-more gemini-more"><summary>${t('Use Gemini too')}</summary>
             <p class="small">${t('Gemini can use the same notebook, next to Claude: both save to the same notes. Google offers this only in the US for now (18+, personal Google account, English).')}</p>
             <ol class="cc-steps">
               <li><span class="n">1</span><div><b>${t('Copy the same address')}</b><div class="row"><button class="btn" type="button" id="gemCopy">${t('Copy address')}</button></div></div></li>
               <li><span class="n">2</span><div><b>${t('Add it in Gemini')}</b><p>${t('On gemini.google.com open Settings → Connected Apps, click “Add a custom app”, paste the address and click Next.')}</p><button class="btn" type="button" id="gemOpen">${t('Open Gemini')}</button></div></li>
               <li><span class="n">3</span><div><b>${t('Sign in and connect')}</b><p>${t('Choose your Google account ({email}), then click the blue Connect button on the Study Notebook page. In a chat, type @ and pick Study Notebook.', { email: s.email })}</p></div></li>
+              <li><span class="n">4</span><div><b>${t('Using it')}</b>${geminiTips()}</div></li>
             </ol></details>`}
         <div class="row">${WEB ? '' : `<button class="btn" type="button" id="cloudNow">${t('Sync now')}</button><button class="btn" type="button" id="cloudWeb">${t('Open on the web')}</button>`}<button class="btn" type="button" id="cloudAcct">${t('Your account')}</button><button class="btn ghost" type="button" id="cloudOff">${t('Sign out')}</button></div>`;
       box.querySelector('#cloudCopy').onclick = () => copy(s.mcp, t('Address copied. Paste it in Claude’s connector settings.'));
@@ -1731,7 +1765,7 @@
     openDlg('settings', `<div class="dlg-in">${head(t('Settings'))}
       <section class="group"><h3>${t('Your account')}</h3><div class="box" id="cloudBox"><p class="small">${t('Checking…')}</p></div></section>
       ${WEB ? '' : claudeSection()}
-      ${WEB ? `<section class="group"><h3>${t('Lecture recording')}</h3><div class="box"><p class="small">${t('Recording lectures needs the Study Notebook app on a Windows computer. Transcripts you record there show up here too.')}</p></div></section>` : `<section class="group"><h3>${t('Lecture recording')}</h3><div class="box" id="speechBox"><p class="small">${t('Checking…')}</p></div></section>`}
+      ${!REC ? `<section class="group"><h3>${t('Lecture recording')}</h3><div class="box"><p class="small">${t('Recording lectures needs the Study Notebook app on a Windows computer. Transcripts you record there show up here too.')}</p></div></section>` : `<section class="group"><h3>${t('Lecture recording')}</h3><div class="box" id="speechBox"><p class="small">${t('Checking…')}</p></div></section>`}
       <section class="group"><h3>${t('Appearance')}</h3>
         <div class="seg" role="group" aria-label="${esc(t('Appearance'))}">${['system', 'light', 'dark'].map(th => `<button type="button" data-theme-pick="${th}" aria-pressed="${theme() === th}">${THEME_ICON[th]}${t(THEME_NAME[th])}</button>`).join('')}</div>
         <p class="small">${t('Automatic follows your computer’s light or dark setting.')}</p>
