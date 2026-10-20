@@ -1266,7 +1266,7 @@
       ``,
       gem ? `In every chat, use the Study Notebook app (@Study Notebook) and save what we study to the course "${c.name}" automatically, as we go, without asking me first:`
         : `In every chat in this project, use the Study Notebook tools and save what we study to the course "${c.name}" automatically, as we go, without asking me:`,
-      gem ? `- The tools come from the Study Notebook app. If you don't have them in this chat, tell me to start a new chat that begins with @Study Notebook.`
+      gem ? `- The tools come from the Study Notebook app. If you can't use them for a message, don't write the notes in the chat instead: tell me in one line to send that message again starting with @Study Notebook (picked from the @ list), and save it then.`
         : `- The tools come from the Study Notebook connector; their names contain "study-notebook". If you don't see them, search your tools for "study-notebook" before telling me they're missing.`,
       `- When you finish explaining something, save the final, clear explanation under the right topic (update an existing section instead of adding a duplicate).`,
       `- When I ask a follow-up question about something already saved (e.g. what the letters in a formula mean), add your answer to the notebook right where it belongs (edit_part), not at the end and not as a separate section.`,
@@ -1564,6 +1564,7 @@
   // What makes Gemini feel broken when nobody says it in advance (Google's rules, not ours).
   const geminiTips = () => `<ul class="small gem-tips">${['After connecting, it can take 1–2 minutes before Study Notebook shows up in Gemini.',
     'In every Gemini chat, type @ and pick Study Notebook from the list. Typing the name as plain text doesn’t connect it.',
+    'Gemini uses the notebook reliably only in messages that mention it. When you want something saved, start that message with @Study Notebook too.',
     'Study Notebook only appears when Gemini is set to English (Settings → Language), on a personal Google account in the US. Each person connects it in their own Gemini.',
     'Gemini asks you to Allow each save. Click Allow; that’s how Google keeps you in control.',
     'If Gemini says it can’t find Study Notebook, start a new chat with @Study Notebook.'].map(x => `<li>${t(x)}</li>`).join('')}</ul>`;
