@@ -21,8 +21,8 @@ export async function launch({ fresh = false } = {}) {
     executablePath: ELECTRON,
     args: [REPO, '--no-sandbox'],
     cwd: REPO,
-    // XDG_CONFIG_HOME keeps the test profile away from your real notes (Linux); on Windows/Mac set SN_PROFILE.
-    env: { ...process.env, XDG_CONFIG_HOME: CFG, APPDATA: CFG, SN_SITE: 'http://127.0.0.1:8787', SN_OPEN_LOG: path.join(OUT, 'opened-urls.txt'), LANG: 'en_US.UTF-8' },
+    // SN_USER_DATA keeps the test profile away from your real notes on every system (and lets tests run while the real app is open).
+    env: { ...process.env, SN_USER_DATA: path.join(CFG, 'Study Notebook'), XDG_CONFIG_HOME: CFG, APPDATA: CFG, SN_SITE: 'http://127.0.0.1:8787', SN_OPEN_LOG: path.join(OUT, 'opened-urls.txt'), LANG: 'en_US.UTF-8' },
     timeout: 60000
   });
   const win = await app.firstWindow();

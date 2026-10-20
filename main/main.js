@@ -20,6 +20,9 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }
 ]);
 
+// Tests pass their own notes folder, so they never touch the real notes and can run while the real app is open.
+if (process.env.SN_USER_DATA) app.setPath('userData', process.env.SN_USER_DATA);
+
 if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0); }
 
 log.init(app.getPath('userData'));
