@@ -129,16 +129,16 @@
           flash.push({ kind: 'flashcard', question: T.mistakes(title), answer: clip(b.text, 2500) });
         }
       }
-      // The section as a whole: its opening explanation.
       const intro = bs[0] && !bs[0].label ? bs[0].text : '';
-      const explainAns = intro.length >= 60 ? clip(intro, 1200) : clip(md, 1200);
-      if (explainAns.length >= 60) flash.push({ kind: 'flashcard', question: T.explain(title), answer: explainAns });
       const f = formula(md);
       if (f) flash.push({ kind: 'flashcard', question: T.formula(title, f.ctx), answer: f.f });
       for (const c of clozes(md)) {
         fill.push({ kind: 'flashcard', question: T.fill(c.blanked), answer: `**${c.term}**\n\n${c.sentence}`, _term: c.term, _blanked: c.blanked, _sentence: c.sentence });
         if (!allTerms.has(norm(c.term))) allTerms.set(norm(c.term), c.term);
       }
+      // "Explain: <topic>" is vague, so it's only the fallback for a section with no sharper question.
+      const explainAns = intro.length >= 60 ? clip(intro, 1200) : clip(md, 1200);
+      if (!flash.length && !fill.length && explainAns.length >= 60) flash.push({ kind: 'flashcard', question: T.explain(title), answer: explainAns });
       fillsAll.push(...fill.map(x => ({ ...x, sid: s.id })));
       perSection.push({ id: s.id, title, flash, fill, choice, intro: intro || md });
     }

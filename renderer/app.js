@@ -180,9 +180,12 @@
     const c = String(s.content || ''), m = c.match(/^\s*(?:#{1,6}[ \t]+([^\n]+)|\*\*([^\n*]+)\*\*[ \t]*)\n+/);
     return m && titleKey(m[1] || m[2]) === titleKey(s.title) ? c.slice(m[0].length) : c;
   }
+  // Gemini and other AIs write inline math as $…$; it's drawn like \( … \). Money ("$5 and $10", "$5/$6") doesn't match.
+  const inlineDollars = s => s.split(/(```[\s\S]*?```|`[^`\n]*`|\$\$[\s\S]+?\$\$)/g)
+    .map((p, i) => i % 2 ? p : p.replace(/(?<![\\$\w])\$(?=[^\s$])([^$\n]+?)(?<=[^\s\\$])\$(?![\w$])/g, '\\($1\\)')).join('');
   function mdToHtml(md) {
     const math = [];
-    let s = String(md || '').replace(/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)/g, m => { math.push(m); return 'MATHPH' + (math.length - 1) + 'X'; });
+    let s = inlineDollars(String(md || '')).replace(/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)/g, m => { math.push(m); return 'MATHPH' + (math.length - 1) + 'X'; });
     // ==highlighted== and =={green}highlighted== (not inside code or a graph description)
     s = s.split(/(```[\s\S]*?```|`[^`\n]*`)/g).map((part, i) => i % 2 ? part
       : part.replace(/==(?:\{(yellow|green|blue|pink|orange)\})?(?=\S)([^=\n]+?)==/g, (_, c, txt) => `<mark class="hl${c ? ' ' + c : ''}">${txt}</mark>`)).join('');
@@ -1065,7 +1068,7 @@
   $('newCourseBtn').addEventListener('click', openNewCourse);
   // Fold the shelf down to a strip of thin spines, and back.
   function paintFold() { const f = document.documentElement.getAttribute('data-shelf') === 'folded'; const b = $('foldBtn'); const label = f ? t('Unfold the shelf') : t('Fold the shelf'); b.title = label + ' (Ctrl+B)'; b.setAttribute('aria-label', label); b.setAttribute('aria-expanded', String(!f)); }
-  function toggleFold() { const f = document.documentElement.getAttribute('data-shelf') !== 'folded'; if (f) document.documentElement.setAttribute('data-shelf', 'folded'); else document.documentElement.removeAttribute('data-shelf'); store('sn-shelf', f ? 'folded' : 'open'); paintFold(); }
+  function toggleFold() { const f = document.documentElement.getAttribute('data-shelf') !== 'folded'; if (f) document.documentElement.setAttribute('data-shelf', 'folded'); else document.documentElement.removeAttribute('data-shelf'); store('sn-shelf', f ? 'folded' : 'open'); paintFold(); setTimeout(syncTitleBar, 350); }
   $('foldBtn').addEventListener('click', toggleFold); paintFold();
   document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b' && !e.target.closest('input, textarea, [contenteditable]')) { e.preventDefault(); toggleFold(); } });
   if (window.StudyTimer) window.StudyTimer.init({ t, tn, esc, toast, dir: UIDIR });
@@ -1135,12 +1138,15 @@
   const fontTiles = () => `<div class="font-grid" role="group" aria-label="${esc(t('Notes font'))}">${Object.entries(NOTEFONT).map(([k, name]) => `<button type="button" data-notefont-pick="${k}" aria-pressed="${noteFont() === k}"><span class="nf-${k}" aria-hidden="true">Aa אב</span>${esc(t(name))}</button>`).join('')}</div>`;
   const noteFont = () => document.documentElement.getAttribute('data-notefont') || 'book';
   function setNoteFont(f) { if (!NOTEFONT[f]) return; document.documentElement.setAttribute('data-notefont', f); saveView({ font: f }); if (dlg && dlg.open && dlgKind === 'settings') renderSettings(); if (S.editMenu) renderTop(); }
-  // The window buttons Windows draws at the top right take the colour of the page behind them.
+  // The window buttons Windows draws at the top right take the colour of what's behind them:
+  // the page, or in Hebrew the course shelf.
   function syncTitleBar() {
     if (!D.setTitleBar) return;
     requestAnimationFrame(() => {
       const hex = css => { const c = document.createElement('canvas').getContext('2d'); c.fillStyle = css; c.fillRect(0, 0, 1, 1); const [r, g, b] = c.getImageData(0, 0, 1, 1).data; return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join(''); };
-      const st = getComputedStyle(document.body);
+      let el = document.elementFromPoint(innerWidth - 4, 4);
+      while (el && el !== document.body && getComputedStyle(el).backgroundColor === 'rgba(0, 0, 0, 0)') el = el.parentElement;
+      const st = getComputedStyle(el || document.body);
       D.setTitleBar(hex(st.backgroundColor), hex(st.color));
     });
   }
@@ -1434,8 +1440,9 @@
       const hits = [];
       const secs = sections(c.id);
       for (const s of Object.values(secs)) {
-        const it = norm(s.title).includes(q), i = find(s.content);
-        if (it || i >= 0) hits.push(`<button type="button" class="sa-hit" data-hit="sec|${esc(c.id)}|${esc(s.id)}"><b dir="auto">${mark(s.title)}</b>${crumbs(secs, s.id).length ? `<small dir="auto">${esc(crumbs(secs, s.id).join(' › '))}</small>` : ''}${i >= 0 ? `<span dir="auto">${mark(snip(s.content, i))}</span>` : ''}</button>`);
+        const body = window.SNMarks ? SNMarks.plain(s.content) : s.content;   // previews show readable text, not Markdown or diagram code
+        const it = norm(s.title).includes(q), i = find(body);
+        if (it || i >= 0) hits.push(`<button type="button" class="sa-hit" data-hit="sec|${esc(c.id)}|${esc(s.id)}"><b dir="auto">${mark(s.title)}</b>${crumbs(secs, s.id).length ? `<small dir="auto">${esc(crumbs(secs, s.id).join(' › '))}</small>` : ''}${i >= 0 ? `<span dir="auto">${mark(snip(body, i))}</span>` : ''}</button>`);
       }
       for (const l of lectures(c.id)) {
         for (const p of String(l.text || '').split(/\n\n+/)) {

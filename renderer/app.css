@@ -602,10 +602,13 @@ kbd { font-family: var(--f-ui); font-size: 12px; font-weight: 500; background: v
   .top h1 { font-size: 19px; line-height: 1.2; flex: none; }
   .top h1 > span:first-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .top .meta { font-size: 13px; margin-top: 2px; }
-  .tools { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
-  .tools .search { grid-column: 1 / -1; width: 100%; min-height: 44px; }
+  /* buttons wrap by their real width and share each row, so long labels never run into the next button */
+  .tools { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+  .tools .search { flex: 1 1 100%; width: 100%; min-height: 44px; }
   .tools .search input { font-size: 16px; }   /* 16px keeps phones from zooming in on focus */
-  .tools > .btn, .tools .menu-wrap > .btn { min-height: 44px; justify-content: center; }
+  .tools > .btn, .tools .menu-wrap { flex: 1 1 auto; }
+  .tools .menu-wrap { display: flex; }
+  .tools > .btn, .tools .menu-wrap > .btn { flex: 1 1 auto; min-height: 44px; justify-content: center; }
   .toc-btn { display: inline-flex; }
   .menu { inset-inline-end: 0; max-width: calc(100vw - 24px); }
   .menu button { min-height: 44px; }
@@ -705,9 +708,12 @@ kbd { font-family: var(--f-ui); font-size: 12px; font-weight: 500; background: v
    The top 40px drags the window; Windows draws its buttons at the top right over the page colour. */
 .drag-strip { display: none; }
 .frameless .drag-strip { display: block; position: fixed; top: 0; inset-inline: 0; height: 40px; -webkit-app-region: drag; z-index: 1; pointer-events: none; }
-.frameless .main { padding-top: 30px; }
-.frameless .top { padding-top: 10px; }
+/* nothing scrolls under the window buttons: the page starts below their 40px strip */
+.frameless .main { padding-top: 40px; }
+.frameless .top { padding-top: 0; }
+.frameless .h-wrap { padding-top: 20px; }
 .frameless .side { padding-top: 14px; }
+.frameless[dir="rtl"] .side { padding-top: 46px; }   /* in Hebrew the shelf is on the right, under the buttons */
 .frameless .brand button, .frameless dialog, .frameless .timer-pop, .frameless .upd-note, .frameless .menu, .frameless .toast { -webkit-app-region: no-drag; }
 
 /* ---------- folding the shelf ---------- */
@@ -765,7 +771,6 @@ kbd { font-family: var(--f-ui); font-size: 12px; font-weight: 500; background: v
 .timer-pop > .row { gap: 8px; }
 .t-total { margin: 0; padding-top: 10px; border-top: 1px solid var(--line); }
 @media (max-width: 700px) {
-  .tools { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto; }
   .timer-btn { min-height: 44px; }
   .timer-pop .btn { min-height: 44px; }
 }

@@ -96,7 +96,7 @@
   panel.addEventListener('click', async e => {
     const b = e.target.closest('[data-rec]'); if (!b) return;
     switch (b.dataset.rec) {
-      case 'close': if (R.state === 'setup' || R.state === 'done' || R.state === 'error') { R.state = 'idle'; draw(); } break;
+      case 'close': if (closable()) { R.state = 'idle'; draw(); } break;
       case 'pause': R.paused = !R.paused; draw(); break;
       case 'cancel': if (R.state === 'preparing') { R.cancelled = true; D.speechCancel(); } break;
       case 'stop': stop(); break;
@@ -108,7 +108,11 @@
   });
 
   /* ---------- open ---------- */
+  // Escape (or the record button again) closes the panel when nothing is running in it; a recording keeps it open.
+  const closable = () => R.state === 'setup' || R.state === 'done' || R.state === 'error';
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !panel.hidden && closable() && !document.querySelector('dialog[open]')) { R.state = 'idle'; draw(); } });
   window.openRecorder = async () => {
+    if (R.state === 'setup') { R.state = 'idle'; draw(); return; }
     if (R.state !== 'idle' && R.state !== 'done' && R.state !== 'error') { R.collapsed = false; draw(); return; }
     const c = SN.course(); if (!c) return;
     R.courseId = c.id; R.state = 'setup'; R.error = ''; R.progress = null;

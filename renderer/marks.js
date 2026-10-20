@@ -175,7 +175,7 @@
   function plain(md) {
     return String(md || '')
       .replace(FENCE, '\n')
-      .replace(/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)/g, '')       // formulas aren't part of the text that gets marked
+      .replace(/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|(?<![\\$\w])\$(?=[^\s$])[^$\n]+?(?<=[^\s\\$])\$(?![\w$])/g, '')       // formulas aren't part of the text that gets marked
       .replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
       .replace(/==(?:\{\w+\})?([^=\n]+?)==/g, '$1').replace(/\*\*|__|~~|`/g, '').replace(/(^|\s)[*_](?=\S)|(?<=\S)[*_](?=\s|$|[.,;:!?])/g, '$1')
       .replace(/^[ \t]*(#{1,6}|>|[-*+]|\d+[.)])[ \t]+/gm, '').replace(/^\s*\[!\w+\][^\n]*$/gm, '').replace(/\|/g, ' ').replace(/^[ \t]*:?-{3,}:?[ \t]*$/gm, '');
@@ -207,5 +207,5 @@
     }
     return n;
   }
-  window.SNMarks = { changes, applyChanges, blocks, textIndex, applyHighlights, clearHighlights, quoteFromRange, drawInk, strokeSvg, HL, INK };
+  window.SNMarks = { plain, changes, applyChanges, blocks, textIndex, applyHighlights, clearHighlights, quoteFromRange, drawInk, strokeSvg, HL, INK };
 })();

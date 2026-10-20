@@ -2,6 +2,19 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.20.4', date: '2026-10-20',
+    en: ['Formulas written as $x$ (the way Gemini often writes them) now show as real math, also inside tables. Prices like $5 stay as they are.',
+      'Search results show readable text from your notes, not the code behind diagrams and formatting.',
+      'The lecture recording window closes with Esc or by pressing Record lecture again (while a recording runs it stays open).',
+      'In a narrow window the buttons above your notes no longer overlap.',
+      'Windows: the minimise, maximise and close buttons no longer cover your notes when you scroll, and in Hebrew they match the course shelf.',
+      'Automatic practice questions are sharper: the general “Explain: topic” card only appears when a topic has nothing better to ask.'],
+    he: ['נוסחאות שנכתבו כ־$x$ (כמו ש־Gemini כותב לרוב) מוצגות עכשיו כמתמטיקה אמיתית, גם בתוך טבלאות. מחירים כמו $5 נשארים כמו שהם.',
+      'תוצאות החיפוש מציגות טקסט קריא מהסיכומים, ולא את הקוד שמאחורי תרשימים ועיצוב.',
+      'חלון הקלטת ההרצאה נסגר ב־Esc או בלחיצה חוזרת על ”הקלטת הרצאה” (בזמן הקלטה הוא נשאר פתוח).',
+      'בחלון צר, הכפתורים מעל הסיכומים כבר לא עולים זה על זה.',
+      'Windows: כפתורי המזעור, ההגדלה והסגירה כבר לא מסתירים את הסיכומים בזמן גלילה, ובעברית הם בצבע של מדף הקורסים.',
+      'שאלות התרגול האוטומטיות ממוקדות יותר: הכרטיסייה הכללית ”הסבירו: נושא” מופיעה רק כשאין לנושא שאלה טובה יותר.'] },
   { v: '1.20.3', date: '2026-10-20',
     en: ['Tidier buttons: buttons you can’t use yet (like “Add notes first”) no longer react when you point at them, buttons keep their shape when you move to them with the keyboard, and the buttons on the Today screen are the same size as the rest of the app.'],
     he: ['כפתורים מסודרים יותר: כפתורים שעוד אי אפשר להשתמש בהם (כמו ”קודם להוסיף הערות”) כבר לא מגיבים כשמצביעים עליהם, כפתורים שומרים על הצורה שלהם כשעוברים אליהם במקלדת, והכפתורים במסך ”היום” באותו גודל כמו בשאר האפליקציה.'] },
