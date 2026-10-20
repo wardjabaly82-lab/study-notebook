@@ -1256,7 +1256,7 @@
     const he = c.lang === 'he', ar = c.lang === 'ar', gem = app === 'gemini';
     return [
       `Study Notebook course: "${c.name}"`,
-      gem ? `Start each Gemini chat with @Study Notebook.` : '',
+      gem ? `In each Gemini chat, type @ and pick Study Notebook from the list first (typing the name as text doesn't connect it). If it isn't in the list, connect it in Gemini's Settings → Connected Apps, with Gemini set to English.` : '',
       ``,
       gem ? `In every chat, use the Study Notebook app (@Study Notebook) and save what we study to the course "${c.name}" automatically, as we go, without asking me first:`
         : `In every chat in this project, use the Study Notebook tools and save what we study to the course "${c.name}" automatically, as we go, without asking me:`,
@@ -1287,7 +1287,7 @@
       <div class="row"><button class="btn primary" type="button" id="copyAuto">${t('Copy for Claude')}</button><button class="btn primary" type="button" id="copyAutoGem">${t('Copy for Gemini')}</button><button class="btn ghost" type="button" data-close>${t('Done')}</button></div>
       <p class="small">${esc(t('Without a project, Claude still saves automatically, but it guesses the course from the subject or asks you once at the start of a chat.'))}</p></div>`, d => {
       d.querySelector('#copyAuto').onclick = () => copy(text, t('Instructions copied. Paste them into the Claude project.'));
-      d.querySelector('#copyAutoGem').onclick = () => copy(autoSaveText(c, 'gemini'), t('Instructions for Gemini copied. Start each Gemini chat with @Study Notebook.'));
+      d.querySelector('#copyAutoGem').onclick = () => copy(autoSaveText(c, 'gemini'), t('Instructions for Gemini copied. In a new Gemini chat, type @, pick Study Notebook from the list, then paste.'));
     });
   }
 
@@ -1557,7 +1557,8 @@
   function claudeSection() { return `<section class="group"><h3>${t('Claude app')}</h3><div class="box">${claudeBox()}</div></section>`; }
   // What makes Gemini feel broken when nobody says it in advance (Google's rules, not ours).
   const geminiTips = () => `<ul class="small gem-tips">${['After connecting, it can take 1–2 minutes before Study Notebook shows up in Gemini.',
-    'Start every Gemini chat with @Study Notebook, or Gemini won’t use your notebook in that chat.',
+    'In every Gemini chat, type @ and pick Study Notebook from the list. Typing the name as plain text doesn’t connect it.',
+    'Study Notebook only appears when Gemini is set to English (Settings → Language), on a personal Google account in the US. Each person connects it in their own Gemini.',
     'Gemini asks you to Allow each save. Click Allow; that’s how Google keeps you in control.',
     'If Gemini says it can’t find Study Notebook, start a new chat with @Study Notebook.'].map(x => `<li>${t(x)}</li>`).join('')}</ul>`;
   function wireClaude(d) { drawClaude(d); }

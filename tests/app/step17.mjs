@@ -12,7 +12,7 @@ await win.click('#copyAuto'); await win.waitForTimeout(300); const c1 = await cl
 await win.click('#copyAutoGem'); await win.waitForTimeout(300); const c2 = await clip();
 console.log('--- CLAUDE ---\n' + c1 + '\n--- GEMINI ---\n' + c2);
 check(/in this project/.test(c1) && /study-notebook/.test(c1) && !/@Study Notebook/.test(c1), 'Claude’s copy is unchanged');
-check(/^Study Notebook course: "okay"\nStart each Gemini chat with @Study Notebook\.\n\n/.test(c2) && !/in this project/.test(c2), 'Gemini’s copy starts with the @Study Notebook line');
+check(/^Study Notebook course: "okay"\nIn each Gemini chat, type @ and pick Study Notebook from the list first[^\n]*\n\n/.test(c2) && !/in this project/.test(c2), 'Gemini’s copy starts with the “type @ and pick Study Notebook” line');
 check(c1.split('\n').slice(4).join('\n') === c2.split('\n').slice(5).join('\n'), 'everything else is the same in both');
 await shot(win, 'autosave');
 console.log('errors:', logs.join('\n') || 'none'); console.log(bad.length ? 'PROBLEMS' : 'ALL GOOD');

@@ -2,6 +2,9 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.20.10', date: '2026-10-20',
+    en: ['Clearer Gemini steps: in each Gemini chat, type @ and pick Study Notebook from the list (typing the name as text doesn’t connect it). Gemini only shows Study Notebook when Gemini is set to English, and each person connects it in their own Gemini.'],
+    he: ['הוראות ברורות יותר ל־Gemini: בכל צ׳אט ב־Gemini מקלידים @ ובוחרים Study Notebook מהרשימה (הקלדת השם כטקסט לא מחברת אותו). Gemini מציג את Study Notebook רק כשהוא מוגדר לאנגלית, וכל אחד מחבר אותו ב־Gemini שלו.'] },
   { v: '1.20.9', date: '2026-10-20',
     en: ['Arabic notes: choose Arabic as a course’s notes language. Claude and Gemini write the notes in Arabic, the page reads right to left, and practice questions and printing are in Arabic too.',
       'If you use Gemini, the app now says so: new and empty courses explain how to study with Gemini (start the chat with @Study Notebook), and the shelf shows “Connected to Gemini” instead of asking you to connect Claude.',
