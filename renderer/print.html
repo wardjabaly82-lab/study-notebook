@@ -19,14 +19,26 @@ body.lined{background-image:linear-gradient(transparent calc(8mm - 1px),var(--pa
 body.dotted{background-image:radial-gradient(circle,rgba(43,80,200,.32) .45px,transparent .7px);background-size:5mm 5mm}
 body.ink.grid,body.ink.lined,body.ink.dotted{background-image:none}
 
-.title-page{break-after:page;display:flex;flex-direction:column;justify-content:center;min-height:60vh}
-.title-page h1{font-family:Rubik,"Segoe UI",Arial,sans-serif;font-size:2.4em;line-height:1.15;margin:0 0 .3em}
-.title-page p{color:var(--muted);margin:.2em 0}
+/* the cover shares page 1 with the contents (or the first topic), so no sheet is spent on a title alone */
+.cover{margin:0 0 1.5em;break-inside:avoid}
+.cover .band{position:relative;overflow:hidden;background:var(--accent);color:#fff;border-radius:3mm;padding:9mm 10mm 8mm}
+.cover .band::before,.cover .band::after{content:"";position:absolute;border-radius:50%;background:rgba(255,255,255,.09)}
+.cover .band::before{width:62mm;height:62mm;inset-inline-end:-16mm;top:-26mm}
+.cover .band::after{width:30mm;height:30mm;inset-inline-end:34mm;bottom:-17mm;background:rgba(255,255,255,.06)}
+.cover .kicker{position:relative;font-family:Rubik,"Segoe UI",Arial,sans-serif;font-size:.78em;font-weight:600;letter-spacing:.09em;text-transform:uppercase;opacity:.85}
+.cover h1{position:relative;font-family:Rubik,"Segoe UI",Arial,sans-serif;font-size:2.7em;line-height:1.08;margin:.2em 0 0;letter-spacing:-.01em}
+.cover .sub{position:relative;margin:.35em 0 0;font-size:1.2em;opacity:.92}
+.cover .facts{display:flex;flex-wrap:wrap;gap:.35em 1.6em;margin:.9em 0 0;padding:0;list-style:none;font-family:Rubik,"Segoe UI",Arial,sans-serif;font-size:.9em;color:var(--muted)}
+.cover .facts b{color:var(--ink);font-weight:600}
+body.ink .cover .band{background:none;color:var(--ink);border:2px solid var(--ink)}
+body.ink .cover .band::before,body.ink .cover .band::after{display:none}
 
-.toc{break-after:page}
-.toc h2{font-family:Rubik,"Segoe UI",Arial,sans-serif;font-size:1.5em;margin:0 0 .6em}
+.toc.cols{break-after:page}   /* a short contents list shares page 1 with the first topic */
+.toc h2{font-family:Rubik,"Segoe UI",Arial,sans-serif;font-size:1.25em;margin:0 0 .5em;padding-bottom:.3em;border-bottom:1px solid var(--rule)}
 .toc ol{list-style:none;margin:0;padding:0}
-.toc li{margin:.25em 0}
+.toc.cols ol{columns:2;column-gap:10mm}
+.toc li{margin:.25em 0;break-inside:avoid}
+.toc li.d0{font-weight:600}
 .toc li.d1{padding-inline-start:1.4em;color:var(--muted)}
 .toc li.d2{padding-inline-start:2.8em;color:var(--muted);font-size:.92em}
 .toc .num{display:inline-block;min-width:2.6em;font-variant-numeric:tabular-nums;color:var(--accent)}
@@ -127,9 +139,17 @@ window.MathJax = {
     });
 
     let html = '';
-    if (opts.titlePage) html += `<section class="title-page"><h1 dir="auto">${esc(payload.course)}</h1><p dir="auto">${esc(payload.subtitle || '')}</p><p>${esc(payload.date || '')}</p></section>`;
+    if (opts.titlePage) {
+      const tops = numbered.filter(s => s.depth === 0).length, subs = numbered.length - tops;
+      const facts = [payload.date && esc(payload.date),
+        tops && `<b>${tops}</b> ${rtl ? (tops === 1 ? 'נושא' : 'נושאים') : (tops === 1 ? 'topic' : 'topics')}${subs ? ` · <b>${subs}</b> ${rtl ? 'תתי־נושאים' : 'sub-topics'}` : ''}`,
+        payload.exam && `${rtl ? 'מבחן:' : 'Exam:'} <b>${esc(payload.exam)}</b>`].filter(Boolean);
+      html += `<header class="cover"><div class="band"><div class="kicker" dir="${rtl ? 'rtl' : 'ltr'}">${esc(payload.num && !String(payload.course).includes(payload.num) ? payload.num : 'Study Notebook')}</div><h1 dir="auto">${esc(payload.course)}</h1>${payload.subtitle ? `<p class="sub" dir="auto">${esc(payload.subtitle)}</p>` : ''}</div>`
+        + `<ul class="facts">${facts.map(f => `<li>${f}</li>`).join('')}</ul></header>`;
+    }
     if (opts.contents && numbered.length > 1) {
-      html += `<section class="toc"><h2>${rtl ? 'תוכן עניינים' : 'Contents'}</h2><ol>` +
+      const listed = numbered.filter(s => s.depth <= 2).length;
+      html += `<section class="toc${listed > 14 ? ' cols' : ''}"><h2>${rtl ? 'תוכן עניינים' : 'Contents'}</h2><ol>` +
         numbered.filter(s => s.depth <= 2).map(s => `<li class="d${s.depth}" dir="auto"><span class="num">${esc(s.num)}</span>${esc(s.title)}</li>`).join('') + '</ol></section>';
     }
     let first = true;

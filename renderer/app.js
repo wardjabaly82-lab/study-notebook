@@ -1883,7 +1883,8 @@
     else if (topicId && secs[topicId]) { add(secs[topicId], 0); walk(secs, (s, d) => add(s, d + 1), topicId); }
     else walk(secs, add);
     const tree = []; walk(secs, (s, d) => tree.push({ id: s.id, title: s.title, depth: d }));
-    return { tree, course: c.name, lang: c.lang === 'he' || c.lang === 'en' ? c.lang : (dirOf(c) === 'rtl' ? 'he' : 'auto'), sections: out, topics: kids(secs, null).map(s => ({ id: s.id, title: s.title })), subtitle: topicId && secs[topicId] ? secs[topicId].title : '' };
+    const exIn = daysTo(c.examDate);
+    return { tree, course: c.name, num: courseNum(c) || '', exam: exIn != null && exIn >= 0 ? fmtDay(c.examDate) : '', lang: c.lang === 'he' || c.lang === 'en' ? c.lang : (dirOf(c) === 'rtl' ? 'he' : 'auto'), sections: out, topics: kids(secs, null).map(s => ({ id: s.id, title: s.title })), subtitle: topicId && secs[topicId] ? secs[topicId].title : '' };
   };
 
   /* ================= what's new ================= */

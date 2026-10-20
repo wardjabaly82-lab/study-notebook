@@ -81,7 +81,7 @@
     if (opts.what === '__formulas') Object.assign(o, { titlePage: false, contents: false, topicBreaks: false, fontSize: Math.min(o.fontSize, 9.5), margins: opts.margins === 'wide' ? 'normal' : opts.margins });
     return o;
   }
-  const payloadOf = s => ({ course: s.course, lang: s.lang, sections: s.sections, subtitle: s.subtitle });
+  const payloadOf = s => ({ course: s.course, num: s.num, exam: s.exam, lang: s.lang, sections: s.sections, subtitle: s.subtitle });
 
   function seg(name, items) {
     return `<div class="pr-seg" data-name="${name}">${items.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${String(opts[name]) === String(v)}">${esc(l)}</button>`).join('')}</div>`;

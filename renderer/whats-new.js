@@ -2,6 +2,9 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.20.6', date: '2026-10-20',
+    en: ['A new first page when you print: a colour band with the course name, a line with the date, how many topics there are and your exam date, and the contents right below. The first topic starts on the same page when the contents are short, so printing uses fewer sheets.'],
+    he: ['עמוד ראשון חדש בהדפסה: פס צבעוני עם שם הקורס, שורה עם התאריך, מספר הנושאים ותאריך המבחן, ותוכן העניינים מיד מתחת. כשתוכן העניינים קצר, הנושא הראשון מתחיל באותו עמוד, כך שההדפסה חוסכת דפים.'] },
   { v: '1.20.5', date: '2026-10-20',
     en: ['Comments work for long notes now: clicking commented words opens the comment to read (with your line breaks, scrolling if it’s long), with Edit and Delete. The writing box is wider, grows as you type, and holds up to 10,000 letters. Ctrl+Enter saves.',
       'Printing: comments come out as numbered notes under their topic instead of inside the sentence.',

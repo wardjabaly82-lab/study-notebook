@@ -72,6 +72,7 @@ function cleanPayload(p) {
   return {
     course: String(p.course || 'Study notes').slice(0, 200),
     subtitle: String(p.subtitle || '').slice(0, 300),
+    num: String(p.num || '').slice(0, 20), exam: String(p.exam || '').slice(0, 80),
     lang: ['he', 'en', 'auto'].includes(p.lang) ? p.lang : 'auto',
     date: new Date().toLocaleDateString(p.lang === 'he' ? 'he-IL' : 'en-GB', { year: 'numeric', month: 'long', day: 'numeric' }),
     sections
