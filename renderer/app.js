@@ -1238,6 +1238,12 @@
     d.querySelector('#cfForm').onsubmit = e => {
       e.preventDefault(); const q = sel => d.querySelector(sel);
       const name = q('#cfName').value.trim(); if (!name) return;
+      // Two courses with one name: Claude and Gemini would save everything into the first and the other would stay empty.
+      const key = x => String(x || '').toLowerCase().replace(/\s+/g, ' ').trim();
+      if (courses().some(o => o.id !== c.id && key(o.name) === key(name))) {
+        const inp = q('#cfName'); inp.setCustomValidity(t('You already have a course called “{name}”. Give this one a different name, for example with the year or the course number.', { name }));
+        inp.reportValidity(); inp.oninput = () => inp.setCustomValidity(''); return;
+      }
       const v = { name: name.slice(0, 80), lang: q('#cfLang').value, num: q('#cfNum').value.replace(/\D/g, '').slice(0, 8), examDate: q('#cfExam').value,
         paper: (q('[name=cfPaper]:checked') || {}).value || 'plain', width: (q('[name=cfWidth]:checked') || {}).value || 'normal', photo };
       const col = q('[name=cfColor]:checked'); if (col) v.color = +col.value;

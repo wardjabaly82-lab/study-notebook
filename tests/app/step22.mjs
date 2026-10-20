@@ -41,5 +41,14 @@ console.log('practice request shown:', ask.slice(0, 120) || '(none on this scree
 // the course form offers Arabic
 await win.click('.side .course[data-course]', { button: 'right' }); await win.waitForTimeout(400);
 check(await win.evaluate(() => [...document.querySelectorAll('dialog[open] select option')].some(o => o.value === 'ar' && o.selected)), 'the course form shows Arabic as the notes language');
+// 4) A second course with the same name is refused with a plain explanation
+await win.keyboard.press('Escape'); await win.waitForTimeout(300);
+await win.evaluate(() => document.querySelectorAll('dialog[open]').forEach(d => d.close()));
+await win.click('#newCourseBtn'); await win.waitForTimeout(400);
+await win.fill('#cfName', 'الاقتصاد الكلي'); await win.click('#cfForm button[type=submit]'); await win.waitForTimeout(300);
+const dup = await win.evaluate(() => ({ open: !!document.querySelector('dialog[open] #cfForm'), msg: document.getElementById('cfName').validationMessage, n: document.querySelectorAll('.side .course[data-course]').length }));
+check(dup.open && /already have a course called/.test(dup.msg) && dup.n === 1, `a second course with the same name isn't created (“${dup.msg.slice(0, 60)}…”)`);
+await win.fill('#cfName', 'الاقتصاد الكلي 2026'); await win.click('#cfForm button[type=submit]'); await win.waitForTimeout(400);
+check(await win.evaluate(() => document.querySelectorAll('.side .course[data-course]').length) === 2, 'with a different name it is created');
 console.log('errors:', logs.join('\n') || 'none'); console.log(bad.length ? `${bad.length} PROBLEM(S)` : 'ALL GOOD');
 await claude.close(); await app.close();

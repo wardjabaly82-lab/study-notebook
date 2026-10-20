@@ -7,6 +7,7 @@
   if (lang !== 'he') lang = 'en';
 
   const HE = {
+    'You already have a course called “{name}”. Give this one a different name, for example with the year or the course number.': 'כבר יש לכם קורס בשם ”{name}”. תנו לזה שם אחר, למשל עם השנה או מספר הקורס.',
     'Instructions for Gemini copied. In a new Gemini chat, type @, pick Study Notebook from the list, then paste.': 'ההוראות ל־Gemini הועתקו. בצ׳אט חדש ב־Gemini מקלידים @, בוחרים Study Notebook מהרשימה, ואז מדביקים.',
     'In every Gemini chat, type @ and pick Study Notebook from the list. Typing the name as plain text doesn’t connect it.': 'בכל צ׳אט ב־Gemini מקלידים @ ובוחרים Study Notebook מהרשימה. הקלדת השם כטקסט רגיל לא מחברת אותו.',
     'Study Notebook only appears when Gemini is set to English (Settings → Language), on a personal Google account in the US. Each person connects it in their own Gemini.': 'Study Notebook מופיע רק כש־Gemini מוגדר לאנגלית (הגדרות ← שפה), בחשבון Google אישי בארה״ב. כל אחד מחבר אותו ב־Gemini שלו.',

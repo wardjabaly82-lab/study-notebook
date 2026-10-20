@@ -2,6 +2,9 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.20.11', date: '2026-10-20',
+    en: ['Two courses can’t have the same name anymore: the app asks you to add the year or course number. If you already have two with one name, Claude and Gemini now ask which one you mean instead of always saving to the first.'],
+    he: ['אי אפשר יותר לתת לשני קורסים אותו שם: האפליקציה מבקשת להוסיף שנה או מספר קורס. אם כבר יש לכם שניים באותו שם, Claude ו־Gemini שואלים עכשיו לאיזה מהם התכוונתם, במקום לשמור תמיד לראשון.'] },
   { v: '1.20.10', date: '2026-10-20',
     en: ['Clearer Gemini steps: in each Gemini chat, type @ and pick Study Notebook from the list (typing the name as text doesn’t connect it). Gemini only shows Study Notebook when Gemini is set to English, and each person connects it in their own Gemini.'],
     he: ['הוראות ברורות יותר ל־Gemini: בכל צ׳אט ב־Gemini מקלידים @ ובוחרים Study Notebook מהרשימה (הקלדת השם כטקסט לא מחברת אותו). Gemini מציג את Study Notebook רק כשהוא מוגדר לאנגלית, וכל אחד מחבר אותו ב־Gemini שלו.'] },

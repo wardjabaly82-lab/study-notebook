@@ -62,6 +62,9 @@
       if (list.length === 1) return list[0];
       throw new OpError(`Say which course. Courses: ${list.map(c => `"${c.name}"`).join(', ')}.`);
     }
+    // two courses with the very same name: ask instead of silently using the first
+    const same = list.filter(c => norm(c.name) === r);
+    if (same.length > 1 && !list.some(c => c.id === ref)) throw new OpError(`There are ${same.length} courses called "${same[0].name}". Ask the student which one, then pass its course_id: ${same.map(c => `${c.id} (${c.num ? 'course number ' + c.num + ', ' : ''}${Object.keys(sections(docs, c.id)).length} sections)`).join('; ')}.`);
     const hit = list.find(c => c.id === ref) || list.find(c => norm(c.name) === r)
       || list.filter(c => { const first = norm(c.name).split(' ')[0]; return norm(c.name).includes(r) || (first.length >= 3 && r.includes(first)); });
     if (hit && !Array.isArray(hit)) return hit;
