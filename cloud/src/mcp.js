@@ -51,7 +51,7 @@ function plainSchema(sc) {
 const PLAIN_TOOLS = TOOLS.map(t => {
   const sc = plainSchema(t.inputSchema);
   if (!Object.keys(sc.properties || {}).length) sc.properties = { note: { type: 'string', description: 'Optional. Leave this out.' } };
-  return { name: t.name, description: t.description, inputSchema: sc };
+  return { name: t.name, title: t.title, description: t.description, inputSchema: sc, annotations: t.annotations };
 });
 export const toolsFor = app => (app === 'claude' ? TOOLS : PLAIN_TOOLS);
 const READ_ONLY = new Set(TOOLS.filter(t => t.annotations.readOnlyHint).map(t => t.name));
@@ -107,9 +107,11 @@ export const McpHandler = {
     // connections made before assistants were told apart are Claude's
     const app = (ctx.props.app === 'gemini' || ctx.props.app === 'other') ? ctx.props.app : 'claude';
     try { const job = noteUse(env, uid, app); if (ctx && ctx.waitUntil) ctx.waitUntil(job); else await job; } catch (e) {}
-    if (await over(env.RL_USER, 'u:' + uid)) return Response.json({ jsonrpc: '2.0', id: null, error: { code: -32029, message: 'Study Notebook: ' + MESSAGE } }, { status: 429, headers: { 'Retry-After': '60' } });
+    const log = (st, why) => { if (app === 'claude') return; const job = noteRpc(env, app, [{ method: why }], [], request, st); if (ctx && ctx.waitUntil) ctx.waitUntil(job); };
+    if (request.method !== 'POST') log(405, request.method + ' (not POST)');
+    if (await over(env.RL_USER, 'u:' + uid)) { log(429, 'rate limited'); return Response.json({ jsonrpc: '2.0', id: null, error: { code: -32029, message: 'Study Notebook: ' + MESSAGE } }, { status: 429, headers: { 'Retry-After': '60' } }); }
     if (request.method !== 'POST') return new Response('Use POST for MCP requests.', { status: 405, headers: { Allow: 'POST' } });
-    let body; try { body = await request.json(); } catch (e) { return Response.json({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }, { status: 400 }); }
+    let body; try { body = await request.json(); } catch (e) { log(400, 'bad JSON'); return Response.json({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }, { status: 400 }); }
     const batch = Array.isArray(body);
     const out = (await Promise.all((batch ? body : [body]).map(m => rpc(env, uid, m, app)))).filter(Boolean);
     // for apps other than Claude, note which requests came and how they were answered (never their content)

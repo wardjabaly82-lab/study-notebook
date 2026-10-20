@@ -43,7 +43,7 @@ export async function recent(env, limit = 60) {
 
 // What a connected app other than Claude asked the notebook (method, tool name, how many tools it was
 // given, error codes), so a chat that doesn't get the tools can be diagnosed. No arguments or notes.
-export async function noteRpc(env, app, msgs, out, request) {
+export async function noteRpc(env, app, msgs, out, request, status = 200) {
   try {
     const byId = new Map(out.map(r => [r && r.id, r]));
     const steps = msgs.slice(0, 10).map(m => {
@@ -55,7 +55,7 @@ export async function noteRpc(env, app, msgs, out, request) {
       if (r && r.error) x.err = String(r.error.code);
       return x;
     });
-    const e = { t: Date.now(), m: request.method, p: '/mcp', s: 200, app, rpc: steps, ua: (request.headers.get('User-Agent') || '').slice(0, 80), acc: (request.headers.get('Accept') || '').slice(0, 60) };
+    const e = { t: Date.now(), m: request.method, p: '/mcp', s: status, app, rpc: steps, ua: (request.headers.get('User-Agent') || '').slice(0, 80), acc: (request.headers.get('Accept') || '').slice(0, 60) };
     await env.OAUTH_KV.put(`trace:${e.t}:${Math.random().toString(36).slice(2, 6)}`, JSON.stringify(e), { expirationTtl: KEEP });
   } catch (x) {}
 }
