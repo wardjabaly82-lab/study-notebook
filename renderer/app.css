@@ -99,7 +99,7 @@ html { transition: background-color var(--slow) ease; }
 body { background: var(--desk); color: var(--ink); font: 14px/1.45 var(--f-ui); -webkit-font-smoothing: antialiased; letter-spacing: -.003em; }
 button, input, select, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
 button { cursor: default; -webkit-tap-highlight-color: transparent; }
-:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 1px; border-radius: 8px; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 1px; }
 [hidden] { display: none !important; }
 ::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 
@@ -177,7 +177,8 @@ button { cursor: default; -webkit-tap-highlight-color: transparent; }
 .btn.ghost:hover { background: var(--accent-soft); }
 .btn.danger { color: var(--danger); }
 .btn.danger.solid { background: var(--danger); color: #fff; }
-.btn[disabled] { opacity: .4; }
+.btn[disabled] { opacity: .5; pointer-events: none; }
+.btn svg { flex: none; pointer-events: none; }
 .menu-wrap { position: relative; }
 .menu { position: absolute; inset-inline-end: 0; top: calc(100% + 6px); z-index: 20; background: color-mix(in srgb, var(--raised) 94%, transparent); -webkit-backdrop-filter: saturate(180%) blur(30px); backdrop-filter: saturate(180%) blur(30px); border: 0; border-radius: 12px; box-shadow: var(--shadow-pop); padding: 5px; min-width: 220px; display: grid; transform-origin: top right; animation: pop var(--med) var(--ease); }
 [dir="rtl"] .menu { transform-origin: top left; }
@@ -1022,14 +1023,14 @@ dialog.news-dlg > .dlg-in { padding: 20px 24px; }
 .h-what { flex: 1; min-width: 0; }
 .h-what small { display: block; font-size: 12.5px; color: color-mix(in srgb, var(--desk) 62%, transparent); margin-top: 1px; }
 .h-min { font-size: 13px; color: color-mix(in srgb, var(--desk) 62%, transparent); white-space: nowrap; }
-.h-go { margin-top: auto; height: 46px; border: 0; border-radius: 14px; background: var(--desk); color: var(--ink); font: inherit; font-size: 15.5px; font-weight: 700; }
+.h-go { margin-top: auto; height: 40px; border: 0; border-radius: 10px; background: var(--desk); color: var(--ink); font: inherit; font-size: 15.5px; font-weight: 700; }
 .h-go:hover { background: color-mix(in srgb, var(--desk) 88%, var(--ink)); }
 .h-cont { grid-column: span 4; }
 .h-cont h2 { font-size: 22px; font-weight: 750; }
 .h-formula { padding: 12px 14px; border-radius: 14px; background: var(--fill); overflow-x: auto; text-align: center; direction: ltr; }
 .h-para { color: var(--ink); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .h-para p { margin: 0; }
-.h-open { margin-top: auto; align-self: flex-start; height: 38px; }
+.h-open { margin-top: auto; align-self: flex-start; }
 .h-added { grid-column: span 3; }
 .h-saved { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .h-saved button { width: 100%; text-align: start; border: 0; background: none; padding: 7px 8px; margin-inline: -8px; border-radius: 10px; color: var(--ink); font: inherit; }

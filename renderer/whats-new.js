@@ -2,6 +2,9 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.20.3', date: '2026-10-20',
+    en: ['Tidier buttons: buttons you can’t use yet (like “Add notes first”) no longer react when you point at them, buttons keep their shape when you move to them with the keyboard, and the buttons on the Today screen are the same size as the rest of the app.'],
+    he: ['כפתורים מסודרים יותר: כפתורים שעוד אי אפשר להשתמש בהם (כמו ”קודם להוסיף הערות”) כבר לא מגיבים כשמצביעים עליהם, כפתורים שומרים על הצורה שלהם כשעוברים אליהם במקלדת, והכפתורים במסך ”היום” באותו גודל כמו בשאר האפליקציה.'] },
   { v: '1.20.2', date: '2026-10-20',
     en: ['Auto-save instructions for a course now have two buttons: Copy for Claude and Copy for Gemini. Gemini’s copy is the same, adapted to Gemini: start each Gemini chat with @Study Notebook.'],
     he: ['בהוראות השמירה האוטומטית של קורס יש עכשיו שני כפתורים: העתקה ל־Claude והעתקה ל־Gemini. ההעתק ל־Gemini זהה, מותאם ל־Gemini: מתחילים כל צ׳אט ב־Gemini עם ‎@Study Notebook.'] },

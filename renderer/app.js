@@ -1343,7 +1343,7 @@
         <div class="h-sub">${dot(c)}<span dir="auto">${esc([c.name, ...path].join(' · '))}</span></div>
         ${ex.formula ? `<div class="h-formula">${esc(ex.formula)}</div>` : ''}
         ${ex.para ? `<div class="h-para" dir="auto">${mdToHtml(ex.para)}</div>` : ''}
-        <button class="btn primary h-open" type="button" data-home-act="open" data-cid="${esc(lr.cid)}" data-id="${esc(lr.sid)}">${t('Continue reading')}</button>
+        <button class="btn primary big h-open" type="button" data-home-act="open" data-cid="${esc(lr.cid)}" data-id="${esc(lr.sid)}">${t('Continue reading')}</button>
       </section>`;
     } else cont = `<section class="h-card h-cont"><div class="h-sub">${t('Continue where you stopped')}</div><p class="h-calm">${t('Nothing read yet. Open a course to start.')}</p></section>`;
 
