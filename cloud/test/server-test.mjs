@@ -122,6 +122,11 @@ console.log('Gemini connects to the same notebook, next to Claude');
   const g = new Client({ name: 'gemini-sim', version: '1' });
   await g.connect(new StreamableHTTPClientTransport(new URL(O + '/mcp'), { requestInit: { headers: { Authorization: 'Bearer ' + tok.access_token } } }));
   ok(JSON.stringify(await call(g, 'list_courses', {})).includes('Linear algebra'), 'Gemini sees the same notes Claude saved');
+  { const gt = JSON.stringify((await g.listTools()).tools), ct = JSON.stringify((await ca.listTools()).tools);
+    ok(JSON.parse(gt).length === JSON.parse(ct).length && !/additionalProperties|minLength|maxLength|minimum|maxItems/.test(gt) && /"required":\["title","content"\]/.test(gt), 'Gemini gets every tool in Google’s simple schema format');
+    ok(/additionalProperties/.test(ct) && /maxLength/.test(ct), 'Claude still gets the full schemas'); 
+    ok(JSON.parse(gt).every(t => Object.keys(t.inputSchema.properties || {}).length > 0), 'no Gemini tool has an empty list of inputs (Google refuses those)');
+    ok(JSON.stringify(await call(g, 'list_courses', { note: '' })).includes('Linear algebra'), 'list_courses still works when Gemini fills that optional field'); }
   const gs = await call(g, 'save_section', { course: 'Linear algebra', title: 'Eigenvalues', content: 'Saved by Gemini for Alice' });
   const cl = await call(ca, 'save_section', { course: 'Linear algebra', title: 'Eigenvectors', content: 'Saved by Claude for Alice' });
   const all = (await api(alice, 'docs')).docs;
@@ -140,6 +145,7 @@ console.log('Gemini connects to the same notebook, next to Claude');
 console.log('Connection trace (owner only)');
 {
   const tr = await (await alice.go('/account?trace=1')).text();
+  ok(/gemini · .*tools\/list \d+ tools/.test(tr) && /tools\/call save_section/.test(tr) && !/Saved by Gemini for Alice/.test(tr), 'the owner trace shows which requests Gemini made (no note content)');
   ok(/Connection steps/.test(tr) && /\/token/.test(tr) && /authorization_code/.test(tr) && /gemini\.google\.com/.test(tr) && !/code_verifier|access_token/.test(tr), 'the site owner can see recent connection steps (no codes or tokens shown)');
   const trb = await (await bob.go('/account?trace=1')).text();
   ok(!/Connection steps/.test(trb), 'other students can’t see it');

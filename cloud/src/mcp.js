@@ -2,6 +2,7 @@
 import Ops from './notebook-ops.js';
 import { INSTRUCTIONS } from './instructions.js';
 import { over, MESSAGE } from './limits.js';
+import { noteRpc } from './trace.js';
 import { loadDocs, writeDocs, userById, usage, QUOTA_BYTES, noteUse } from './store.js';
 
 export const VERSION = '2.0.0';
@@ -29,6 +30,30 @@ const TOOLS = [
   { name: 'get_practice_overview', title: 'Practice results', description: 'How the student is doing in practice: number of items, how many are due, accuracy per topic, the questions they get wrong most, and topics with no practice yet.', inputSchema: obj({ course }), annotations: RO },
   { name: 'create_course', title: 'Create a course', description: 'Create a new course notebook.', inputSchema: obj({ name: { type: 'string', minLength: 1, maxLength: 80, description: 'Course name, e.g. "52324 - Probability for Statistics students".' }, notes_language: { type: 'string', enum: ['Hebrew', 'English', 'Same as the material'], description: 'Language to write this course’s notes in.' } }, ['name']), annotations: WRITE }
 ];
+// Gemini (and other non-Claude apps) read tool inputs in Google's simpler schema format, which has no
+// additionalProperties and may reject length/size limits; a tool list it can't read leaves the chat
+// with no tools at all. They get the same tools with only the basics: type, description, enum, items,
+// properties, required. Claude keeps the full schemas. (The server still checks every limit.)
+const KEEP_KEYS = new Set(['type', 'description', 'enum', 'items', 'properties', 'required']);
+function plainSchema(sc) {
+  if (Array.isArray(sc)) return sc.map(plainSchema);
+  if (!sc || typeof sc !== 'object') return sc;
+  const out = {};
+  for (const [k, v] of Object.entries(sc)) {
+    if (!KEEP_KEYS.has(k)) continue;
+    if (k === 'properties') { out.properties = {}; for (const [n, ps] of Object.entries(v)) out.properties[n] = plainSchema(ps); }
+    else if (k === 'required') { if (Array.isArray(v) && v.length) out.required = v; }
+    else out[k] = plainSchema(v);
+  }
+  return out;
+}
+// Google's format also refuses an object with no properties, so a tool that takes nothing gets one optional field.
+const PLAIN_TOOLS = TOOLS.map(t => {
+  const sc = plainSchema(t.inputSchema);
+  if (!Object.keys(sc.properties || {}).length) sc.properties = { note: { type: 'string', description: 'Optional. Leave this out.' } };
+  return { name: t.name, description: t.description, inputSchema: sc };
+});
+export const toolsFor = app => (app === 'claude' ? TOOLS : PLAIN_TOOLS);
 const READ_ONLY = new Set(TOOLS.filter(t => t.annotations.readOnlyHint).map(t => t.name));
 const ONLINE_NOTE = 'Saved in the student’s Study Notebook. It shows on the website right away, and in the app on their computer within a minute if it is open.';
 
@@ -67,7 +92,7 @@ async function rpc(env, uid, msg, app) {
       return reply({ protocolVersion: PROTOCOLS.includes(asked) ? asked : PROTOCOLS[2], capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'study-notebook', title: 'Study Notebook', version: VERSION }, instructions: INSTRUCTIONS });
     }
     case 'ping': return reply({});
-    case 'tools/list': return reply({ tools: TOOLS });
+    case 'tools/list': return reply({ tools: toolsFor(app) });
     case 'tools/call': return reply(await callTool(env, uid, msg.params && msg.params.name, msg.params && msg.params.arguments, app));
     case 'resources/list': return reply({ resources: [] });
     case 'prompts/list': return reply({ prompts: [] });
@@ -87,6 +112,8 @@ export const McpHandler = {
     let body; try { body = await request.json(); } catch (e) { return Response.json({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }, { status: 400 }); }
     const batch = Array.isArray(body);
     const out = (await Promise.all((batch ? body : [body]).map(m => rpc(env, uid, m, app)))).filter(Boolean);
+    // for apps other than Claude, note which requests came and how they were answered (never their content)
+    if (app !== 'claude') { const job = noteRpc(env, app, batch ? body : [body], out, request); if (ctx && ctx.waitUntil) ctx.waitUntil(job); else await job; }
     if (!out.length) return new Response(null, { status: 202 });
     return Response.json(batch ? out : out[0], { headers: { 'Cache-Control': 'no-store' } });
   }

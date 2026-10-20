@@ -2,6 +2,9 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.20.1', date: '2026-10-20',
+    en: ['Gemini: the notebook now describes its tools in the simpler format Gemini reads, so Gemini chats get Study Notebook’s tools instead of none. Claude is unchanged.'],
+    he: ['Gemini: המחברת מתארת עכשיו את הכלים שלה בפורמט הפשוט ש־Gemini קורא, כך שבצ׳אטים של Gemini הכלים של Study Notebook זמינים. ב־Claude לא השתנה דבר.'] },
   { v: '1.20.0', date: '2026-10-20',
     en: ['When Claude or Gemini deepens or fixes part of a topic, the new text (and any new picture) is marked in green on the page, so you see exactly what changed. Press “Got it” next to the topic’s title to clear the marks. Your own highlights stay on top.'],
     he: ['כש־Claude או Gemini מעמיקים או מתקנים חלק מנושא, הטקסט החדש (וכל תמונה חדשה) מסומן בירוק בדף, כך שרואים בדיוק מה השתנה. לוחצים ”הבנתי” ליד כותרת הנושא כדי להסיר את הסימון. הסימונים שלכם נשארים מעל.'] },
