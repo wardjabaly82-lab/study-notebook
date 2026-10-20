@@ -33,6 +33,7 @@ jobs:
               -c.win.azureSignOptions.endpoint="$SIGN_ENDPOINT" -c.win.azureSignOptions.codeSigningAccountName="$SIGN_ACCOUNT" \
               -c.win.azureSignOptions.certificateProfileName="$SIGN_PROFILE" -c.win.azureSignOptions.publisherName="$SIGN_PUBLISHER"
           else
+            unset AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET   # empty values from unset secrets
             npx electron-builder --win nsis --publish never
           fi
       - name: Publish the release
@@ -85,6 +86,8 @@ jobs:
           if [ -n "$CSC_LINK" ]; then
             npx electron-builder --mac dmg zip --arm64 --x64 --publish never -c.mac.identity="$APPLE_TEAM_ID" -c.mac.notarize=true -c.mac.hardenedRuntime=true
           else
+            # GitHub passes unset secrets as empty values; an empty CSC_LINK makes electron-builder look for a certificate file.
+            unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
             CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac dmg zip --arm64 --x64 --publish never
           fi
       - name: Add them to the release
