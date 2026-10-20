@@ -2,6 +2,9 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.20.2', date: '2026-10-20',
+    en: ['Auto-save instructions for a course now have two buttons: Copy for Claude and Copy for Gemini. Gemini’s copy is the same, adapted to Gemini: start each Gemini chat with @Study Notebook.'],
+    he: ['בהוראות השמירה האוטומטית של קורס יש עכשיו שני כפתורים: העתקה ל־Claude והעתקה ל־Gemini. ההעתק ל־Gemini זהה, מותאם ל־Gemini: מתחילים כל צ׳אט ב־Gemini עם ‎@Study Notebook.'] },
   { v: '1.20.1', date: '2026-10-20',
     en: ['Gemini: the notebook now describes its tools in the simpler format Gemini reads, so Gemini chats get Study Notebook’s tools instead of none. Claude is unchanged.'],
     he: ['Gemini: המחברת מתארת עכשיו את הכלים שלה בפורמט הפשוט ש־Gemini קורא, כך שבצ׳אטים של Gemini הכלים של Study Notebook זמינים. ב־Claude לא השתנה דבר.'] },

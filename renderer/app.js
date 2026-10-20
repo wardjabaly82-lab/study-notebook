@@ -1210,13 +1210,17 @@
     }));
   }
   // One-time setup per course: a Claude Project whose instructions send every chat's notes here.
-  function autoSaveText(c) {
-    const he = c.lang === 'he';
+  // The same instructions for Claude (a project) or for Gemini (where each chat starts with @Study Notebook).
+  function autoSaveText(c, app = 'claude') {
+    const he = c.lang === 'he', gem = app === 'gemini';
     return [
       `Study Notebook course: "${c.name}"`,
+      gem ? `Start each Gemini chat with @Study Notebook.` : '',
       ``,
-      `In every chat in this project, use the Study Notebook tools and save what we study to the course "${c.name}" automatically, as we go, without asking me:`,
-      `- The tools come from the Study Notebook connector; their names contain "study-notebook". If you don't see them, search your tools for "study-notebook" before telling me they're missing.`,
+      gem ? `In every chat, use the Study Notebook app (@Study Notebook) and save what we study to the course "${c.name}" automatically, as we go, without asking me first:`
+        : `In every chat in this project, use the Study Notebook tools and save what we study to the course "${c.name}" automatically, as we go, without asking me:`,
+      gem ? `- The tools come from the Study Notebook app. If you don't have them in this chat, tell me to start a new chat that begins with @Study Notebook.`
+        : `- The tools come from the Study Notebook connector; their names contain "study-notebook". If you don't see them, search your tools for "study-notebook" before telling me they're missing.`,
       `- When you finish explaining something, save the final, clear explanation under the right topic (update an existing section instead of adding a duplicate).`,
       `- When I ask a follow-up question about something already saved (e.g. what the letters in a formula mean), add your answer to the notebook right where it belongs (edit_part), not at the end and not as a separate section.`,
       `- When I ask to go deeper into one part, or say I didn't understand it, replace only that part with a deeper, clearer explanation (edit_part), not the whole section.`,
@@ -1226,7 +1230,7 @@
       `- Don't save anything I say not to save.`,
       `- After each save, tell me in one short line what was saved and where.`,
       he ? `- Write the notes in Hebrew, with formulas in Latin form.` : ''
-    ].filter((x, i) => x !== '' || i === 1).join('\n');
+    ].filter((x, i) => x !== '' || i === 2).join('\n');
   }
   function openAutoSave(c) {
     if (!c) return;
@@ -1239,9 +1243,10 @@
         <li><div><b>${esc(t('Use the Claude desktop app on this computer'))}</b><span>${esc(t('Start the chats in the Claude desktop app on this computer. Chats started on your phone or on the web can’t save to Study Notebook.'))}</span></div></li>
       </ol>
       <pre class="auto-text" dir="ltr">${esc(text)}</pre>
-      <div class="row"><button class="btn primary" type="button" id="copyAuto">${t('Copy instructions')}</button><button class="btn ghost" type="button" data-close>${t('Done')}</button></div>
+      <div class="row"><button class="btn primary" type="button" id="copyAuto">${t('Copy for Claude')}</button><button class="btn primary" type="button" id="copyAutoGem">${t('Copy for Gemini')}</button><button class="btn ghost" type="button" data-close>${t('Done')}</button></div>
       <p class="small">${esc(t('Without a project, Claude still saves automatically, but it guesses the course from the subject or asks you once at the start of a chat.'))}</p></div>`, d => {
       d.querySelector('#copyAuto').onclick = () => copy(text, t('Instructions copied. Paste them into the Claude project.'));
+      d.querySelector('#copyAutoGem').onclick = () => copy(autoSaveText(c, 'gemini'), t('Instructions for Gemini copied. Start each Gemini chat with @Study Notebook.'));
     });
   }
 

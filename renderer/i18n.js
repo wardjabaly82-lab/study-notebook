@@ -7,6 +7,9 @@
   if (lang !== 'he') lang = 'en';
 
   const HE = {
+    'Copy for Claude': 'העתקה ל־Claude',
+    'Copy for Gemini': 'העתקה ל־Gemini',
+    'Instructions for Gemini copied. Start each Gemini chat with @Study Notebook.': 'ההוראות ל־Gemini הועתקו. מתחילים כל צ׳אט ב־Gemini עם ‎@Study Notebook.',
     'Hide the marks': 'הסתרת הסימון',
     'What Claude changed is marked': 'מה ש־Claude שינה מסומן',
     'What Gemini changed is marked': 'מה ש־Gemini שינה מסומן',
