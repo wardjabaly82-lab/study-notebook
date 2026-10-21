@@ -193,6 +193,11 @@
   // Gemini and other AIs write inline math as $…$; it's drawn like \( … \). Money ("$5 and $10", "$5/$6") doesn't match.
   const inlineDollars = s => s.split(/(```[\s\S]*?```|`[^`\n]*`|\$\$[\s\S]+?\$\$)/g)
     .map((p, i) => i % 2 ? p : p.replace(/(?<![\\$\w])\$(?=[^\s$])([^$\n]+?)(?<=[^\s\\$])\$(?![\w$])/g, '\\($1\\)')).join('');
+  // Formulas are drawn left to right letter by letter, so Hebrew words inside \text{…} came out backwards.
+  // They're written in visual order instead: the words reversed, brackets mirrored, digits and Latin runs kept as they are.
+  const MIRROR = { '(': ')', ')': '(', '[': ']', ']': '[', '{': '}', '}': '{', '<': '>', '>': '<' };
+  const rtlText = m => String(m).replace(/\\(text|textbf|textit|textrm|mbox)\s*\{((?:[^{}]|\{[^{}]*\})*)\}/g, (all, cmd, s) =>
+    /[֐-׿]/.test(s) ? `\\${cmd}{${(s.match(/[A-Za-z0-9]+(?:[.,][0-9]+)*|[\s\S]/g) || []).reverse().map(x => MIRROR[x] || x).join('')}}` : all);
   function mdToHtml(md) {
     const math = [];
     let s = inlineDollars(String(md || '')).replace(/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)/g, m => { math.push(m); return 'MATHPH' + (math.length - 1) + 'X'; });
@@ -202,7 +207,7 @@
     let html;
     if (window.marked && window.DOMPurify) html = DOMPurify.sanitize(marked.parse(s, { gfm: true, breaks: false }));
     else html = '<p>' + esc(s).replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
-    return html.replace(/MATHPH(\d+)X/g, (_, i) => esc(math[+i]));
+    return html.replace(/MATHPH(\d+)X/g, (_, i) => esc(rtlText(math[+i])));
   }
   function decorate(el) {
     if (window.SNFig) SNFig.upgrade(el);   // graphs, diagrams, callout boxes

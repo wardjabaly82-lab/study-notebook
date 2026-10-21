@@ -2,6 +2,9 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.20.13', date: '2026-10-21',
+    en: ['Hebrew words inside formulas, like (מספר העצים) next to a sum, now read the right way round instead of backwards. Numbers and English letters in the same text stay as written. This also applies to practice cards, the formula sheet and printing.'],
+    he: ['מילים בעברית בתוך נוסחאות, כמו (מספר העצים) ליד סכום, נקראות עכשיו נכון ולא הפוך. מספרים ואותיות באנגלית באותו טקסט נשארים כמו שנכתבו. זה חל גם על כרטיסי תרגול, דף הנוסחאות וההדפסה.'] },
   { v: '1.20.12', date: '2026-10-20',
     en: ['Gemini: it uses the notebook reliably only in messages that mention it, so start the messages you want saved with @Study Notebook. The copied Gemini instructions now make Gemini ask you to resend with @Study Notebook, instead of writing the notes in the chat or sending you to a new chat.'],
     he: ['Gemini: הוא משתמש במחברת באופן אמין רק בהודעות שמזכירות אותה, ולכן מתחילים ב־‎@Study Notebook את ההודעות שרוצים לשמור. ההוראות המועתקות ל־Gemini גורמות לו עכשיו לבקש לשלוח שוב עם ‎@Study Notebook, במקום לכתוב את הסיכום בצ׳אט או לשלוח לצ׳אט חדש.'] },
