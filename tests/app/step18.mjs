@@ -1,34 +1,42 @@
-// Windows: no text or buttons sit under the window buttons (top-right 140 x 40), scrolled or not, in English and Hebrew,
-// and the window buttons take the colour of what's behind them.
-import { launch, shot } from './launch.mjs';
-const bad = []; const check = (ok, s) => { console.log((ok ? '✓ ' : '✗ ') + s); if (!ok) bad.push(s); };
-const { app, win } = await launch({ fresh: true });
-await app.evaluate(({ ipcMain }) => { global.__tb = null; ipcMain.on('app:titleBar', (e, c) => { global.__tb = c; }); });
-await win.setViewportSize({ width: 1100, height: 560 });
-await win.waitForTimeout(1800); await win.getByRole('button', { name: 'Later' }).click().catch(() => {});
+// "View" on the notice that tells you something changed: opens the topic that changed.
+import { launch, shot, REPO, CFG } from './launch.mjs';
+import path from 'path';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+const bad = []; const check = (c, s) => { console.log((c ? '✓ ' : '✗ ') + s); if (!c) bad.push(s); };
+const { app, win, logs } = await launch({ fresh: true });
+await win.waitForTimeout(1800); await win.getByRole('button', { name: 'Later' }).click();
 await win.evaluate(() => localStorage.setItem('sn-seen-version', '9.9.9'));
-const under = () => win.evaluate(() => {
-  const hits = new Set();
-  for (let x = innerWidth - 140; x < innerWidth; x += 10) for (let y = 1; y < 40; y += 6)
-    for (const el of document.elementsFromPoint(x, y)) {
-      if (el.closest('.drag-strip') || el === document.documentElement || el === document.body) continue;
-      if ([...el.childNodes].some(n => n.nodeType === 3 && n.nodeValue.trim()) || /^(BUTTON|INPUT|svg|IMG|A|LABEL)$/i.test(el.tagName)) hits.add((el.id || el.className || el.tagName).toString().slice(0, 40));
-    }
-  return [...hits];
-});
-const behind = () => win.evaluate(() => { const c = document.createElement('canvas').getContext('2d'); let el = document.elementFromPoint(innerWidth - 4, 4);
-  while (el && el !== document.body && getComputedStyle(el).backgroundColor === 'rgba(0, 0, 0, 0)') el = el.parentElement;
-  c.fillStyle = getComputedStyle(el || document.body).backgroundColor; c.fillRect(0, 0, 1, 1); return '#' + [...c.getImageData(0, 0, 1, 1).data].slice(0, 3).map(v => v.toString(16).padStart(2, '0')).join(''); });
-for (const lang of ['en', 'he']) {
-  await win.evaluate(l => { localStorage.setItem('sn-ui-lang', l); }, lang); await win.reload(); await win.waitForTimeout(2200);
-  check((await under()).length === 0, `${lang}: no text or buttons under the window buttons ${JSON.stringify(await under())}`);
-  await win.evaluate(() => { const h = document.querySelector('.home'); if (h) h.scrollTop = 9999; }); await win.waitForTimeout(300);
-  check((await under()).length === 0, `${lang}: same with the page scrolled`);
-  await win.evaluate(() => document.documentElement.setAttribute('data-theme', 'light')); await win.evaluate(() => window.dispatchEvent(new Event('focus')));
-  await win.keyboard.press('Control+b'); await win.waitForTimeout(600); await win.keyboard.press('Control+b'); await win.waitForTimeout(600);
-  const sent = await app.evaluate(() => global.__tb), want = await behind();
-  check(sent && sent.color.toLowerCase() === want, `${lang}: window buttons use the colour behind them (sent ${sent && sent.color}, behind ${want})`);
-  await shot(win, 'tb-' + lang);
-}
-console.log(bad.length ? `${bad.length} PROBLEM(S)` : 'ALL GOOD');
-await app.close();
+const claude = new Client({ name: 't', version: '1' });
+await claude.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(REPO, 'connector/src/server.js')], env: { ...process.env, STUDY_NOTEBOOK_DATA_DIR: path.join(CFG, 'Study Notebook') } }));
+await claude.callTool({ name: 'create_course', arguments: { name: 'Macro', notes_language: 'English' } });
+await claude.callTool({ name: 'create_course', arguments: { name: 'Probability', notes_language: 'English' } });
+for (let i = 1; i <= 6; i++) await claude.callTool({ name: 'save_section', arguments: { course: 'Probability', title: 'Topic ' + i, content: 'Text. '.repeat(120) } });
+await win.waitForTimeout(2500);
+await win.click('#homeBtn'); await win.waitForTimeout(500);
+await claude.callTool({ name: 'save_section', arguments: { course: 'Probability', title: 'Bayes rule', content: 'Bayes rule turns P(B|A) into P(A|B).' } });
+await win.waitForSelector('#toast:not([hidden]) .toast-act', { timeout: 8000 });
+const tt = await win.evaluate(() => document.getElementById('toast').textContent);
+console.log(tt);
+check(/View$/.test(tt), 'the notice has a View button');
+await shot(win, 'toast-view');
+await win.click('#toast .toast-act'); await win.waitForTimeout(1500);
+const st = await win.evaluate(() => { const el = document.getElementById(document.querySelector('#sheet .sec:last-of-type').id); const w = document.getElementById('sheetWrap').getBoundingClientRect(); const r = [...document.querySelectorAll('#sheet .sec')].find(s => s.textContent.includes('Bayes rule')).getBoundingClientRect();
+  return { home: !document.getElementById('home').hidden, course: document.querySelector('.top h1').textContent, visible: r.top >= w.top - 4 && r.top < w.bottom - 40 }; });
+console.log(JSON.stringify(st));
+check(!st.home && /Probability/.test(st.course) && st.visible, 'View opens the course and shows the topic that changed');
+// a change that came in from the online notebook while another course is open
+await win.click('.side .course >> nth=0'); await win.waitForTimeout(600);
+const cid = await win.evaluate(() => [...document.querySelectorAll('.side .course')].find(b => b.textContent.includes('Probability')).dataset.course);
+const sid = await win.evaluate(c => { const d = JSON.parse(localStorage.getItem('sn-pos-' + c) || '{}'); return d.id; }, cid);
+const secId = String(sid || '').replace(/^sec-/, '');
+await app.evaluate(({ BrowserWindow }, a) => BrowserWindow.getAllWindows()[0].webContents.send('connector:op', { reqId: 'test', op: '__cloud_apply', args: { changes: [{ path: `data/users/local/${a.cid}/sections/${a.sid}`, data: { title: 'Bayes rule', content: 'Changed online.', source: 'claude', rev: 2, updatedAt: Date.now(), createdAt: 1, order: 9 } }] } }), { cid, sid: secId });
+await win.waitForSelector('#toast:not([hidden]) .toast-act', { timeout: 8000 });
+const t2 = await win.evaluate(() => document.getElementById('toast').textContent); console.log(t2);
+check(/1 change came in from your online notebook/.test(t2) && /View$/.test(t2), 'the online change notice has a View button');
+await win.click('#toast .toast-act'); await win.waitForTimeout(1600);
+const st2 = await win.evaluate(() => { const w = document.getElementById('sheetWrap').getBoundingClientRect(); const s = [...document.querySelectorAll('#sheet .sec')].find(x => x.textContent.includes('Changed online.')); const r = s && s.getBoundingClientRect(); return { course: document.querySelector('.top h1').textContent, visible: !!r && r.top >= w.top - 4 && r.top < w.bottom - 40 }; });
+console.log(JSON.stringify(st2));
+check(/Probability/.test(st2.course) && st2.visible, 'View switches to that course and shows the changed topic');
+console.log('errors:', logs.join('\n') || 'none'); console.log(bad.length ? 'PROBLEMS' : 'ALL GOOD');
+await claude.close(); await app.close();

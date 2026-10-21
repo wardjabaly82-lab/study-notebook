@@ -1683,23 +1683,37 @@
 
   /* ---------- online notebook: use Study Notebook in any Claude chat ---------- */
   const DOC_RX = /^data\/users\/local\/[A-Za-z0-9_-]{1,64}(\/(sections|sources|lectures|cards)\/[A-Za-z0-9_-]{1,64})?$/;
+  // "View" on a change notice: open the course at the topic that changed (or its practice, for questions).
+  function openChange(cid, sid) {
+    if (!docs[coursePath(cid)]) return;
+    S.home = false; S.search = ''; S.prac = null; S.editing = S.confirmDel = null;
+    if (sid && docs[secPath(cid, sid)]) {
+      if (S.courseId !== cid) { store('sn-pos-' + cid, JSON.stringify({ id: 'sec-' + sid, off: 0 })); selectCourse(cid); setTimeout(() => flash(sid), 400); }
+      else { S.view = 'notes'; render(); requestAnimationFrame(() => goTo(sid)); }
+    } else { if (S.courseId !== cid) selectCourse(cid); showView('practice'); }
+  }
+  const viewAct = (cid, sid) => ({ label: t('View'), fn: () => openChange(cid, sid) });
   async function applyCloud(changes, from) {
     try {
       if (!Array.isArray(changes)) throw new Error('bad');
-      let notes = 0; const fresh = {};
+      let notes = 0, target = null; const fresh = {};
       for (const c of changes) {
         if (!c || !DOC_RX.test(c.path) || (c.data !== null && (typeof c.data !== 'object' || Array.isArray(c.data)))) continue;
         const isNew = c.data && !docs[c.path] && c.data.source === 'claude' && c.path.includes('/sections/');
         if (c.data === null) delete docs[c.path]; else docs[c.path] = c.path.includes('/sections/') && docs[c.path] && window.NotebookOps ? NotebookOps.keepMarks(c.data, docs[c.path]) : c.data;
         if (isNew) { const parts = c.path.split('/'); (fresh[parts[3]] = fresh[parts[3]] || []).push(parts[5]); }
         if (c.path.includes('/sections/') || c.path.includes('/cards/')) notes++;
+        // what "View" opens: the last topic that changed, else the course whose practice questions changed
+        const parts = c.path.split('/');
+        if (c.data && c.path.includes('/sections/')) target = { cid: parts[3], sid: parts[5] };
+        else if (c.data && c.path.includes('/cards/') && (!target || !target.sid)) target = { cid: parts[3], sid: '' };
       }
       for (const [cid, ids] of Object.entries(fresh)) autoPractice(cid, ids);
       dirty = true; await saveNow();
       if (!S.editing && !(S.view === 'practice' && S.prac)) render(); else { renderSide(); renderContents(); }
       if (notes) toast(from === 'claude'
         ? tn(notes, 'Claude saved 1 change to your notes', 'Claude saved {n} changes to your notes')
-        : tn(notes, '1 change came in from your online notebook', '{n} changes came in from your online notebook'));
+        : tn(notes, '1 change came in from your online notebook', '{n} changes came in from your online notebook'), target ? viewAct(target.cid, target.sid) : undefined);
       return { ok: true, result: { applied: changes.length } };
     } catch (e) { return { ok: false, error: 'Couldn’t apply the online changes.' }; }
   }
@@ -1859,19 +1873,19 @@
         const cid = writes[0].path.split('/')[3];
         if (op === 'create_course') { toast(t('Claude created the course “{name}”', { name: result.name })); if (!S.courseId) S.courseId = result.course_id; render(); }
         else if (op === 'save_practice') {
-          toast(tn(result.saved, 'Claude added 1 practice item to {course}', 'Claude added {n} practice items to {course}', { course: result.course }));
+          toast(tn(result.saved, 'Claude added 1 practice item to {course}', 'Claude added {n} practice items to {course}', { course: result.course }), viewAct(cid, ''));
           render();
         } else if (op === 'save_sections') {
           const added = result.saved.filter(x => x.action === 'added').map(x => x.section_id);
           const made = autoPractice(cid, added); if (made) save();
-          toast(tn(result.saved.length, 'Claude saved 1 topic in {course}', 'Claude saved {n} topics in {course}', { course: result.course }) + (made ? ' · ' + tn(made, '1 practice question made', '{n} practice questions made') : ''));
+          toast(tn(result.saved.length, 'Claude saved 1 topic in {course}', 'Claude saved {n} topics in {course}', { course: result.course }) + (made ? ' · ' + tn(made, '1 practice question made', '{n} practice questions made') : ''), result.saved[0] ? viewAct(cid, result.saved[0].section_id) : undefined);
           const busy = S.editing || (S.view === 'practice' && S.prac);
           if (cid !== S.courseId && !busy) { S.courseId = cid; store('sn-course', cid); S.search = ''; }
           if (S.view !== 'notes' && !busy && cid === S.courseId && S.view !== 'lecture') S.view = 'notes';
           render(); if (cid === S.courseId && S.view === 'notes' && result.saved[0]) flash(result.saved[0].section_id);
         } else if (op === 'save_section' || op === 'edit_part') {
           if (op === 'save_section' && result.action === 'added' && autoPractice(cid, [result.section_id])) save();
-          toast(result.action === 'updated' ? t('Claude updated “{title}” in {course}', { title: result.title, course: result.course }) : t('Claude saved “{title}” in {course}', { title: result.title, course: result.course }));
+          toast(result.action === 'updated' ? t('Claude updated “{title}” in {course}', { title: result.title, course: result.course }) : t('Claude saved “{title}” in {course}', { title: result.title, course: result.course }), viewAct(cid, result.section_id));
           const busy = S.editing || (S.view === 'practice' && S.prac);
           if (cid !== S.courseId && !busy) { S.courseId = cid; store('sn-course', cid); S.search = ''; }
           if (S.editing === result.section_id) S.editing = null;
