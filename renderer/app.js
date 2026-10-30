@@ -1804,6 +1804,7 @@
     openDlg('settings', `<div class="dlg-in">${head(t('Settings'))}
       <section class="group"><h3>${t('Your account')}</h3><div class="box" id="cloudBox"><p class="small">${t('Checking…')}</p></div></section>
       ${WEB ? '' : claudeSection()}
+      ${WEB ? '' : aiKeysSection()}
       ${!REC ? `<section class="group"><h3>${t('Lecture recording')}</h3><div class="box"><p class="small">${t('Recording lectures needs the Study Notebook app on a Windows computer. Transcripts you record there show up here too.')}</p></div></section>` : `<section class="group"><h3>${t('Lecture recording')}</h3><div class="box" id="speechBox"><p class="small">${t('Checking…')}</p></div></section>`}
       <section class="group"><h3>${t('Appearance')}</h3>
         <div class="seg" role="group" aria-label="${esc(t('Appearance'))}">${['system', 'light', 'dark'].map(th => `<button type="button" data-theme-pick="${th}" aria-pressed="${theme() === th}">${THEME_ICON[th]}${t(THEME_NAME[th])}</button>`).join('')}</div>
@@ -1823,7 +1824,7 @@
         <div class="path" dir="ltr">${esc(s.dataDir || '')}</div></div></section>
       <section class="group"><h3>${t('Updates')}</h3><div class="box" id="updBox"><p class="small">${esc(t('Version {v}.', { v: s.version || '' }))}</p></div><div class="row news-row"><button class="btn" type="button" data-act="whats-new">${t('What’s new')}</button></div></section></div>`}
       `, d => {
-      drawCloud(d); if (!WEB) { wireClaude(d); drawSpeech(d); drawUpdates(d); }
+      drawCloud(d); if (!WEB) { wireClaude(d); drawSpeech(d); drawUpdates(d); drawAiKeys(d); }
       const kl = d.querySelector('#keysLink'); if (kl) kl.onclick = () => openShortcuts();
       d.querySelectorAll('[data-theme-pick]').forEach(b => b.onclick = () => setTheme(b.dataset.themePick));
       d.querySelectorAll('[data-warmth-pick]').forEach(b => b.onclick = () => setWarmth(b.dataset.warmthPick));
@@ -1840,6 +1841,160 @@
       };
     });
   }
+  /* ================= Your AI keys and Ask AI (in the app) ================= */
+  // Each key stays on this computer (encrypted by the system). Requests go through the
+  // main process, which adds the key, so the page never holds it.
+  const AI_KEYS = {
+    anthropic: { name: 'Claude', hint: 'sk-ant-…', url: 'https://platform.claude.com/settings/keys', note: 'Pay per use, usually a few cents per question.', model: 'claude-opus-5-5' },
+    gemini: { name: 'Gemini', hint: 'AIza…', url: 'https://aistudio.google.com/app/apikey', note: 'Google’s free tier is enough for normal studying.', model: 'gemini-2.5-flash' }
+  };
+  const AI_KEY_ERRORS = {
+    bad_format: 'That doesn’t look like a key. Copy the whole key and paste it again.',
+    no_encryption: 'This computer can’t store keys safely, so the key wasn’t saved.'
+  };
+  const ASK_ERRORS = {
+    no_key: 'Add your key in Settings first.',
+    bad_key: 'That key was not accepted. Check it in Settings.',
+    rate_limited: 'Too many questions right now. Wait a minute and try again.',
+    no_credit: 'Your account has no credit left. Add credit with the company that gave you the key.',
+    offline: 'Can’t reach the AI. Check your internet connection.'
+  };
+  const LANG_RULE = { he: 'Reply in Hebrew.', ar: 'Reply in Arabic.', en: 'Reply in English.' };
+
+  function aiKeysSection() {
+    return `<section class="group"><h3>${t('Your AI keys')}</h3><div class="box">
+      <p class="small">${t('To ask AI about a passage in the app, add your own key. It stays on this computer. Each key is billed by its company, not by Study Notebook.')}</p>
+      ${Object.keys(AI_KEYS).map(id => `<div class="ai-key" data-ai="${id}">
+        <div class="ai-key-head"><b>${esc(AI_KEYS[id].name)}</b> <span class="small" data-ai-state></span></div>
+        <div class="row"><input type="password" autocomplete="off" spellcheck="false" dir="ltr" placeholder="${esc(AI_KEYS[id].hint)}" aria-label="${esc(t('Key for {name}', { name: AI_KEYS[id].name }))}" data-ai-input>
+          <button class="btn" type="button" data-ai-save>${t('Save key')}</button><button class="btn" type="button" data-ai-check>${t('Check key')}</button><button class="btn" type="button" data-ai-clear>${t('Remove')}</button></div>
+        <p class="small"><button type="button" class="sn-link" data-ai-link>${t('Create a key')}</button> · ${t(AI_KEYS[id].note)}</p>
+        <p class="status" data-ai-msg role="status"></p></div>`).join('')}
+    </div></section>`;
+  }
+
+  async function drawAiKeys(d) {
+    if (!D.aiStatus) return;
+    const st = await D.aiStatus();
+    d.querySelectorAll('.ai-key').forEach(row => {
+      const id = row.dataset.ai, info = (st.providers && st.providers[id]) || {};
+      const msg = row.querySelector('[data-ai-msg]');
+      row.querySelector('[data-ai-state]').textContent = info.saved ? t('Saved (ends in {last})', { last: info.last4 }) : t('Not set');
+      row.querySelector('[data-ai-clear]').disabled = !info.saved;
+      row.querySelector('[data-ai-link]').onclick = () => D.openExternal(AI_KEYS[id].url);
+      row.querySelector('[data-ai-save]').onclick = async () => {
+        const input = row.querySelector('[data-ai-input]'), key = input.value.trim();
+        if (!key) { msg.className = 'status bad'; msg.textContent = t('Paste your key first.'); return; }
+        const r = await D.aiSaveKey(id, key);
+        input.value = '';
+        if (!r.ok) { msg.className = 'status bad'; msg.textContent = t(AI_KEY_ERRORS[r.code] || 'Couldn’t save the key.'); return; }
+        toast(t('{name} key saved', { name: AI_KEYS[id].name }));
+        drawAiKeys(d);
+      };
+      // A one-word test call, so the student can see the key works before asking anything.
+      row.querySelector('[data-ai-check]').onclick = async () => {
+        msg.className = 'status'; msg.textContent = t('Checking…');
+        const body = id === 'gemini'
+          ? { contents: [{ role: 'user', parts: [{ text: 'Reply with the word OK.' }] }], generationConfig: { maxOutputTokens: 5 } }
+          : { max_tokens: 5, messages: [{ role: 'user', content: 'Reply with the word OK.' }] };
+        const r = await D.aiRequest(id, AI_KEYS[id].model, body);
+        if (r.ok) { msg.className = 'status ok'; msg.textContent = t('Your {name} key works.', { name: AI_KEYS[id].name }); }
+        else { msg.className = 'status bad'; msg.textContent = t(ASK_ERRORS[r.code] || 'The AI had a problem. Try again.'); }
+      };
+      row.querySelector('[data-ai-clear]').onclick = async () => {
+        if (!confirm(t('Remove the {name} key from this computer?', { name: AI_KEYS[id].name }))) return;
+        await D.aiClearKey(id);
+        drawAiKeys(d);
+      };
+    });
+  }
+
+  // Right-click a passage inside a section: offer Ask AI for that passage.
+  document.addEventListener('contextmenu', ev => {
+    if (!D.aiRequest || ev.target.closest('textarea, input')) return;
+    const sec = ev.target.closest('.sec[id^="sec-"]');
+    const sel = window.getSelection ? window.getSelection() : null;
+    const text = sel ? sel.toString().trim() : '';
+    if (!sec || text.length < 3 || !sel.anchorNode || !sec.contains(sel.anchorNode)) return;
+    ev.preventDefault();
+    showAskMenu(ev.clientX, ev.clientY, sec.id.slice(4), text);
+  });
+
+  function showAskMenu(x, y, sectionId, text) {
+    document.querySelectorAll('.ask-menu').forEach(m => m.remove());
+    const menu = document.createElement('div');
+    menu.className = 'ask-menu';
+    menu.style.left = Math.min(x, window.innerWidth - 240) + 'px';
+    menu.style.top = Math.min(y, window.innerHeight - 56) + 'px';
+    menu.innerHTML = `<button type="button" role="menuitem" data-ask-open>${esc(t('Ask AI about this'))}</button>`;
+    document.body.appendChild(menu);
+    const close = () => { menu.remove(); document.removeEventListener('pointerdown', outside, true); };
+    const outside = e => { if (!menu.contains(e.target)) close(); };
+    menu.querySelector('[data-ask-open]').onclick = () => { close(); openAsk(sectionId, text); };
+    setTimeout(() => document.addEventListener('pointerdown', outside, true), 0);
+  }
+
+  async function openAsk(sectionId, selection) {
+    const st = await D.aiStatus();
+    const provider = Object.keys(AI_KEYS).find(id => st.providers && st.providers[id] && st.providers[id].saved);
+    if (!provider) { toast(t(ASK_ERRORS.no_key)); openSettings(); return; }
+    openDlg('ask', `<div class="dlg-in">${head(t('Ask AI about this passage'))}
+      <blockquote class="ask-quote" dir="auto">${esc(selection)}</blockquote>
+      <label class="small" for="askQ">${t('What would you like to know?')}</label>
+      <textarea id="askQ" rows="3" dir="auto" placeholder="${esc(t('For example: I don’t understand this part.'))}"></textarea>
+      <div class="row"><button class="btn primary" type="button" data-ask-go>${t('Ask')}</button><button class="btn ghost" type="button" data-close>${t('Close')}</button></div>
+      <div class="ask-answer" aria-live="polite"></div>
+      <p class="status" data-ask-msg role="status"></p></div>`, d => {
+      d.querySelector('[data-ask-go]').onclick = () => askAi(d, provider, sectionId, selection, d.querySelector('#askQ').value.trim());
+    });
+  }
+
+  async function askAi(d, provider, sectionId, selection, question) {
+    const c = course(); if (!c) return;
+    const sec = docs[`${Ops.BASE}/${c.id}/sections/${sectionId}`];
+    const out = d.querySelector('.ask-answer'), msg = d.querySelector('[data-ask-msg]'), go = d.querySelector('[data-ask-go]');
+    if (!sec) { msg.className = 'status bad'; msg.textContent = t('That section is no longer here.'); return; }
+    go.disabled = true; msg.className = 'status'; msg.textContent = ''; out.innerHTML = `<p class="small">${t('Thinking…')}</p>`;
+    const titles = []; let cur = sec, guard = 0;
+    while (cur && guard++ < 50) { titles.unshift(cur.title); cur = cur.parentId ? docs[`${Ops.BASE}/${c.id}/sections/${cur.parentId}`] : null; }
+    try {
+      const r = await SNAgent.ask({
+        provider, model: AI_KEYS[provider].model, sectionId, sectionTitle: sec.title, sectionPath: titles.join(' › '),
+        sectionText: sec.content || '', selection, question: question || t('Explain this passage.'),
+        languageRule: LANG_RULE[c.lang] || 'Reply in the language the student wrote in.',
+        callApi: async (p, m, body) => {
+          const res = await D.aiRequest(p, m, body);
+          if (!res.ok) { const e = new Error(res.code); e.code = res.code; throw e; }
+          return res.data;
+        },
+        applyTool: (name, args) => applyAiTool(c.id, name, args)
+      });
+      out.innerHTML = '<div class="md"></div>';
+      const body = out.querySelector('.md'); body.innerHTML = mdToHtml(r.text || ''); decorate(body);
+      if (r.edits.length) { render(); flash(sectionId); toast(t('Changed the passage in “{title}”', { title: sec.title })); }
+      else msg.textContent = t('The AI did not change anything.');
+    } catch (e) {
+      out.innerHTML = '';
+      msg.className = 'status bad';
+      msg.textContent = t(ASK_ERRORS[e.code] || 'The AI had a problem. Try again.');
+    } finally { go.disabled = false; }
+  }
+
+  // The one place the AI can change a note: the same notebook operation the connector uses,
+  // saved the same way. The agent only ever passes the selected section here.
+  async function applyAiTool(cid, name, args) {
+    try {
+      const { result, writes } = Ops.run(docs, name, { ...args, course: cid });
+      if (writes.length) {
+        for (const w of writes) { if (w.data === null) delete docs[w.path]; else docs[w.path] = w.data; }
+        dirty = true; await saveNow();
+      }
+      return { result, isError: false };
+    } catch (e) {
+      return { result: (e && e.message) || t('That did not work.'), isError: true };
+    }
+  }
+
   async function openSettings() { S.settings = await D.getSettings(); claudeMsg = null; renderSettings(); }
 
   function openWelcome() {

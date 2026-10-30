@@ -1091,3 +1091,14 @@ button.h-conn:hover { color: var(--ink); }
 .fresh-sw { width: 14px; height: 9px; border-radius: 2px; background: color-mix(in srgb, #23a978 22%, transparent); box-shadow: inset 0 -2px 0 color-mix(in srgb, #23a978 70%, transparent); }
 :root[data-theme="dark"] .tag.fresh-tag { color: #7fdcb5; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tag.fresh-tag { color: #7fdcb5; } }
+
+/* Your AI keys (Settings) and Ask AI about a selected passage */
+.ai-key { padding: 10px 0; border-top: 1px solid var(--line); }
+.ai-key:first-of-type { border-top: 0; padding-top: 0; }
+.ai-key-head { margin-bottom: 6px; }
+.ai-key input { flex: 1; min-width: 0; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); font: inherit; }
+.ask-menu { position: fixed; z-index: 90; min-width: 200px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); box-shadow: 0 8px 28px rgba(20, 30, 60, .18); }
+.ask-menu button { display: block; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; background: none; text-align: start; font: inherit; color: var(--ink); cursor: pointer; }
+.ask-menu button:hover { background: var(--accent-soft); }
+.ask-quote { margin: 0 0 10px; padding: 8px 12px; border-inline-start: 3px solid var(--accent); background: var(--accent-soft); font-family: var(--f-notes); border-radius: 0 8px 8px 0; }
+.ask-answer { margin-top: 12px; max-height: 50vh; overflow: auto; }

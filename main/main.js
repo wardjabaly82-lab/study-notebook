@@ -426,6 +426,24 @@ ipcMain.handle('cloud:signin', async () => {
 ipcMain.handle('cloud:disconnect', async () => { if (cloud) await cloud.signOut(); const s = loadSettings(); delete s.cloud; saveSettings(s); cloud.configure(null); cloud.reset(); log.info('cloud.signedout'); return { ok: true }; });
 ipcMain.handle('cloud:sync', () => cloud ? cloud.sync() : { enabled: false });
 
+// The student's own AI keys (Claude and Gemini) for the in-app AI. The page only
+// ever sees whether a key is saved; requests go through aiKeys.forward, which adds the key here.
+const aiKeys = require('./ai-keys').create({ dataDir, safeStorage });
+const aiFail = e => ({ ok: false, code: (e && e.code) || 'error' });
+ipcMain.handle('ai:status', () => aiKeys.status());
+ipcMain.handle('ai:save', (ev, req) => {
+  try { return { ok: true, ...aiKeys.save(String(req && req.provider), String(req && req.key || '')) }; } catch (e) { return aiFail(e); }
+});
+ipcMain.handle('ai:clear', (ev, provider) => {
+  try { return { ok: true, ...aiKeys.clear(String(provider)) }; } catch (e) { return aiFail(e); }
+});
+ipcMain.handle('ai:request', async (ev, req) => {
+  try {
+    const data = await aiKeys.forward(String(req && req.provider), String(req && req.model), req && req.body);
+    return { ok: true, data };
+  } catch (e) { log.warn('ai.request.failed', { code: (e && e.code) || 'error' }); return aiFail(e); }
+});
+
 async function handleConnector(op, args) {
   if (op === 'ping') {
     // The Claude app just started the connector: it's connected.

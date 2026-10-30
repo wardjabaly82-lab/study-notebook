@@ -19,6 +19,12 @@ contextBridge.exposeInMainWorld('desktop', {
   openDataFolder: () => ipcRenderer.invoke('app:openDataFolder'),
   openExternal: url => ipcRenderer.send('app:openExternal', url),
 
+  // The student's own AI keys (Claude, Gemini). Keys go in, never come out.
+  aiStatus: () => ipcRenderer.invoke('ai:status'),
+  aiSaveKey: (provider, key) => ipcRenderer.invoke('ai:save', { provider, key }),
+  aiClearKey: provider => ipcRenderer.invoke('ai:clear', provider),
+  aiRequest: (provider, model, body) => ipcRenderer.invoke('ai:request', { provider, model, body }),
+
   printPreview: (payload, opts) => ipcRenderer.invoke('print:preview', { payload, opts }),
   printSavePdf: (payload, opts) => ipcRenderer.invoke('print:savePdf', { payload, opts }),
   printPaper: (payload, opts) => ipcRenderer.invoke('print:paper', { payload, opts }),

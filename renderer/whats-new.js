@@ -2,6 +2,9 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.21.0', date: '2026-10-30',
+    en: ['New: Ask AI. Select a passage in your notes, right-click it and choose “Ask AI about this”. The AI explains it and can rewrite just that passage. It needs your own key: in Settings → Your AI keys, paste a Claude or Gemini key, press Save key, then Check key. The key stays on this computer.'],
+    he: ['חדש: שאלו את ה-AI. בחרו קטע בסיכומים, לחצו עליו ימנית ובחרו ”שאלו את ה-AI על זה”. ה-AI יסביר ויכול לשכתב רק את הקטע הזה. צריך מפתח משלכם: בהגדרות ← המפתחות שלכם ל-AI, הדביקו מפתח של Claude או Gemini, לחצו ”שמירת מפתח”, ואז ”בדיקת מפתח”. המפתח נשאר במחשב הזה.'] },
   { v: '1.20.14', date: '2026-10-21',
     en: ['When something changes in your notes (Claude or Gemini saved, or a change came in from your online notebook), the message now has a View button that takes you straight to that topic.'],
     he: ['כשמשהו משתנה בסיכומים (Claude או Gemini שמרו, או ששינוי הגיע מהמחברת המקוונת), בהודעה יש עכשיו כפתור ”הצגה” שמוביל ישר לנושא הזה.'] },
