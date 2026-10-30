@@ -20,6 +20,7 @@ function redact(s) {
     .replace(/sk-ant-[A-Za-z0-9_\-]{8,}/g, 'sk-ant-[hidden]')
     .replace(/sk-[A-Za-z0-9_\-]{12,}/g, 'sk-[hidden]')
     .replace(/AIza[0-9A-Za-z_\-]{20,}/g, 'AIza[hidden]')
+    .replace(/AQ\.[A-Za-z0-9_.\-]{20,}/g, 'AQ.[hidden]')
     .replace(/(bearer\s+|x-api-key["':\s]+|x-goog-api-key["':\s]+|key=)[^\s"',&]+/gi, '$1[hidden]')
     .replace(/[\r\n]+/g, ' ')
     .slice(0, 500);
