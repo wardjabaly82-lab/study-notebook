@@ -2,6 +2,9 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.21.1', date: '2026-10-30',
+    en: ['Fixed: Gemini keys that start with “AQ.” are now accepted when you save them in Settings → Your AI keys, as well as keys that start with “AIza”.'],
+    he: ['תוקן: מפתחות Gemini שמתחילים ב-”AQ.” נשמרים עכשיו בהגדרות ← המפתחות שלכם ל-AI, כמו מפתחות שמתחילים ב-”AIza”.'] },
   { v: '1.21.0', date: '2026-10-30',
     en: ['New: Ask AI. Select a passage in your notes, right-click it and choose “Ask AI about this”. The AI explains it and can rewrite just that passage. It needs your own key: in Settings → Your AI keys, paste a Claude or Gemini key, press Save key, then Check key. The key stays on this computer.'],
     he: ['חדש: שאלו את ה-AI. בחרו קטע בסיכומים, לחצו עליו ימנית ובחרו ”שאלו את ה-AI על זה”. ה-AI יסביר ויכול לשכתב רק את הקטע הזה. צריך מפתח משלכם: בהגדרות ← המפתחות שלכם ל-AI, הדביקו מפתח של Claude או Gemini, לחצו ”שמירת מפתח”, ואז ”בדיקת מפתח”. המפתח נשאר במחשב הזה.'] },

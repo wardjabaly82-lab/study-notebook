@@ -16,8 +16,9 @@ const PROVIDERS = {
   },
   gemini: {
     label: 'Gemini',
-    keyPattern: /^AIza[A-Za-z0-9_-]{20,}$/,
-    keyHint: 'AIza…',
+    // Google issues two formats: the older "AIza…" keys and the newer "AQ.…" keys.
+    keyPattern: /^(AIza|AQ\.)[A-Za-z0-9_.\-]{20,}$/,
+    keyHint: 'AIza… or AQ.…',
     keyUrl: 'https://aistudio.google.com/app/apikey'
   }
 };

@@ -51,6 +51,14 @@ test('no key is saved when this computer cannot encrypt', () => {
   assert.equal(fs.existsSync(path.join(dir, 'ai-keys.json')), false);
 });
 
+test('Gemini keys in either Google format are accepted', () => {
+  const { keys } = setup();
+  const newer = 'AQ.' + 'c'.repeat(30) + 'ABCD';
+  assert.equal(keys.save('gemini', newer).providers.gemini.last4, 'ABCD');
+  assert.equal(keys.save('gemini', GEMINI).providers.gemini.last4, 'QRST');
+  assert.throws(() => keys.save('gemini', 'AQ.short'), err => err.code === 'bad_format');
+});
+
 test('a key with the wrong shape is refused', () => {
   const { keys } = setup();
   assert.throws(() => keys.save('anthropic', GEMINI), err => err.code === 'bad_format');
