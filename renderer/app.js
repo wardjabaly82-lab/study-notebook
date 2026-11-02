@@ -295,6 +295,9 @@
   addEventListener('online', () => { if (cloudState && cloudState.enabled) fixSync(); });   // back online: don't wait for the next sync
   // Which assistant saves to this notebook, so the app talks about the one the student actually uses.
   const AI = () => { const c = !!lastClaude(), g = !!(cloudState && cloudState.gemini); return c && g ? 'both' : c ? 'claude' : g ? 'gemini' : 'none'; };
+  // The one AI the student studies with: what they picked in Settings, else the one that's connected, else Claude.
+  const aiChoice = () => { const p = store('sn-ai-choice'); return p === 'claude' || p === 'gemini' ? p : AI() === 'gemini' ? 'gemini' : 'claude'; };
+  const AI_NAMES = { claude: 'Claude', gemini: 'Gemini' };
   function renderClaudePill() {
     const why = syncProblem();
     if (why) { $('claudePill').innerHTML = `<span class="dot warn"></span><span><b>${t('Notes aren’t syncing')}</b>${esc(why)}</span>`; return; }
@@ -1565,7 +1568,13 @@
       drawClaude(d);
     };
   }
-  function claudeSection() { return `<section class="group"><h3>${t('Claude app')}</h3><div class="box">${claudeBox()}</div></section>`; }
+  // Things most students never need: the older connector for the Claude desktop app, and AI keys
+  // for answers inside the app. Closed by default so Settings shows one way to connect.
+  function advancedSection() {
+    return `<section class="group"><details class="adv"><summary>${t('Advanced')}</summary>
+      <h4 class="cc-title">${t('Claude desktop app (older connection)')}</h4><div class="box">${claudeBox()}</div>
+      ${aiKeysSection()}</details></section>`;
+  }
   // What makes Gemini feel broken when nobody says it in advance (Google's rules, not ours).
   const geminiTips = () => `<ul class="small gem-tips">${['After connecting, it can take 1–2 minutes before Study Notebook shows up in Gemini.',
     'In every Gemini chat, type @ and pick Study Notebook from the list. Typing the name as plain text doesn’t connect it.',
@@ -1730,51 +1739,51 @@
   function paintCloud(box) {
     const s = cloudState || {};
     if (s.enabled && s.email) {
+      const pick = aiChoice();
       const when = s.syncing ? t('Syncing…') : s.lastSync ? t('Last synced {when}', { when: ago(s.lastSync) }) : t('Not synced yet');
       const who = s.name ? `${esc(s.name)}<span class="cs-sub">${esc(s.email)}</span>` : esc(s.email);
       const site = (s.mcp || '').replace(/\/mcp$/, '');
       box.innerHTML = `<div class="cs-state ${s.error ? '' : 'ok'}"><span class="cs-ico">${s.error ? '!' : '✓'}</span><div><b>${who}</b><p>${esc(s.error ? t(s.error) : WEB ? t('Your notes are saved online and sync with the app on your computer.') : when)}</p></div></div>
-        ${s.claude ? `<div class="cs-state ok claude-ok"><span class="cs-ico">✓</span><div><b>${t('Claude is connected')}</b><p>${esc(s.claudeLast ? t('Claude last used your notebook {when}.', { when: ago(s.claudeLast) }) : t('Claude hasn’t used it yet. Open a new chat in Claude and ask it to save something.'))}</p></div></div>
+        <h4 class="cc-title">${t('Which AI do you study with?')}</h4>
+        <div class="seg ai-pick" role="group" aria-label="${esc(t('Which AI do you study with?'))}">${['claude', 'gemini'].map(id => `<button type="button" data-ai-pick="${id}" aria-pressed="${pick === id}">${AI_NAMES[id]}${s[id] ? ' ✓' : ''}</button>`).join('')}</div>
+        ${pick === 'claude' ? (s.claude ? `<div class="cs-state ok claude-ok"><span class="cs-ico">✓</span><div><b>${t('Claude is connected')}</b><p>${esc(s.claudeLast ? t('Claude last used your notebook {when}.', { when: ago(s.claudeLast) }) : t('Claude hasn’t used it yet. Open a new chat in Claude and ask it to save something.'))}</p></div></div>
             <p class="small">${t('In any chat (web, phone or desktop) Claude saves to this notebook. If a chat doesn’t find it: start a new chat, and check that Study Notebook is switched on in the chat’s connectors (the + or tools menu under the message box).')}</p>
             <div class="row"><code class="path" dir="ltr">${esc(s.mcp || '')}</code><button class="btn" type="button" id="cloudCopy">${t('Copy address')}</button></div>`
-          : `<h4 class="cc-title">${t('Connect Claude (once, about a minute)')}</h4>
+          : `<p class="small">${t('Works with a free Claude account. Takes about a minute, once.')}</p>
             <ol class="cc-steps">
               <li><span class="n">1</span><div><b>${t('Copy this address')}</b><div class="row"><code class="path" dir="ltr">${esc(s.mcp || '')}</code><button class="btn" type="button" id="cloudCopy">${t('Copy address')}</button></div></div></li>
               <li><span class="n">2</span><div><b>${t('Add it in Claude')}</b><p>${t('In Claude open Customize → Connectors, click “Add custom connector”, name it Study Notebook, paste the address and click Add.')}</p><button class="btn" type="button" id="cloudOpenClaude">${t('Open Claude’s connectors')}</button></div></li>
               <li><span class="n">3</span><div><b>${t('Click Connect')}</b><p>${t('Next to Study Notebook, click Connect. Choose your Google account ({email}), then click the blue Connect button on the Study Notebook page that opens.', { email: s.email })}</p></div></li>
             </ol>
-            <p class="cc-wait" role="status"><span class="spin" aria-hidden="true"></span>${t('Waiting for Claude… this turns green by itself when it’s connected.')}</p>`}
-        ${s.gemini ? `<div class="cs-state ok gemini-ok"><span class="cs-ico">✓</span><div><b>${t('Gemini is connected')}</b><p>${esc(s.geminiLast ? t('Gemini last used your notebook {when}.', { when: ago(s.geminiLast) }) : t('Gemini hasn’t used it yet. In a Gemini chat, type @ and pick Study Notebook.'))}</p><details class="cs-more"><summary>${t('Tips for Gemini')}</summary>${geminiTips()}</details></div></div>`
-          : `<details class="cs-more gemini-more"><summary>${t('Use Gemini too')}</summary>
-            <p class="small">${t('Gemini can use the same notebook, next to Claude: both save to the same notes. Google offers this only in the US for now (18+, personal Google account, English).')}</p>
+            <p class="cc-wait" role="status"><span class="spin" aria-hidden="true"></span>${t('Waiting for Claude… this turns green by itself when it’s connected.')}</p>`)
+        : (s.gemini ? `<div class="cs-state ok gemini-ok"><span class="cs-ico">✓</span><div><b>${t('Gemini is connected')}</b><p>${esc(s.geminiLast ? t('Gemini last used your notebook {when}.', { when: ago(s.geminiLast) }) : t('Gemini hasn’t used it yet. In a Gemini chat, type @ and pick Study Notebook.'))}</p><details class="cs-more"><summary>${t('Tips for Gemini')}</summary>${geminiTips()}</details></div></div>`
+          : `<p class="small">${t('Google offers this only in the US for now (18+, personal Google account, English).')}${WEB ? '' : ' ' + t('Somewhere else? Add a free Gemini key under Advanced below instead.')}</p>
             <ol class="cc-steps">
-              <li><span class="n">1</span><div><b>${t('Copy the same address')}</b><div class="row"><button class="btn" type="button" id="gemCopy">${t('Copy address')}</button></div></div></li>
+              <li><span class="n">1</span><div><b>${t('Copy this address')}</b><div class="row"><code class="path" dir="ltr">${esc(s.mcp || '')}</code><button class="btn" type="button" id="gemCopy">${t('Copy address')}</button></div></div></li>
               <li><span class="n">2</span><div><b>${t('Add it in Gemini')}</b><p>${t('On gemini.google.com open Settings → Connected Apps, click “Add a custom app”, paste the address and click Next.')}</p><button class="btn" type="button" id="gemOpen">${t('Open Gemini')}</button></div></li>
               <li><span class="n">3</span><div><b>${t('Sign in and connect')}</b><p>${t('Choose your Google account ({email}), then click the blue Connect button on the Study Notebook page. In a chat, type @ and pick Study Notebook.', { email: s.email })}</p></div></li>
               <li><span class="n">4</span><div><b>${t('Using it')}</b>${geminiTips()}</div></li>
-            </ol></details>`}
+            </ol>
+            <p class="cc-wait" role="status"><span class="spin" aria-hidden="true"></span>${t('Waiting for Gemini… this turns green by itself when it’s connected.')}</p>`)}
         <div class="row">${WEB ? '' : `<button class="btn" type="button" id="cloudNow">${t('Sync now')}</button><button class="btn" type="button" id="cloudWeb">${t('Open on the web')}</button>`}<button class="btn" type="button" id="cloudAcct">${t('Your account')}</button><button class="btn ghost" type="button" id="cloudOff">${t('Sign out')}</button></div>`;
-      box.querySelector('#cloudCopy').onclick = () => copy(s.mcp, t('Address copied. Paste it in Claude’s connector settings.'));
+      box.querySelectorAll('[data-ai-pick]').forEach(b => b.onclick = () => { store('sn-ai-choice', b.dataset.aiPick); paintCloud(box); renderClaudePill(); });
+      const cc = box.querySelector('#cloudCopy'); if (cc) cc.onclick = () => copy(s.mcp, t('Address copied. Paste it in Claude’s connector settings.'));
       const gc = box.querySelector('#gemCopy'); if (gc) gc.onclick = () => copy(s.mcp, t('Address copied. Paste it in Gemini’s Connected Apps.'));
       const go = box.querySelector('#gemOpen'); if (go) go.onclick = () => { copy(s.mcp, t('Address copied. Paste it in Gemini’s Connected Apps.')); D.openExternal('https://gemini.google.com/'); };
       const oc = box.querySelector('#cloudOpenClaude'); if (oc) oc.onclick = () => { copy(s.mcp, t('Address copied. Paste it in Claude’s connector settings.')); D.openExternal('https://claude.ai/customize/connectors'); };
-      // While Claude isn't connected yet (or Gemini's steps are open), check every few seconds so the
-      // box turns green by itself.
+      // While the chosen AI isn't connected yet, check every few seconds so the box turns green by itself.
       clearTimeout(box._poll);
-      const gemOpen = () => { const g = box.querySelector('details.gemini-more'); return !!(g && g.open); };
       const tick = async () => {
         if (!box.isConnected) return;
-        const was = !!(cloudState && cloudState.claude), wasG = !!(cloudState && cloudState.gemini), keepOpen = gemOpen();
+        const was = !!(cloudState && cloudState.claude), wasG = !!(cloudState && cloudState.gemini);
         cloudState = await D.cloudStatus();
         if (!box.isConnected || box.dataset.busy) return;
         paintCloud(box);
-        const g = box.querySelector('details.gemini-more'); if (g && keepOpen) { g.open = true; schedule(); }
         if (!was && cloudState.claude) { toast(t('Claude is connected')); renderClaudePill(); }
-        if (!wasG && cloudState.gemini) toast(t('Gemini is connected'));
+        if (!wasG && cloudState.gemini) { toast(t('Gemini is connected')); renderClaudePill(); }
       };
       const schedule = () => { clearTimeout(box._poll); box._poll = setTimeout(tick, 4000); };
-      if (!s.claude) schedule();
-      const gd = box.querySelector('details.gemini-more'); if (gd) gd.addEventListener('toggle', () => { if (gd.open) schedule(); });
+      if (!s[pick]) schedule();
       if (box.querySelector('#cloudNow')) box.querySelector('#cloudNow').onclick = () => D.cloudSync();
       if (box.querySelector('#cloudWeb')) box.querySelector('#cloudWeb').onclick = () => D.openExternal(site + '/app/');
       box.querySelector('#cloudAcct').onclick = () => D.openExternal(site + '/account');
@@ -1803,8 +1812,6 @@
     const s = S.settings || {};
     openDlg('settings', `<div class="dlg-in">${head(t('Settings'))}
       <section class="group"><h3>${t('Your account')}</h3><div class="box" id="cloudBox"><p class="small">${t('Checking…')}</p></div></section>
-      ${WEB ? '' : claudeSection()}
-      ${WEB ? '' : aiKeysSection()}
       ${!REC ? `<section class="group"><h3>${t('Lecture recording')}</h3><div class="box"><p class="small">${t('Recording lectures needs the Study Notebook app on a Windows computer. Transcripts you record there show up here too.')}</p></div></section>` : `<section class="group"><h3>${t('Lecture recording')}</h3><div class="box" id="speechBox"><p class="small">${t('Checking…')}</p></div></section>`}
       <section class="group"><h3>${t('Appearance')}</h3>
         <div class="seg" role="group" aria-label="${esc(t('Appearance'))}">${['system', 'light', 'dark'].map(th => `<button type="button" data-theme-pick="${th}" aria-pressed="${theme() === th}">${THEME_ICON[th]}${t(THEME_NAME[th])}</button>`).join('')}</div>
@@ -1822,6 +1829,7 @@
         <section class="group"><h3>${t('Updates')}</h3><div class="box"><p class="small">${t('The website always has the newest version.')}</p><div class="row"><button class="btn" type="button" data-act="whats-new">${t('What’s new')}</button></div></div></section></div>` : `<p class="small">${s.lastBackup ? esc(t('Notes save automatically on this computer, and a backup copy is kept each day (the last 14); the latest is from {date}. To move your notes to another laptop, back them up to a file and restore it there.', { date: new Date(s.lastBackup + 'T12:00').toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' }) })) : t('Notes save automatically on this computer, and a backup copy is kept each day (the last 14). To move your notes to another laptop, back them up to a file and restore it there.')}</p>
         <div class="row"><button class="btn" type="button" id="backup">${t('Back up all notes')}</button><button class="btn" type="button" id="restore">${t('Restore from a backup')}</button><button class="btn ghost" type="button" id="folder">${t('Open notes folder')}</button></div>
         <div class="path" dir="ltr">${esc(s.dataDir || '')}</div></div></section>
+      ${WEB ? '' : advancedSection()}
       <section class="group"><h3>${t('Updates')}</h3><div class="box" id="updBox"><p class="small">${esc(t('Version {v}.', { v: s.version || '' }))}</p></div><div class="row news-row"><button class="btn" type="button" data-act="whats-new">${t('What’s new')}</button></div></section></div>`}
       `, d => {
       drawCloud(d); if (!WEB) { wireClaude(d); drawSpeech(d); drawUpdates(d); drawAiKeys(d); }
@@ -1868,15 +1876,15 @@
   const LANG_RULE = { he: 'Reply in Hebrew.', ar: 'Reply in Arabic.', en: 'Reply in English.' };
 
   function aiKeysSection() {
-    return `<section class="group"><h3>${t('Your AI keys')}</h3><div class="box">
-      <p class="small">${t('To ask AI about a passage in the app, add your own key. It stays on this computer. Each key is billed by its company, not by Study Notebook.')}</p>
+    return `<h4 class="cc-title">${t('Answers inside the app (your own AI key)')}</h4><div class="box">
+      <p class="small">${t('Not needed: Ask AI normally opens your Claude or Gemini chat. Add a key only if you want answers right here in the app. It stays on this computer. A Gemini key is free; a Claude key is billed by Anthropic.')}</p>
       ${Object.keys(AI_KEYS).map(id => `<div class="ai-key" data-ai="${id}">
         <div class="ai-key-head"><b>${esc(AI_KEYS[id].name)}</b> <span class="small" data-ai-state></span></div>
         <div class="row"><input type="password" autocomplete="off" spellcheck="false" dir="ltr" placeholder="${esc(AI_KEYS[id].hint)}" aria-label="${esc(t('Key for {name}', { name: AI_KEYS[id].name }))}" data-ai-input>
           <button class="btn" type="button" data-ai-save>${t('Save key')}</button><button class="btn" type="button" data-ai-check>${t('Check key')}</button><button class="btn" type="button" data-ai-clear>${t('Remove')}</button></div>
         <p class="small"><button type="button" class="sn-link" data-ai-link>${t('Create a key')}</button> · ${t(AI_KEYS[id].note)}</p>
         <p class="status" data-ai-msg role="status"></p></div>`).join('')}
-    </div></section>`;
+    </div>`;
   }
 
   async function drawAiKeys(d) {
@@ -1917,7 +1925,7 @@
 
   // Right-click a passage inside a section: offer Ask AI for that passage.
   document.addEventListener('contextmenu', ev => {
-    if (!D.aiRequest || ev.target.closest('textarea, input')) return;
+    if (ev.target.closest('textarea, input')) return;
     const sec = ev.target.closest('.sec[id^="sec-"]');
     const sel = window.getSelection ? window.getSelection() : null;
     const text = sel ? sel.toString().trim() : '';
@@ -1940,27 +1948,48 @@
     setTimeout(() => document.addEventListener('pointerdown', outside, true), 0);
   }
 
+  // Ask AI goes to the chat the student already uses (no key, no extra cost). The chat is connected
+  // to the notebook, so it can also improve the passage. A saved key adds "Answer here" in the app.
   async function openAsk(sectionId, selection) {
-    const st = await D.aiStatus();
+    const who = aiChoice();
+    const st = D.aiStatus ? await D.aiStatus() : {};
     const saved = Object.keys(AI_KEYS).filter(id => st.providers && st.providers[id] && st.providers[id].saved);
-    if (!saved.length) { toast(t(ASK_ERRORS.no_key)); openSettings(); return; }
-    // With both keys saved, the student picks which AI answers; the choice is remembered.
-    const last = store('sn-ai-provider');
-    const pick = saved.includes(last) ? last : saved[0];
-    const chooser = saved.length > 1
-      ? `<label class="small">${t('Ask with')} <select id="askWho">${saved.map(id => `<option value="${id}"${id === pick ? ' selected' : ''}>${esc(AI_KEYS[id].name)}</option>`).join('')}</select></label>`
-      : '';
+    const own = who === 'claude' ? 'anthropic' : 'gemini';
+    const keyAi = saved.includes(own) ? own : saved[0];
     openDlg('ask', `<div class="dlg-in">${head(t('Ask AI about this passage'))}
       <blockquote class="ask-quote" dir="auto">${esc(selection)}</blockquote>
       <label class="small" for="askQ">${t('What would you like to know?')}</label>
       <textarea id="askQ" rows="3" dir="auto" placeholder="${esc(t('For example: I don’t understand this part.'))}"></textarea>
-      <div class="row"><button class="btn primary" type="button" data-ask-go>${t('Ask')}</button>${chooser}<button class="btn ghost" type="button" data-close>${t('Close')}</button></div>
+      <div class="row"><button class="btn primary" type="button" data-ask-chat>${esc(t('Ask in {name}', { name: AI_NAMES[who] }))}</button>${keyAi ? `<button class="btn" type="button" data-ask-go>${t('Answer here')}</button>` : ''}<button class="btn ghost" type="button" data-close>${t('Close')}</button></div>
+      <p class="small">${esc(t('Opens {name} with your question ready to paste. {name} can also improve this passage in your notes.', { name: AI_NAMES[who] }))}</p>
       <div class="ask-answer" aria-live="polite"></div>
       <p class="status" data-ask-msg role="status"></p></div>`, d => {
-      const who = d.querySelector('#askWho');
-      if (who) who.onchange = () => store('sn-ai-provider', who.value);
-      d.querySelector('[data-ask-go]').onclick = () => askAi(d, who ? who.value : pick, sectionId, selection, d.querySelector('#askQ').value.trim());
+      const q = () => d.querySelector('#askQ').value.trim();
+      d.querySelector('[data-ask-chat]').onclick = () => askInChat(d, who, sectionId, selection, q());
+      const go = d.querySelector('[data-ask-go]'); if (go) go.onclick = () => askAi(d, keyAi, sectionId, selection, q());
     });
+  }
+
+  // The message for the chat: where the passage is (so the AI can find and edit it), the passage, the question.
+  function chatPrompt(c, sec, selection, question) {
+    return [
+      t('About my Study Notebook notes: course “{course}”, topic “{title}” (section id {id}).', { course: c.name, title: sec.title, id: sec.id }),
+      selection.split('\n').map(l => '> ' + l).join('\n'),
+      question || t('Explain this passage.'),
+      t('Explain it clearly. If my notes explain this passage badly, improve just that passage in Study Notebook with edit_part.')
+    ].join('\n\n');
+  }
+  async function askInChat(d, who, sectionId, selection, question) {
+    const c = course(); if (!c) return;
+    const sec = docs[`${Ops.BASE}/${c.id}/sections/${sectionId}`];
+    const msg = d.querySelector('[data-ask-msg]');
+    if (!sec) { msg.className = 'status bad'; msg.textContent = t('That section is no longer here.'); return; }
+    const done = who === 'gemini'
+      ? t('Question copied. In Gemini, type @, pick Study Notebook, then paste.')
+      : t('Question copied. Paste it in the new Claude chat.');
+    await copy(chatPrompt(c, { ...sec, id: sectionId }, selection, question), done);
+    msg.className = 'status'; msg.textContent = done;
+    D.openExternal(who === 'gemini' ? 'https://gemini.google.com/app' : 'https://claude.ai/new');
   }
 
   async function askAi(d, provider, sectionId, selection, question) {

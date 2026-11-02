@@ -1,6 +1,6 @@
 // Ask AI end to end, against a local stand-in for Google and Anthropic (SN_AI_TEST_BASE).
 // Gemini's model is retired (404) and the app must find the new one by itself; the answer
-// changes the passage; with both keys saved the student picks who answers.
+// changes the passage; "Answer here" follows the AI the student picked.
 import http from 'http';
 import path from 'path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -46,7 +46,8 @@ await openCourse(win); await win.waitForTimeout(1500);
 
 // 1. Save both keys; Check key on Gemini works even though its model was retired
 await win.locator('#settingsBtn').click(); await win.waitForTimeout(800);
-const save = async (id, key) => { const c = win.locator(`.ai-key[data-ai="${id}"]`); await c.locator('[data-ai-input]').fill(key); await c.locator('[data-ai-save]').click(); await win.waitForTimeout(700); };
+await win.locator('details.adv > summary').click(); await win.waitForTimeout(300);
+const save =async (id, key) => { const c = win.locator(`.ai-key[data-ai="${id}"]`); await c.locator('[data-ai-input]').fill(key); await c.locator('[data-ai-save]').click(); await win.waitForTimeout(700); };
 await save('anthropic', 'sk-ant-api03-' + 'a'.repeat(30) + 'WXYZ');
 await save('gemini', 'AIza' + 'b'.repeat(30) + 'QRST');
 const gem = win.locator('.ai-key[data-ai="gemini"]');
@@ -68,10 +69,11 @@ const askOn = async () => {
   await win.locator('.ask-menu [data-ask-open]').click(); await win.waitForTimeout(700);
 };
 
-// 2. Both keys saved: the dialog offers a choice. Ask Gemini; it changes the passage.
+// 2. A student who studies with Gemini and saved a key: "Answer here" uses Gemini and changes the passage.
+await win.evaluate(() => localStorage.setItem('sn-ai-choice', 'gemini'));
 await askOn();
-check(await win.locator('#askWho').count() === 1, 'with two keys, the dialog lets the student pick who answers');
-await win.locator('#askWho').selectOption('gemini');
+check((await win.locator('[data-ask-chat]').textContent()).trim() === 'Ask in Gemini', 'the window offers the AI the student picked (Gemini)');
+check(await win.locator('[data-ask-go]').count() === 1, 'with a key saved, “Answer here” is offered too');
 await win.locator('#askQ').fill('Why?');
 await win.locator('[data-ask-go]').click(); await win.waitForTimeout(2500);
 check(/Gemini: I rewrote the sentence/.test(await win.locator('.ask-answer').textContent()), 'Gemini’s answer is shown');
@@ -81,13 +83,13 @@ const text = await win.locator('.sec').first().textContent();
 check(/independent rows/.test(text) && !/counts the non-zero rows/.test(text), 'the passage in the note was changed');
 check(/Updated by Gemini/.test(text), 'the note says Gemini made the change');
 
-// 3. The choice is remembered; switching to Claude answers with Claude
+// 3. A student who studies with Claude: "Answer here" uses the Claude key
+await win.evaluate(() => localStorage.setItem('sn-ai-choice', 'claude'));
 await win.evaluate(() => { const p = document.querySelector('.sec p'); const r = document.createRange(); r.selectNodeContents(p); const s = getSelection(); s.removeAllRanges(); s.addRange(r); const b = p.getBoundingClientRect(); p.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: b.left + 10, clientY: b.top + 10 })); });
 await win.waitForTimeout(300); await win.locator('.ask-menu [data-ask-open]').click(); await win.waitForTimeout(700);
-check(await win.locator('#askWho').inputValue() === 'gemini', 'the last choice (Gemini) is remembered');
-await win.locator('#askWho').selectOption('anthropic');
+check((await win.locator('[data-ask-chat]').textContent()).trim() === 'Ask in Claude', 'the window follows the choice (Claude)');
 await win.locator('[data-ask-go]').click(); await win.waitForTimeout(2000);
-check(/Claude: rank explained/.test(await win.locator('.ask-answer').textContent()), 'switching to Claude answers with Claude');
+check(/Claude: rank explained/.test(await win.locator('.ask-answer').textContent()), '“Answer here” answers with Claude');
 await shot(win, '25-ask-claude');
 
 console.log('errors:', logs.join('\n') || 'none');

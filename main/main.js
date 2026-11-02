@@ -564,7 +564,7 @@ ipcMain.handle('update:install', () => { if (updates) updates.install(); });
 ipcMain.handle('app:openDataFolder', () => shell.openPath(dataDir()));
 
 ipcMain.on('app:openExternal', (ev, url) => {
-  try { const u = new URL(String(url)); if (u.protocol === 'https:') shell.openExternal(u.toString()); } catch (e) {}
+  try { const u = new URL(String(url)); if (u.protocol === 'https:') openInBrowser(u.toString()); } catch (e) {}
 });
 
 /* ---------- window ---------- */

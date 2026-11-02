@@ -2,6 +2,13 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.22.0', date: '2026-11-02',
+    en: ['Simpler AI setup. Settings now asks one question, “Which AI do you study with?”, and shows only the steps for Claude or for Gemini. A free Claude account is enough.',
+      'Ask AI no longer needs a key. Right-click a passage, choose “Ask AI about this”, and press “Ask in Claude” (or Gemini): your chat opens with the question ready to paste, and it can improve that passage in your notes. Ask AI now works on the website too.',
+      'AI keys and the older Claude desktop connection moved to Settings → Advanced. If you saved a key, “Answer here” still answers inside the app.'],
+    he: ['הגדרת ה-AI פשוטה יותר. בהגדרות יש עכשיו שאלה אחת, ”עם איזה AI אתם לומדים?”, ומוצגים רק הצעדים של Claude או של Gemini. מספיק חשבון Claude חינמי.',
+      'שאלה ל-AI כבר לא צריכה מפתח. לחצו ימנית על קטע, בחרו ”שאלו את ה-AI על זה” ולחצו ”לשאול ב-Claude” (או Gemini): הצ׳אט נפתח עם השאלה מוכנה להדבקה, והוא יכול לשפר את הקטע בסיכומים. זה עובד עכשיו גם באתר.',
+      'מפתחות ה-AI והחיבור הישן לאפליקציית Claude למחשב עברו להגדרות ← מתקדם. אם שמרתם מפתח, ”תשובה כאן” עדיין עונה בתוך האפליקציה.'] },
   { v: '1.21.5', date: '2026-11-02',
     en: ['Ask AI is more reliable. When Google or Anthropic retires an AI model, the app now switches to the newest one by itself instead of failing.',
       'If you saved both a Claude and a Gemini key, you can choose which one answers in the Ask AI window. The app remembers your choice.',
