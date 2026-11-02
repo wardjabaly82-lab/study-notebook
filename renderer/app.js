@@ -1857,8 +1857,14 @@
     bad_key: 'That key was not accepted. Check it in Settings.',
     rate_limited: 'Too many questions right now. Wait a minute and try again.',
     no_credit: 'Your account has no credit left. Add credit with the company that gave you the key.',
-    offline: 'Can’t reach the AI. Check your internet connection.'
+    offline: 'Can’t reach the AI. Check your internet connection.',
+    empty: 'The AI sent no answer. Try again, or ask the question differently.'
   };
+  // The plain message, then the company's own words when there are any, so a problem can be fixed.
+  function aiProblem(code, detail) {
+    const plain = t(ASK_ERRORS[code] || 'The AI had a problem. Try again.');
+    return detail && code !== 'no_key' ? `${plain} (${String(detail).slice(0, 220)})` : plain;
+  }
   const LANG_RULE = { he: 'Reply in Hebrew.', ar: 'Reply in Arabic.', en: 'Reply in English.' };
 
   function aiKeysSection() {
@@ -1899,7 +1905,7 @@
           : { max_tokens: 5, messages: [{ role: 'user', content: 'Reply with the word OK.' }] };
         const r = await D.aiRequest(id, AI_KEYS[id].model, body);
         if (r.ok) { msg.className = 'status ok'; msg.textContent = t('Your {name} key works.', { name: AI_KEYS[id].name }); }
-        else { msg.className = 'status bad'; msg.textContent = t(ASK_ERRORS[r.code] || 'The AI had a problem. Try again.'); }
+        else { msg.className = 'status bad'; msg.textContent = aiProblem(r.code, r.detail); }
       };
       row.querySelector('[data-ai-clear]').onclick = async () => {
         if (!confirm(t('Remove the {name} key from this computer?', { name: AI_KEYS[id].name }))) return;
@@ -1936,16 +1942,24 @@
 
   async function openAsk(sectionId, selection) {
     const st = await D.aiStatus();
-    const provider = Object.keys(AI_KEYS).find(id => st.providers && st.providers[id] && st.providers[id].saved);
-    if (!provider) { toast(t(ASK_ERRORS.no_key)); openSettings(); return; }
+    const saved = Object.keys(AI_KEYS).filter(id => st.providers && st.providers[id] && st.providers[id].saved);
+    if (!saved.length) { toast(t(ASK_ERRORS.no_key)); openSettings(); return; }
+    // With both keys saved, the student picks which AI answers; the choice is remembered.
+    const last = store('sn-ai-provider');
+    const pick = saved.includes(last) ? last : saved[0];
+    const chooser = saved.length > 1
+      ? `<label class="small">${t('Ask with')} <select id="askWho">${saved.map(id => `<option value="${id}"${id === pick ? ' selected' : ''}>${esc(AI_KEYS[id].name)}</option>`).join('')}</select></label>`
+      : '';
     openDlg('ask', `<div class="dlg-in">${head(t('Ask AI about this passage'))}
       <blockquote class="ask-quote" dir="auto">${esc(selection)}</blockquote>
       <label class="small" for="askQ">${t('What would you like to know?')}</label>
       <textarea id="askQ" rows="3" dir="auto" placeholder="${esc(t('For example: I don’t understand this part.'))}"></textarea>
-      <div class="row"><button class="btn primary" type="button" data-ask-go>${t('Ask')}</button><button class="btn ghost" type="button" data-close>${t('Close')}</button></div>
+      <div class="row"><button class="btn primary" type="button" data-ask-go>${t('Ask')}</button>${chooser}<button class="btn ghost" type="button" data-close>${t('Close')}</button></div>
       <div class="ask-answer" aria-live="polite"></div>
       <p class="status" data-ask-msg role="status"></p></div>`, d => {
-      d.querySelector('[data-ask-go]').onclick = () => askAi(d, provider, sectionId, selection, d.querySelector('#askQ').value.trim());
+      const who = d.querySelector('#askWho');
+      if (who) who.onchange = () => store('sn-ai-provider', who.value);
+      d.querySelector('[data-ask-go]').onclick = () => askAi(d, who ? who.value : pick, sectionId, selection, d.querySelector('#askQ').value.trim());
     });
   }
 
@@ -1967,26 +1981,29 @@
           if (!res.ok) { const e = new Error(res.code); e.code = res.code; e.detail = res.detail || ''; throw e; }
           return res.data;
         },
-        applyTool: (name, args) => applyAiTool(c.id, name, args)
+        applyTool: (name, args) => applyAiTool(c.id, name, args, provider)
       });
       out.innerHTML = '<div class="md"></div>';
       const body = out.querySelector('.md'); body.innerHTML = mdToHtml(r.text || ''); decorate(body);
+      const notes = [];
       if (r.edits.length) { render(); flash(sectionId); toast(t('Changed the passage in “{title}”', { title: sec.title })); }
-      else msg.textContent = t('The AI did not change anything.');
+      else notes.push(t('The AI did not change anything.'));
+      if (r.truncated) notes.push(t('The answer was cut short. Ask a narrower question for the rest.'));
+      msg.textContent = notes.join(' ');
     } catch (e) {
       out.innerHTML = '';
       msg.className = 'status bad';
-      msg.textContent = e.code === 'api_error' && e.detail
-        ? t('The AI had a problem: {detail}', { detail: e.detail.slice(0, 220) })
-        : t(ASK_ERRORS[e.code] || 'The AI had a problem. Try again.');
+      msg.textContent = aiProblem(e.code, e.code === 'empty' ? e.message : e.detail);
     } finally { go.disabled = false; }
   }
 
   // The one place the AI can change a note: the same notebook operation the connector uses,
   // saved the same way. The agent only ever passes the selected section here.
-  async function applyAiTool(cid, name, args) {
+  async function applyAiTool(cid, name, args, provider) {
     try {
       const { result, writes } = Ops.run(docs, name, { ...args, course: cid });
+      // Label the change with the AI that made it, as the online server does ("Updated by Gemini").
+      for (const w of writes) if (w.data && w.data.source === 'claude' && provider === 'gemini') w.data.by = 'gemini';
       if (writes.length) {
         for (const w of writes) { if (w.data === null) delete docs[w.path]; else docs[w.path] = w.data; }
         dirty = true; await saveNow();

@@ -428,7 +428,11 @@ ipcMain.handle('cloud:sync', () => cloud ? cloud.sync() : { enabled: false });
 
 // The student's own AI keys (Claude and Gemini) for the in-app AI. The page only
 // ever sees whether a key is saved; requests go through aiKeys.forward, which adds the key here.
-const aiKeys = require('./ai-keys').create({ dataDir, safeStorage });
+const aiKeys = require('./ai-keys').create({
+  dataDir, safeStorage,
+  baseUrls: !app.isPackaged && process.env.SN_AI_TEST_BASE ? { anthropic: process.env.SN_AI_TEST_BASE, gemini: process.env.SN_AI_TEST_BASE } : null,
+  onModelChange: (provider, from, to) => log.info('ai.model.changed', { provider, from, to })
+});
 const aiFail = e => ({ ok: false, code: (e && e.code) || 'error' });
 ipcMain.handle('ai:status', () => aiKeys.status());
 ipcMain.handle('ai:save', (ev, req) => {

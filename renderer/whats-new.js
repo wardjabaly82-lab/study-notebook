@@ -2,6 +2,13 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.21.5', date: '2026-11-02',
+    en: ['Ask AI is more reliable. When Google or Anthropic retires an AI model, the app now switches to the newest one by itself instead of failing.',
+      'If you saved both a Claude and a Gemini key, you can choose which one answers in the Ask AI window. The app remembers your choice.',
+      'When something goes wrong, the message now includes the AI company’s own explanation. Long answers no longer come back empty or cut off without a warning.'],
+    he: ['השאלות ל-AI עובדות בצורה אמינה יותר. כש-Google או Anthropic מפסיקות מודל AI, האפליקציה עוברת לבד למודל החדש ביותר במקום להיכשל.',
+      'אם שמרתם גם מפתח של Claude וגם של Gemini, אפשר לבחור בחלון השאלה מי יענה. האפליקציה זוכרת את הבחירה.',
+      'כשמשהו משתבש, ההודעה כוללת עכשיו את ההסבר של חברת ה-AI עצמה. תשובות ארוכות כבר לא חוזרות ריקות או קטועות בלי אזהרה.'] },
   { v: '1.21.1', date: '2026-10-30',
     en: ['Fixed: Gemini keys that start with “AQ.” are now accepted when you save them in Settings → Your AI keys, as well as keys that start with “AIza”.'],
     he: ['תוקן: מפתחות Gemini שמתחילים ב-”AQ.” נשמרים עכשיו בהגדרות ← המפתחות שלכם ל-AI, כמו מפתחות שמתחילים ב-”AIza”.'] },

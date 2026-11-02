@@ -142,3 +142,69 @@ test('a network failure is reported as offline', async () => {
   keys.save('anthropic', CLAUDE);
   await assert.rejects(keys.forward('anthropic', 'claude-opus-5-5', {}), err => err.code === 'offline');
 });
+
+// A stand-in for the company: the old model is retired (404), the model list offers others.
+function retiring({ provider, gone, list, message }) {
+  const calls = [];
+  const fetchFn = async (url, init) => {
+    calls.push({ url, method: init.method, body: init.body ? JSON.parse(init.body) : null });
+    const reply = (status, obj) => ({ ok: status < 300, status, text: async () => JSON.stringify(obj) });
+    if (init.method === 'GET') return reply(200, list);
+    const used = provider === 'anthropic' ? JSON.parse(init.body).model : decodeURIComponent(url.split('/models/')[1].split(':')[0]);
+    if (used === gone) return reply(404, { error: { code: 404, message: message || `model: ${gone} not found` } });
+    return reply(200, { used });
+  };
+  return { fetchFn, calls };
+}
+
+test('Gemini: a retired model is replaced by the one Google names, and the choice is remembered', async () => {
+  const { fetchFn, calls } = retiring({
+    provider: 'gemini', gone: 'gemini-3.8-flash',
+    message: 'This model models/gemini-3.8-flash is no longer available to new users. Please update your code to use models/gemini-4.0-flash for the latest features.',
+    list: { models: [
+      { name: 'models/gemini-4.0-pro', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-4.0-flash', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/text-embedding-9', supportedGenerationMethods: ['embedContent'] }
+    ] }
+  });
+  const { keys, dir } = setup({ fetchFn });
+  keys.save('gemini', GEMINI);
+  assert.deepEqual(await keys.forward('gemini', 'gemini-3.8-flash', { contents: [] }), { used: 'gemini-4.0-flash' });
+  calls.length = 0;
+  assert.deepEqual(await keys.forward('gemini', 'gemini-3.8-flash', { contents: [] }), { used: 'gemini-4.0-flash' });
+  assert.equal(calls.length, 1, 'the next question goes straight to the new model');
+  assert.ok(!fs.readFileSync(path.join(dir, 'ai-keys.json'), 'utf8').includes(GEMINI));
+});
+
+test('Gemini: with no model named, the newest stable flash model is picked', async () => {
+  const { fetchFn } = retiring({
+    provider: 'gemini', gone: 'gemini-3.8-flash', message: 'models/gemini-3.8-flash is not found for API version v1beta',
+    list: { models: [
+      { name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-4.1-flash-preview-11', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-4.0-flash-lite', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-4.0-flash', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-4.0-pro', supportedGenerationMethods: ['generateContent'] }
+    ] }
+  });
+  const { keys } = setup({ fetchFn });
+  keys.save('gemini', GEMINI);
+  assert.deepEqual(await keys.forward('gemini', 'gemini-3.8-flash', { contents: [] }), { used: 'gemini-4.0-flash' });
+});
+
+test('Claude: a retired model is replaced by the newest of the same family', async () => {
+  const { fetchFn } = retiring({
+    provider: 'anthropic', gone: 'claude-opus-5-5',
+    list: { data: [{ id: 'claude-sonnet-6-0' }, { id: 'claude-opus-6-0' }, { id: 'claude-opus-5-5' }] }
+  });
+  const { keys } = setup({ fetchFn });
+  keys.save('anthropic', CLAUDE);
+  assert.deepEqual(await keys.forward('anthropic', 'claude-opus-5-5', { messages: [] }), { used: 'claude-opus-6-0' });
+});
+
+test('when no replacement is found, the company’s own message is passed on', async () => {
+  const { fetchFn } = retiring({ provider: 'gemini', gone: 'gemini-3.8-flash', list: { models: [] } });
+  const { keys } = setup({ fetchFn });
+  keys.save('gemini', GEMINI);
+  await assert.rejects(keys.forward('gemini', 'gemini-3.8-flash', {}), err => err.code === 'api_error' && /not found/.test(err.message));
+});

@@ -99,12 +99,49 @@ test('a thrown tool error is contained and reported, not raised', async () => {
   assert.match(s.bodies[1].messages.at(-1).content[0].content, /disk full/);
 });
 
-test('the loop stops at the round limit', async () => {
+test('the loop stops at the round limit, and the last round must answer without tools', async () => {
+  const tools = Array.from({ length: SNAgent.MAX_ROUNDS - 1 }, (_, i) => claudeTool('read_section', { section_id: 'sec1' }, 't' + i));
+  const s = scripted('anthropic', [...tools, claudeText('Here is the answer.')]);
+  const out = await SNAgent.ask({ ...base, provider: 'anthropic', callApi: s.callApi, applyTool: async () => ({ result: 'text' }) });
+  assert.equal(out.text, 'Here is the answer.');
+  assert.equal(s.bodies.length, SNAgent.MAX_ROUNDS);
+  assert.deepEqual(s.bodies[SNAgent.MAX_ROUNDS - 1].tool_choice, { type: 'none' });
+  assert.equal(s.bodies[0].tool_choice, undefined);
+});
+
+test('a model that still calls tools in the last round, with nothing to show, is an error', async () => {
   const endless = Array.from({ length: SNAgent.MAX_ROUNDS }, (_, i) => claudeTool('read_section', { section_id: 'sec1' }, 't' + i));
   const s = scripted('anthropic', endless);
-  const out = await SNAgent.ask({ ...base, provider: 'anthropic', callApi: s.callApi, applyTool: async () => ({ result: 'text' }) });
-  assert.equal(out.truncated, true);
-  assert.equal(s.bodies.length, SNAgent.MAX_ROUNDS);
+  await assert.rejects(SNAgent.ask({ ...base, provider: 'anthropic', callApi: s.callApi, applyTool: async () => ({ result: 'text' }) }), err => err.code === 'empty');
+});
+
+test('an empty reply is an error with the reason, not a blank answer', async () => {
+  const gem = scripted('gemini', [{ candidates: [{ content: { parts: [] }, finishReason: 'SAFETY' }] }]);
+  await assert.rejects(SNAgent.ask({ ...base, provider: 'gemini', callApi: gem.callApi, applyTool: async () => ({ result: '' }) }), err => err.code === 'empty' && /SAFETY/.test(err.message));
+  const blocked = scripted('gemini', [{ promptFeedback: { blockReason: 'OTHER' } }]);
+  await assert.rejects(SNAgent.ask({ ...base, provider: 'gemini', callApi: blocked.callApi, applyTool: async () => ({ result: '' }) }), err => err.code === 'empty' && /blocked/.test(err.message));
+  const cla = scripted('anthropic', [{ content: [], stop_reason: 'refusal' }]);
+  await assert.rejects(SNAgent.ask({ ...base, provider: 'anthropic', callApi: cla.callApi, applyTool: async () => ({ result: '' }) }), err => err.code === 'empty');
+});
+
+test('an answer cut off by the length limit is marked truncated', async () => {
+  const cla = scripted('anthropic', [{ content: [{ type: 'text', text: 'Half an ans' }], stop_reason: 'max_tokens' }]);
+  assert.equal((await SNAgent.ask({ ...base, provider: 'anthropic', callApi: cla.callApi, applyTool: async () => ({}) })).truncated, true);
+  const gem = scripted('gemini', [{ candidates: [{ content: { parts: [{ text: 'Half' }] }, finishReason: 'MAX_TOKENS' }] }]);
+  assert.equal((await SNAgent.ask({ ...base, provider: 'gemini', callApi: gem.callApi, applyTool: async () => ({}) })).truncated, true);
+});
+
+test('Gemini: thinking parts are not shown, and call ids are sent back with the results', async () => {
+  const s = scripted('gemini', [
+    { candidates: [{ content: { parts: [{ text: 'let me think', thought: true }, { functionCall: { id: 'fc-7', name: 'read_section', args: { section_id: 'sec1' } }, thoughtSignature: 'sig' }] } }] },
+    { candidates: [{ content: { parts: [{ text: 'hidden', thought: true }, { text: 'The answer.' }] }, finishReason: 'STOP' }] }
+  ]);
+  const out = await SNAgent.ask({ ...base, provider: 'gemini', callApi: s.callApi, applyTool: async () => ({ result: 'text', isError: false }) });
+  assert.equal(out.text, 'The answer.');
+  const sent = s.bodies[1].contents;
+  assert.equal(sent[1].parts[1].thoughtSignature, 'sig', 'the model turn goes back unchanged (Gemini needs its signature)');
+  assert.equal(sent[2].parts[0].functionResponse.id, 'fc-7');
+  assert.equal(s.bodies[0].generationConfig.maxOutputTokens, 8192);
 });
 
 test('the model call error is passed up (so the page can show the reason)', async () => {

@@ -15,7 +15,8 @@
   'use strict';
 
   const MAX_ROUNDS = 4;
-  const MAX_OUTPUT_TOKENS = 2000;
+  // Gemini counts its thinking in this limit too, so it gets more room or answers come back cut or empty.
+  const MAX_OUTPUT_TOKENS = { anthropic: 4000, gemini: 8192 };
 
   class AgentError extends Error {
     constructor(code, message) { super(message || code); this.code = code; }
@@ -51,21 +52,24 @@
   // Each provider adapter knows only its own message shapes.
   const ADAPTERS = {
     anthropic: {
-      body(model, system, messages) {
-        return {
+      body(model, system, messages, lastRound) {
+        const body = {
           model,
-          max_tokens: MAX_OUTPUT_TOKENS,
+          max_tokens: MAX_OUTPUT_TOKENS.anthropic,
           system,
           messages,
           tools: TOOLS.map(t => ({ name: t.name, description: t.description, input_schema: t.parameters }))
         };
+        if (lastRound) body.tool_choice = { type: 'none' };
+        return body;
       },
       userMessage(text) { return { role: 'user', content: text }; },
       read(json) {
         const blocks = Array.isArray(json.content) ? json.content : [];
         const calls = blocks.filter(b => b.type === 'tool_use').map(b => ({ id: b.id, name: b.name, args: b.input || {} }));
         const text = blocks.filter(b => b.type === 'text').map(b => b.text).join('');
-        return { text, calls };
+        const stop = json.stop_reason || '';
+        return { text, calls, cut: stop === 'max_tokens', why: stop === 'refusal' ? 'refused' : stop };
       },
       assistant(json) { return { role: 'assistant', content: json.content }; },
       results(calls, outcomes) {
@@ -81,21 +85,26 @@
       }
     },
     gemini: {
-      body(model, system, messages) {
-        return {
+      body(model, system, messages, lastRound) {
+        const body = {
           systemInstruction: { parts: [{ text: system }] },
           contents: messages,
           tools: [{ functionDeclarations: TOOLS }],
-          generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS }
+          generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS.gemini }
         };
+        if (lastRound) body.toolConfig = { functionCallingConfig: { mode: 'NONE' } };
+        return body;
       },
       userMessage(text) { return { role: 'user', parts: [{ text }] }; },
       read(json) {
         const cand = Array.isArray(json.candidates) ? json.candidates[0] : null;
         const parts = (cand && cand.content && Array.isArray(cand.content.parts)) ? cand.content.parts : [];
-        const text = parts.filter(p => typeof p.text === 'string').map(p => p.text).join('');
-        const calls = parts.filter(p => p.functionCall).map((p, i) => ({ id: 'g' + i, name: p.functionCall.name, args: p.functionCall.args || {} }));
-        return { text, calls };
+        // Parts marked thought are the model thinking to itself, not the answer.
+        const text = parts.filter(p => typeof p.text === 'string' && !p.thought).map(p => p.text).join('');
+        const calls = parts.filter(p => p.functionCall).map((p, i) => ({ id: p.functionCall.id || 'g' + i, googleId: p.functionCall.id, name: p.functionCall.name, args: p.functionCall.args || {} }));
+        const finish = (cand && cand.finishReason) || '';
+        const blocked = json.promptFeedback && json.promptFeedback.blockReason;
+        return { text, calls, cut: finish === 'MAX_TOKENS', why: blocked ? 'blocked: ' + blocked : finish };
       },
       assistant(json) {
         const cand = json.candidates[0];
@@ -106,7 +115,9 @@
           role: 'user',
           parts: calls.map((c, i) => {
             const o = outcomes[i];
-            return { functionResponse: { name: c.name, response: o.isError ? { error: o.result } : { result: o.result } } };
+            const fr = { name: c.name, response: o.isError ? { error: o.result } : { result: o.result } };
+            if (c.googleId) fr.id = c.googleId;
+            return { functionResponse: fr };
           })
         };
       }
@@ -158,18 +169,26 @@
       }
     };
 
-    let text = '';
+    // An answer with no words and no change would look like nothing happened, so it is an error the page explains.
+    const finish = (text, reply, truncated) => {
+      if (!text.trim() && !edits.length) throw new AgentError('empty', reply.why || 'no answer');
+      return { text: text.trim(), edits, truncated };
+    };
+
+    let text = '', reply = {};
     for (let round = 0; round < MAX_ROUNDS; round++) {
-      const json = await opts.callApi(opts.provider, opts.model, adapter.body(opts.model, system, messages));
-      const reply = adapter.read(json);
+      // The last round may not use tools, so the model always ends with an answer.
+      const lastRound = round === MAX_ROUNDS - 1;
+      const json = await opts.callApi(opts.provider, opts.model, adapter.body(opts.model, system, messages, lastRound));
+      reply = adapter.read(json || {});
       if (reply.text) text = reply.text;
-      if (!reply.calls.length) return { text: text.trim(), edits, truncated: false };
+      if (!reply.calls.length || lastRound) return finish(text, reply, !!reply.cut || (lastRound && reply.calls.length > 0));
       messages.push(adapter.assistant(json));
       const outcomes = [];
       for (const call of reply.calls) outcomes.push(await runOne(call));
       messages.push(adapter.results(reply.calls, outcomes));
     }
-    return { text: text.trim(), edits, truncated: true };
+    return finish(text, reply, true);
   }
 
   return { ask, TOOLS, AgentError, MAX_ROUNDS };
