@@ -1964,7 +1964,7 @@
         languageRule: LANG_RULE[c.lang] || 'Reply in the language the student wrote in.',
         callApi: async (p, m, body) => {
           const res = await D.aiRequest(p, m, body);
-          if (!res.ok) { const e = new Error(res.code); e.code = res.code; throw e; }
+          if (!res.ok) { const e = new Error(res.code); e.code = res.code; e.detail = res.detail || ''; throw e; }
           return res.data;
         },
         applyTool: (name, args) => applyAiTool(c.id, name, args)
@@ -1976,7 +1976,9 @@
     } catch (e) {
       out.innerHTML = '';
       msg.className = 'status bad';
-      msg.textContent = t(ASK_ERRORS[e.code] || 'The AI had a problem. Try again.');
+      msg.textContent = e.code === 'api_error' && e.detail
+        ? t('The AI had a problem: {detail}', { detail: e.detail.slice(0, 220) })
+        : t(ASK_ERRORS[e.code] || 'The AI had a problem. Try again.');
     } finally { go.disabled = false; }
   }
 

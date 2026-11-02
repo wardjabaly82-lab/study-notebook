@@ -14,6 +14,7 @@
     'Not set': 'לא הוגדר',
     'Save key': 'שמירת מפתח',
     'Check key': 'בדיקת מפתח',
+    'The AI had a problem: {detail}': 'ה-AI נתקל בבעיה: {detail}',
     'Your {name} key works.': 'המפתח של {name} עובד.',
     'Remove': 'הסרה',
     'Create a key': 'יצירת מפתח',

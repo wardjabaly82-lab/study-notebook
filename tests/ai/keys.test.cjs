@@ -129,6 +129,13 @@ test('API errors become plain codes the page can explain', async () => {
   }
 });
 
+test('Google’s "key not valid" answer is reported as a bad key, even with status 400', async () => {
+  const fetchFn = async () => ({ ok: false, status: 400, text: async () => JSON.stringify({ error: { message: 'API key not valid. Please pass a valid API key.', status: 'INVALID_ARGUMENT', details: [{ reason: 'API_KEY_INVALID' }] } }) });
+  const { keys } = setup({ fetchFn });
+  keys.save('gemini', GEMINI);
+  await assert.rejects(keys.forward('gemini', 'gemini-2.5-flash', {}), err => err.code === 'bad_key');
+});
+
 test('a network failure is reported as offline', async () => {
   const fetchFn = async () => { throw new Error('getaddrinfo ENOTFOUND'); };
   const { keys } = setup({ fetchFn });

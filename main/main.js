@@ -441,7 +441,12 @@ ipcMain.handle('ai:request', async (ev, req) => {
   try {
     const data = await aiKeys.forward(String(req && req.provider), String(req && req.model), req && req.body);
     return { ok: true, data };
-  } catch (e) { log.warn('ai.request.failed', { code: (e && e.code) || 'error' }); return aiFail(e); }
+  } catch (e) {
+    // The reason from the AI service (never the key): shown to the student and kept in the log.
+    const detail = log.redact(e && e.message).slice(0, 300);
+    log.warn('ai.request.failed', { code: (e && e.code) || 'error', detail });
+    return { ...aiFail(e), detail };
+  }
 });
 
 async function handleConnector(op, args) {

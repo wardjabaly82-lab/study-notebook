@@ -124,7 +124,10 @@ function create({ dataDir, safeStorage, fetchFn = globalThis.fetch }) {
     if (res.ok && data) return data;
 
     const message = JSON.stringify((data && data.error) || text).slice(0, 300);
-    if (res.status === 401 || res.status === 403) throw new KeyError('bad_key', message);
+    // Google answers a wrong key with 400 (API_KEY_INVALID) as well as 401/403.
+    if (res.status === 401 || res.status === 403 || /API key not valid|API_KEY_INVALID|ACCESS_TOKEN_TYPE_UNSUPPORTED/.test(message)) {
+      throw new KeyError('bad_key', message);
+    }
     if (res.status === 429) throw new KeyError('rate_limited', message);
     if (/credit|billing|quota/i.test(message)) throw new KeyError('no_credit', message);
     throw new KeyError('api_error', `${res.status} ${message}`);
