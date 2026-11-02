@@ -1846,7 +1846,7 @@
   // main process, which adds the key, so the page never holds it.
   const AI_KEYS = {
     anthropic: { name: 'Claude', hint: 'sk-ant-…', url: 'https://platform.claude.com/settings/keys', note: 'Pay per use, usually a few cents per question.', model: 'claude-opus-5-5' },
-    gemini: { name: 'Gemini', hint: 'AIza… or AQ.…', url: 'https://aistudio.google.com/app/apikey', note: 'Google’s free tier is enough for normal studying.', model: 'gemini-2.5-flash' }
+    gemini: { name: 'Gemini', hint: 'AIza… or AQ.…', url: 'https://aistudio.google.com/app/apikey', note: 'Google’s free tier is enough for normal studying.', model: 'gemini-3.8-flash' }
   };
   const AI_KEY_ERRORS = {
     bad_format: 'That doesn’t look like a key. Copy the whole key and paste it again.',

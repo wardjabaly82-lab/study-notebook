@@ -97,8 +97,8 @@ test('Claude requests carry the Claude key and go only to Anthropic', async () =
 test('Gemini requests carry the Gemini key and go only to Google', async () => {
   const { keys, sent } = setup();
   keys.save('gemini', GEMINI);
-  await keys.forward('gemini', 'gemini-2.5-flash', { contents: [] });
-  assert.equal(sent[0].url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent');
+  await keys.forward('gemini', 'gemini-3.8-flash', { contents: [] });
+  assert.equal(sent[0].url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent');
   assert.equal(sent[0].init.headers['x-goog-api-key'], GEMINI);
   assert.equal(sent[0].init.headers['x-api-key'], undefined);
 });
@@ -133,7 +133,7 @@ test('Google’s "key not valid" answer is reported as a bad key, even with stat
   const fetchFn = async () => ({ ok: false, status: 400, text: async () => JSON.stringify({ error: { message: 'API key not valid. Please pass a valid API key.', status: 'INVALID_ARGUMENT', details: [{ reason: 'API_KEY_INVALID' }] } }) });
   const { keys } = setup({ fetchFn });
   keys.save('gemini', GEMINI);
-  await assert.rejects(keys.forward('gemini', 'gemini-2.5-flash', {}), err => err.code === 'bad_key');
+  await assert.rejects(keys.forward('gemini', 'gemini-3.8-flash', {}), err => err.code === 'bad_key');
 });
 
 test('a network failure is reported as offline', async () => {
