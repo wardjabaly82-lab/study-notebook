@@ -2,6 +2,9 @@
    Settings → What's new), and used for the release notes on GitHub.
    Add an entry for every new version: plain words, what the student will notice. */
 window.SNWhatsNew = [
+  { v: '1.22.1', date: '2026-11-02',
+    en: ['Fixed: in Search all courses, one press of Escape now closes the window, even after you typed something. Before, the first press only cleared the text.'],
+    he: ['תוקן: בחיפוש בכל הקורסים, לחיצה אחת על Escape סוגרת עכשיו את החלון, גם אחרי שהקלדתם משהו. קודם הלחיצה הראשונה רק מחקה את הטקסט.'] },
   { v: '1.22.0', date: '2026-11-02',
     en: ['Simpler AI setup. Settings now asks one question, “Which AI do you study with?”, and shows only the steps for Claude or for Gemini. A free Claude account is enough.',
       'Ask AI no longer needs a key. Right-click a passage, choose “Ask AI about this”, and press “Ask in Claude” (or Gemini): your chat opens with the question ready to paste, and it can improve that passage in your notes. Ask AI now works on the website too.',

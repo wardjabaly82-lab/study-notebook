@@ -9,6 +9,7 @@ const check = (c, s) => (c ? ok(s) : fail(s));
 let { app, win, logs } = await launch({ fresh: true });
 await win.waitForTimeout(1800);
 await win.getByRole('button', { name: 'Later' }).click();
+await win.evaluate(() => localStorage.setItem('sn-seen-version', '9.9.9'));   // What's new stays out of the way after the restart
 const claude = new Client({ name: 't', version: '1' });
 await claude.connect(new StdioClientTransport({ command: process.execPath, args: [path.join(REPO, 'connector/src/server.js')], env: { ...process.env, STUDY_NOTEBOOK_DATA_DIR: path.join(CFG, 'Study Notebook') } }));
 const call = async (name, args) => { const r = await claude.callTool({ name, arguments: args }); const t = r.content.map(c => c.text).join('\n'); if (r.isError) throw new Error(t); return JSON.parse(t.slice(0, t.lastIndexOf('}') + 1)); };
@@ -62,8 +63,9 @@ await win.click('.mark-bar [data-c="pink"]'); await win.waitForTimeout(400);
 check(await win.evaluate(() => [...document.querySelectorAll('.note mark.uh-pink')].map(m => m.textContent).join('') === 'כמה צרכנים רוצים לקנות'), 'the phrase is highlighted in pink');
 
 // 3) The student draws: a pen stroke, a box and an arrow on the first paragraph
-await win.click(`[data-act="draw"][data-id="${idA}"]`); await win.waitForTimeout(300);
+await win.click('#drawBtn'); await win.waitForTimeout(300);   // Draw lives in the course toolbar and draws on the whole page
 check(await win.evaluate(() => !!document.querySelector('.draw-bar:not([hidden])') && !!document.querySelector('.ink-input')), 'Draw opens the drawing toolbar');
+await win.evaluate(() => document.querySelector('.note > p').scrollIntoView({ block: 'center' })); await win.waitForTimeout(300);   // not under the header or the drawing toolbar
 const p = await win.evaluate(() => { const r = document.querySelector('.note > p').getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
 const drag = async (pts) => { await win.mouse.move(pts[0][0], pts[0][1]); await win.mouse.down(); for (const q of pts.slice(1)) await win.mouse.move(q[0], q[1], { steps: 4 }); await win.mouse.up(); await win.waitForTimeout(250); };
 await win.click('.draw-bar [data-tool="pen"]'); await win.click('.draw-bar [data-color="red"]');
@@ -90,6 +92,7 @@ check(await win.evaluate(() => !!document.querySelector('.note mark.uh-pink') &&
 // 5) Restart: everything is still there; dark mode
 await claude.close(); await app.close();
 ({ app, win, logs: logs } = await launch());
+await win.waitForTimeout(1500); await openCourse(win);   // the app starts on the Home screen
 await win.waitForTimeout(3000);
 const after = await win.evaluate(() => ({ pink: document.querySelectorAll('.note mark.uh-pink').length, ink: document.querySelectorAll('.note svg.ink > *').length, plots: document.querySelectorAll('.note svg.plot').length, dia: document.querySelectorAll('.note .fig-dia[data-done] svg').length }));
 check(after.pink >= 1 && after.ink === 3 && after.plots === 3 && after.dia === 1, `after restarting the app: highlight, 3 drawings, 3 graphs, 1 diagram (${JSON.stringify(after)})`);

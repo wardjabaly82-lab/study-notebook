@@ -1468,6 +1468,8 @@
       const inp = d.querySelector('#saInput'), out = d.querySelector('#saResults');
       inp.focus();
       inp.oninput = () => { clearTimeout(inp._t); inp._t = setTimeout(() => runSearchAll(inp.value, out), 140); };
+      // A search box only clears its text on Escape; here one Escape closes the window, like every other window.
+      inp.onkeydown = e => { if (e.key === 'Escape') { e.preventDefault(); dlg.close(); } };
       out.onclick = e => {
         const r = e.target.closest('[data-hit]'); if (!r) return;
         const [kind, cid, id, at] = r.dataset.hit.split('|');

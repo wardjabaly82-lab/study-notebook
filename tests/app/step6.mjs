@@ -15,7 +15,7 @@ await win.mouse.move(5, 5);   // pointer away from the topic: buttons must still
 const vis = await win.evaluate(() => { const t = document.querySelector('.sec-tools'); return t ? getComputedStyle(t).opacity : 'none'; });
 check(vis === '1', `topic buttons visible without hovering (opacity ${vis})`);
 await shot(win, '50-buttons-visible');
-await win.click(`[data-act="draw"][data-id="${id}"]`); await win.waitForTimeout(400);
+await win.click('#drawBtn'); await win.waitForTimeout(400);   // Draw lives in the course toolbar and draws on the whole page
 const bar = await win.evaluate(() => { const b = document.querySelector('.draw-bar').getBoundingClientRect(), h = document.getElementById('top').getBoundingClientRect(); return { top: Math.round(b.top), headBottom: Math.round(h.bottom), colors: document.querySelectorAll('.draw-bar [data-color]').length, sizes: document.querySelectorAll('.draw-bar [data-size]').length, tools: document.querySelectorAll('.draw-bar [data-tool]').length }; });
 check(bar.top >= bar.headBottom && bar.top < bar.headBottom + 30, `toolbar at the top, under the course header (toolbar ${bar.top}px, header ends ${bar.headBottom}px)`);
 check(bar.tools === 7 && bar.colors === 8 && bar.sizes === 3, `all options shown: ${bar.tools} tools, ${bar.colors} colors, ${bar.sizes} sizes`);
@@ -25,6 +25,7 @@ check(er.colors === 8 && er.sizes === 3, 'with the eraser on, colors and sizes s
 await win.click('.draw-bar [data-color="orange"]'); await win.waitForTimeout(150);
 check(await win.evaluate(() => document.querySelector('.draw-bar [data-tool="pen"]').getAttribute('aria-pressed') === 'true'), 'picking a color while erasing goes back to the pen');
 await win.click('.draw-bar [data-tool="rect"]');
+await win.evaluate(() => document.querySelector('.note > p').scrollIntoView({ block: 'center' })); await win.waitForTimeout(300);   // not under the header or the drawing toolbar
 const p = await win.evaluate(() => { const r = document.querySelector('.note > p').getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
 await win.mouse.move(p.x + p.w * 0.3, p.y - 2); await win.mouse.down(); await win.mouse.move(p.x + p.w * 0.6, p.y + p.h + 30, { steps: 6 });
 const mid = await win.evaluate(() => { const el = document.querySelector('.ink-preview rect'); return el ? getComputedStyle(el).fill : 'no preview'; });
