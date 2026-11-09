@@ -25,7 +25,12 @@ export async function ensureSchema(env) {
     // When the student's Claude last used the notebook (shown in the app, so they can see it works).
     env.DB.prepare('CREATE TABLE IF NOT EXISTS claude_use (uid TEXT PRIMARY KEY, last INTEGER NOT NULL)'),
     // the same for each assistant (claude, gemini, ...)
-    env.DB.prepare('CREATE TABLE IF NOT EXISTS assistant_use (uid TEXT NOT NULL, app TEXT NOT NULL, last INTEGER NOT NULL, PRIMARY KEY (uid, app))')
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS assistant_use (uid TEXT NOT NULL, app TEXT NOT NULL, last INTEGER NOT NULL, PRIMARY KEY (uid, app))'),
+    // Deleted items, kept for 30 days so a delete can be undone (one batch = one delete)
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS trash (
+      uid TEXT NOT NULL, batch TEXT NOT NULL, path TEXT NOT NULL, data TEXT NOT NULL, deleted_at INTEGER NOT NULL,
+      PRIMARY KEY (uid, batch, path))`),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS trash_age ON trash(uid, deleted_at)')
   ]);
   ready = true;
 }
@@ -103,6 +108,7 @@ export async function deleteUser(env, uid) {
     env.DB.prepare('DELETE FROM sessions WHERE uid = ?1').bind(uid),
     env.DB.prepare('DELETE FROM claude_use WHERE uid = ?1').bind(uid),
     env.DB.prepare('DELETE FROM assistant_use WHERE uid = ?1').bind(uid),
+    env.DB.prepare('DELETE FROM trash WHERE uid = ?1').bind(uid),
     env.DB.prepare('DELETE FROM users WHERE id = ?1').bind(uid)
   ]);
 }
@@ -269,4 +275,51 @@ export async function legacyPasswordOk(env, given, stored) {
   const got = await pbkdf2(given, fromHex(stored.salt)), want = fromHex(stored.hash);
   let d = got.length ^ want.length; for (let i = 0; i < Math.min(got.length, want.length); i++) d |= got[i] ^ want[i];
   return d === 0;
+}
+
+/* ---------- deleting several sections at once, and undoing it ---------- */
+export const TRASH_DAYS = 30;
+const fail = (code, message, status = 400) => Object.assign(new Error(code), { code, message, status });
+export const BATCH_ID = /^[A-Za-z0-9_-]{6,48}$/;
+// Deletes the chosen sections of one course, their sub-sections and their practice questions, in one
+// database transaction: the items are copied to the trash and removed from the notes together, or not
+// at all. Refused when the course changed since the student looked (e.g. Claude is saving to it).
+export async function bulkDelete(env, uid, { course_id, section_ids, seen, batch }) {
+  await ensureSchema(env);
+  if (!BATCH_ID.test(String(batch || ''))) throw fail('bad_batch', 'Missing delete id.');
+  if (!Array.isArray(section_ids) || !section_ids.length || section_ids.length > 2000) throw fail('bad_request', 'Choose what to delete.');
+  const docs = await loadDocs(env, uid, { skipLarge: true });
+  if (!docs[`${Ops.BASE}/${course_id}`]) throw fail('no_course', 'That course doesn’t exist any more.', 404);
+  const set = Ops.deletionSet(docs, course_id, section_ids);
+  if (!set.items.length) throw fail('nothing', 'Those sections are already gone.', 404);
+  if (!Ops.sameAsSeen(set, seen)) throw fail('changed', 'This course just changed (maybe Claude or Gemini is saving to it). Nothing was deleted. Look again and try once more.', 409);
+  const now = Date.now(), P = JSON.stringify(set.paths);
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM trash WHERE uid = ?1 AND deleted_at < ?2').bind(uid, now - TRASH_DAYS * 86400000),
+    env.DB.prepare(`INSERT OR REPLACE INTO trash (uid, batch, path, data, deleted_at)
+      SELECT uid, ?2, path, data, ?3 FROM notes WHERE uid = ?1 AND data IS NOT NULL AND path IN (SELECT value FROM json_each(?4))`).bind(uid, batch, now, P),
+    env.DB.prepare(`INSERT INTO notes (uid, path, data, rev, mtime)
+      SELECT ?1, value, NULL, (SELECT COALESCE(MAX(rev), 0) FROM notes WHERE uid = ?1) + key + 1, ?2 FROM json_each(?3) WHERE true
+      ON CONFLICT(uid, path) DO UPDATE SET data = NULL, rev = excluded.rev, mtime = excluded.mtime`).bind(uid, now, P)
+  ]);
+  return { batch, rev: await currentRev(env, uid), paths: set.paths, items: set.items, sections: set.sections, practice: set.practice };
+}
+// Brings a delete back from the trash, in one transaction. Items made again since then aren't overwritten.
+export async function bulkRestore(env, uid, { batch }) {
+  await ensureSchema(env);
+  if (!BATCH_ID.test(String(batch || ''))) throw fail('bad_batch', 'Missing delete id.');
+  const { results } = await env.DB.prepare('SELECT path, LENGTH(data) AS n FROM trash WHERE uid = ?1 AND batch = ?2').bind(uid, batch).all();
+  if (!results.length) throw fail('gone', 'That delete can’t be undone any more.', 404);
+  const u = await usage(env, uid), adding = results.reduce((n, r) => n + r.n, 0);
+  if (u.bytes + adding > QUOTA_BYTES) throw fail('full', 'Your notebook is full (15 MB). Delete old recordings or courses to make room.', 413);
+  const now = Date.now(), P = JSON.stringify(results.map(r => r.path));
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO notes (uid, path, data, rev, mtime)
+      SELECT ?1, t.path, t.data, (SELECT COALESCE(MAX(rev), 0) FROM notes WHERE uid = ?1) + j.key + 1, ?3
+      FROM json_each(?4) j JOIN trash t ON t.uid = ?1 AND t.batch = ?2 AND t.path = j.value WHERE true
+      ON CONFLICT(uid, path) DO UPDATE SET data = excluded.data, rev = excluded.rev, mtime = excluded.mtime WHERE notes.data IS NULL`).bind(uid, batch, now, P),
+    env.DB.prepare('DELETE FROM trash WHERE uid = ?1 AND batch = ?2').bind(uid, batch)
+  ]);
+  const back = await env.DB.prepare('SELECT path, data FROM notes WHERE uid = ?1 AND data IS NOT NULL AND path IN (SELECT value FROM json_each(?2))').bind(uid, P).all();
+  return { rev: await currentRev(env, uid), changes: back.results.map(r => ({ path: r.path, data: JSON.parse(r.data) })) };
 }

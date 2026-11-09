@@ -374,5 +374,30 @@
     return out;
   }
 
-  return { run, OpError, OPS: Object.keys(OPS), BASE, keepMarks };
+  // Everything deleting these sections removes: the sections, all their sub-sections, and the practice
+  // questions on any of them. A section whose parent is also chosen is counted under its parent.
+  // seen = each section's updatedAt, so whoever deletes can check nothing changed in the meantime.
+  function deletionSet(docs, cid, ids) {
+    const secs = sections(docs || {}, cid);
+    const wanted = [...new Set(Array.isArray(ids) ? ids : [])].filter(id => typeof id === 'string' && secs[id]);
+    const chosen = new Set(wanted);
+    const underChosen = id => { let s = secs[id], g = 0; while (s && s.parentId && g++ < 60) { if (chosen.has(s.parentId)) return true; s = secs[s.parentId]; } return false; };
+    const all = new Set();
+    const take = id => { if (all.has(id)) return; all.add(id); for (const k of kids(secs, id)) take(k.id); };
+    const items = [];
+    for (const id of wanted.filter(x => !underChosen(x))) { const before = all.size; take(id); items.push({ id, title: secs[id].title, subs: all.size - before - 1 }); }
+    const paths = [...all].map(id => `${BASE}/${cid}/sections/${id}`);
+    let practice = 0;
+    for (const k of cards(docs || {}, cid)) if (k.topicId && all.has(k.topicId)) { paths.push(`${BASE}/${cid}/cards/${k.id}`); practice++; }
+    const seen = {}; for (const id of all) seen[id] = secs[id].updatedAt || 0;
+    return { items, paths, sections: all.size, practice, seen };
+  }
+  // True when `seen` (what the student looked at) still matches these docs: same sections, same versions.
+  function sameAsSeen(set, seen) {
+    if (!seen || typeof seen !== 'object') return false;
+    const a = Object.keys(set.seen), b = Object.keys(seen);
+    return a.length === b.length && a.every(id => Object.prototype.hasOwnProperty.call(seen, id) && Number(seen[id]) === set.seen[id]);
+  }
+
+  return { run, OpError, OPS: Object.keys(OPS), BASE, keepMarks, deletionSet, sameAsSeen };
 });

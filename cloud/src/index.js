@@ -64,6 +64,7 @@ async function api(request, env, url, user) {
     return json({ rev: changes.length ? changes[changes.length - 1].rev : await store.currentRev(env, user.id), more: changes.length === 5000, changes });
   }
   if (route === 'push' && request.method === 'POST') return push(request, env, user.id);
+  if ((route === 'bulk-delete' || route === 'bulk-restore') && request.method === 'POST') return bulk(request, env, user.id, route);
   if (route === 'export' && request.method === 'GET') {
     const docs = await store.loadDocs(env, user.id);
     const day = new Date().toISOString().slice(0, 10);
@@ -77,6 +78,13 @@ async function push(request, env, uid) {
   if (!incoming || incoming.length > 5000) return json({ error: 'bad_changes' }, 400);
   try { return json({ ok: true, ...(await store.applyPush(env, uid, incoming)) }); }
   catch (e) { if (e.code === 'full') return json({ error: 'full', message: 'Your notebook is full (15 MB). Delete old recordings or courses to make room.' }, 413); if (e.code) return json({ error: e.code, path: e.path }, 400); throw e; }
+}
+
+// Deleting several sections at once (one transaction), and undoing it. Used by the website and the app.
+async function bulk(request, env, uid, route) {
+  let body; try { body = await request.json(); } catch (e) { return json({ error: 'bad_json' }, 400); }
+  try { return json({ ok: true, ...(await (route === 'bulk-delete' ? store.bulkDelete(env, uid, body || {}) : store.bulkRestore(env, uid, body || {}))) }); }
+  catch (e) { if (e.code) return json({ error: e.code, message: e.message }, e.status || 400); throw e; }
 }
 
 /* ---------------- the desktop app's sync (signed in with a token) ---------------- */
@@ -97,6 +105,7 @@ async function sync(request, env, url) {
     return json({ rev: changes.length ? changes[changes.length - 1].rev : await store.currentRev(env, user.id), more: changes.length === 5000, changes });
   }
   if (route === 'push' && request.method === 'POST') return push(request, env, user.id);
+  if ((route === 'bulk-delete' || route === 'bulk-restore') && request.method === 'POST') return bulk(request, env, user.id, route);
   if (route === 'signout' && request.method === 'POST') { await store.endSession(env, token); return json({ ok: true }); }
   return json({ error: 'not_found' }, 404);
 }
